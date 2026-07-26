@@ -9,16 +9,21 @@ import { listChildToys, type ChildToy } from '@/repositories/toys-repository';
 
 type LoadedRecommendations = { toys: ChildToy[]; shown: number[] };
 
-async function loadRecommendations(category: PlayType, dismissed: readonly number[]): Promise<LoadedRecommendations> {
+export function childSuggestionLimit(choiceLimit: number, surprise: boolean): number {
+  return surprise ? 1 : safeChoiceLimit(choiceLimit);
+}
+
+async function loadRecommendations(category: PlayType, dismissed: readonly number[], surprise: boolean): Promise<LoadedRecommendations> {
   const database = await initializeDatabase();
   const [allToys, settings] = await Promise.all([listChildToys(database), getSettings(database)]);
-  const toys = recommendToys(allToys, { category, choiceLimit: safeChoiceLimit(settings.choiceLimit), dismissedIds: dismissed });
+  const toys = recommendToys(allToys, { category, choiceLimit: childSuggestionLimit(settings.choiceLimit, surprise), dismissedIds: dismissed });
   return { toys, shown: [...dismissed, ...toys.map((toy) => toy.id)] };
 }
 
 export default function ChildToySuggestionsRoute() {
-  const params = useLocalSearchParams<{ category?: string }>();
+  const params = useLocalSearchParams<{ category?: string; surprise?: string }>();
   const category = (params.category ?? 'anything') as PlayType;
+  const surprise = params.surprise === '1';
   const [toys, setToys] = useState<ChildToy[]>([]);
   const [shown, setShown] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,13 +31,13 @@ export default function ChildToySuggestionsRoute() {
 
   useEffect(() => {
     let mounted = true;
-    void loadRecommendations(category, []).then((result) => { if (mounted) { setToys(result.toys); setShown(result.shown); setLoading(false); } }).catch((caught: unknown) => { if (mounted) { setError(caught instanceof Error ? caught.message : 'Could not find toys.'); setLoading(false); } });
+    void loadRecommendations(category, [], surprise).then((result) => { if (mounted) { setToys(result.toys); setShown(result.shown); setLoading(false); } }).catch((caught: unknown) => { if (mounted) { setError(caught instanceof Error ? caught.message : 'Could not find toys.'); setLoading(false); } });
     return () => { mounted = false; };
-  }, [category]);
+  }, [category, surprise]);
 
   const different = async (): Promise<void> => {
     setLoading(true); setError(null);
-    try { const result = await loadRecommendations(category, shown); setToys(result.toys); setShown(result.shown); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not find toys.'); } finally { setLoading(false); }
+    try { const result = await loadRecommendations(category, shown, surprise); setToys(result.toys); setShown(result.shown); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not find toys.'); } finally { setLoading(false); }
   };
 
   if (loading) return <SafeAreaView style={styles.center}><ActivityIndicator /><Text>Finding toys…</Text></SafeAreaView>;
