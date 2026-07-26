@@ -1,8 +1,9 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ChildToy } from '@/repositories/toys-repository';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 export function ChildButton({ label, onPress, secondary = false, disabled = false }: { label: string; onPress(): void; secondary?: boolean; disabled?: boolean }) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button, secondary && styles.secondary, disabled && styles.disabled]}><Text style={[styles.buttonText, secondary && styles.secondaryText]}>{label}</Text></Pressable>;
+  return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, secondary && styles.secondary, disabled && styles.disabled, pressed && !disabled && styles.pressed]}><Text style={[styles.buttonText, secondary && styles.secondaryText]}>{label}</Text></Pressable>;
 }
 
 export function ToyImage({ uri }: { uri: string | null }) {
@@ -14,7 +15,7 @@ export function ToyCard({ toy, onPress }: { toy: ChildToy; onPress(): void }) {
 }
 
 const styles = StyleSheet.create({
-  button: { alignItems: 'center', backgroundColor: '#2166D1', borderRadius: 14, justifyContent: 'center', minHeight: 58, paddingHorizontal: 20, width: '100%' },
-  buttonText: { color: '#FFF', fontSize: 18, fontWeight: '700' }, secondary: { backgroundColor: '#EAF1FF', borderColor: '#2166D1', borderWidth: 1 }, secondaryText: { color: '#2166D1' }, disabled: { opacity: 0.45 },
-  card: { backgroundColor: '#F5F7FC', borderRadius: 18, gap: 10, padding: 14, width: '48%' }, image: { backgroundColor: '#E4E8F1', borderRadius: 14, height: 150, width: '100%' }, imageFallback: { alignItems: 'center', justifyContent: 'center' }, fallbackText: { color: '#5C6270' }, toyName: { color: '#1A1A1F', fontSize: 20, fontWeight: '700' }, location: { color: '#4B4B55', fontSize: 15, minHeight: 40 },
+  button: { alignItems: 'center', backgroundColor: theme.colors.primary, borderRadius: theme.radii.lg, justifyContent: 'center', minHeight: 60, paddingHorizontal: 20, width: '100%' },
+  buttonText: { color: '#FFF', fontSize: 18, fontWeight: '700' }, secondary: { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary, borderWidth: 1 }, secondaryText: { color: theme.colors.primary }, disabled: { opacity: 0.45 }, pressed: { opacity: 0.82 },
+  card: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, gap: 10, padding: 12, width: '48%' }, image: { backgroundColor: theme.colors.photoFallback, borderRadius: theme.radii.md, height: 150, width: '100%' }, imageFallback: { alignItems: 'center', justifyContent: 'center' }, fallbackText: { color: theme.colors.mutedText, fontWeight: '700' }, toyName: { color: theme.colors.text, fontSize: 20, fontWeight: '700' }, location: { color: theme.colors.mutedText, fontSize: 15, minHeight: 40 },
 });

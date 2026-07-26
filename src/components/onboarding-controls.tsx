@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { ChoiceLimit } from '@/domain/models';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 type PrimaryButtonProps = { label: string; onPress(): void; disabled?: boolean; accessibilityLabel?: string };
 export function PrimaryButton({ label, onPress, disabled = false, accessibilityLabel }: PrimaryButtonProps) {
@@ -20,11 +21,11 @@ export function ChoiceControls({ choiceLimit, onChoiceLimitChange, cleanupRequir
 }
 
 const styles = StyleSheet.create({
-  primaryButton: { alignItems: 'center', backgroundColor: '#2166D1', borderRadius: 12, minHeight: 52, justifyContent: 'center', paddingHorizontal: 20 },
+  primaryButton: { alignItems: 'center', backgroundColor: theme.colors.primary, borderRadius: theme.radii.lg, minHeight: 54, justifyContent: 'center', paddingHorizontal: 20 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
   disabled: { backgroundColor: '#A8B8D9' }, pressed: { opacity: 0.82 },
-  backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }, backButtonText: { color: '#2166D1', fontSize: 16, fontWeight: '600' },
-  field: { gap: 6 }, label: { color: '#24242A', fontSize: 16, fontWeight: '600' },
-  input: { borderColor: '#B8B8C2', borderRadius: 10, borderWidth: 1, color: '#1A1A1F', fontSize: 18, minHeight: 52, paddingHorizontal: 14 }, inputError: { borderColor: '#C62828' }, error: { color: '#C62828', minHeight: 18 },
-  choiceGroup: { gap: 12 }, optionRow: { flexDirection: 'row', gap: 10 }, option: { alignItems: 'center', borderColor: '#B8B8C2', borderRadius: 10, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 52 }, optionSelected: { borderColor: '#2166D1', backgroundColor: '#EAF1FF', borderWidth: 2 }, optionText: { color: '#24242A', fontSize: 16, fontWeight: '600' },
+  backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }, backButtonText: { color: theme.colors.primary, fontSize: 16, fontWeight: '600' },
+  field: { gap: 6 }, label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
+  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, color: theme.colors.text, fontSize: 18, minHeight: 52, paddingHorizontal: 14 }, inputError: { borderColor: theme.colors.danger }, error: { color: theme.colors.danger, minHeight: 18 },
+  choiceGroup: { gap: 12 }, optionRow: { flexDirection: 'row', gap: 10 }, option: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 52 }, optionSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft, borderWidth: 2 }, optionText: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
 });

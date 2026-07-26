@@ -1,0 +1,36 @@
+export const playmapTheme = {
+  colors: {
+    background: '#FBFAF7',
+    childBackground: '#F7FAF8',
+    surface: '#FFFFFF',
+    surfaceWarm: '#F3EFE6',
+    surfaceCool: '#EAF3F0',
+    text: '#25231F',
+    mutedText: '#5F625C',
+    primary: '#2F6F63',
+    primarySoft: '#DDEDE8',
+    accent: '#C7823B',
+    border: '#D8D2C7',
+    danger: '#B5433F',
+    success: '#2F6F45',
+    photoFallback: '#E7DED0',
+  },
+  radii: {
+    sm: 6,
+    md: 8,
+    lg: 10,
+  },
+  spacing: {
+    xs: 6,
+    sm: 10,
+    md: 14,
+    lg: 18,
+    xl: 24,
+  },
+  type: {
+    title: 32,
+    childTitle: 34,
+    body: 17,
+    button: 17,
+  },
+};

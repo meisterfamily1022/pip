@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 type LocationButtonProps = { label: string; onPress(): void; destructive?: boolean };
 export function LocationButton({ label, onPress, destructive = false }: LocationButtonProps) {
@@ -16,10 +17,10 @@ export function LocationEmpty({ onAddRoom }: { onAddRoom(): void }) {
 }
 
 const styles = StyleSheet.create({
-  button: { alignItems: 'center', borderColor: '#2166D1', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
-  buttonText: { color: '#2166D1', fontSize: 15, fontWeight: '700' },
-  destructiveButton: { borderColor: '#C62828' }, destructiveText: { color: '#C62828' }, pressed: { opacity: 0.75 },
+  button: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.primary, borderRadius: theme.radii.md, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
+  buttonText: { color: theme.colors.primary, fontSize: 15, fontWeight: '700' },
+  destructiveButton: { borderColor: theme.colors.danger }, destructiveText: { color: theme.colors.danger }, pressed: { opacity: 0.75 },
   center: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
   empty: { alignItems: 'center', gap: 14, justifyContent: 'center', padding: 24 }, emptyTitle: { fontSize: 20, fontWeight: '700' },
-  errorBox: { alignItems: 'center', gap: 12, padding: 24 }, errorText: { color: '#C62828', textAlign: 'center' },
+  errorBox: { alignItems: 'center', gap: 12, padding: 24 }, errorText: { color: theme.colors.danger, textAlign: 'center' },
 });

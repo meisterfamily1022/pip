@@ -1,5 +1,6 @@
 import { KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { PropsWithChildren, ReactNode } from 'react';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 type OnboardingScreenProps = PropsWithChildren<{ step?: string; title: string; description?: string; footer?: ReactNode }>;
 
@@ -20,12 +21,12 @@ export function OnboardingScreen({ step, title, description, children, footer }:
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  safeArea: { flex: 1, backgroundColor: theme.colors.background },
   keyboardAvoidingView: { flex: 1 },
   content: { flexGrow: 1, padding: 24, paddingTop: 36 },
-  step: { color: '#5C5C66', fontSize: 14, fontWeight: '600', marginBottom: 16 },
-  title: { color: '#1A1A1F', fontSize: 32, fontWeight: '700', lineHeight: 38 },
-  description: { color: '#4B4B55', fontSize: 17, lineHeight: 25, marginTop: 14 },
+  step: { color: theme.colors.mutedText, fontSize: 14, fontWeight: '600', marginBottom: 16 },
+  title: { color: theme.colors.text, fontSize: theme.type.title, fontWeight: '700', lineHeight: 38 },
+  description: { color: theme.colors.mutedText, fontSize: 17, lineHeight: 25, marginTop: 14 },
   body: { flex: 1, gap: 16, marginTop: 32 },
-  footer: { borderTopColor: '#E5E5E8', borderTopWidth: 1, padding: 16 },
+  footer: { backgroundColor: theme.colors.background, borderTopColor: theme.colors.border, borderTopWidth: 1, padding: 16 },
 });
