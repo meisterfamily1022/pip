@@ -1,5 +1,5 @@
 import { initializeDatabase, resetDatabaseInitializationForTests } from './client';
-import { runMigrations } from './migrations';
+import { LATEST_DATABASE_VERSION, runMigrations } from './migrations';
 import type { DatabaseConnection, SqlParameters, SqlRunResult } from './types';
 import { countToysAssignedToRoom, createRoom, createStorageSpot, getRoom } from '@/repositories/rooms-repository';
 import { createToy, getToy } from '@/repositories/toys-repository';
@@ -54,7 +54,7 @@ class TestDatabase implements DatabaseConnection {
     if (source.startsWith('UPDATE storage_spots')) { const row = this.spots.get(params[2] as number); if (!row) return { lastInsertRowId: 0, changes: 0 }; row.name = params[0]!; row.updated_at = params[1]!; return { lastInsertRowId: 0, changes: 1 }; }
     if (source.startsWith('DELETE FROM rooms')) { const idToDelete = params[0] as number; const changes = this.rooms.delete(idToDelete) ? 1 : 0; return { lastInsertRowId: 0, changes }; }
     if (source.startsWith('DELETE FROM storage_spots')) { const idToDelete = params[0] as number; const changes = this.spots.delete(idToDelete) ? 1 : 0; return { lastInsertRowId: 0, changes }; }
-    if (source.startsWith('INSERT INTO toys')) { const rowId = id(); this.toys.set(rowId, { id: rowId, name: params[0]!, image_uri: params[1]!, room_id: params[2]!, storage_spot_id: params[3]!, is_available: params[4]!, is_archived: params[5]!, created_at: params[6]!, updated_at: params[7]! }); return { lastInsertRowId: rowId, changes: 1 }; }
+    if (source.startsWith('INSERT INTO toys')) { const rowId = id(); this.toys.set(rowId, { id: rowId, name: params[0]!, image_uri: params[1]!, room_id: params[2]!, storage_spot_id: params[3]!, cleanup_difficulty: params[4]!, adult_help_required: params[5]!, is_available: params[6]!, is_archived: params[7]!, created_at: params[8]!, updated_at: params[9]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO toy_categories')) { const toyId = params[0] as number; this.categories.set(toyId, [...(this.categories.get(toyId) ?? []), params[1] as string]); return { lastInsertRowId: 0, changes: 1 }; }
     if (source.startsWith('INSERT INTO play_sessions')) { const rowId = id(); this.sessions.set(rowId, { id: rowId, toy_id: params[0]!, status: params[1]!, started_at: params[2]!, completed_at: params[3]!, created_at: params[4]!, updated_at: params[5]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('UPDATE play_sessions')) { const session = this.sessions.get(params[3] as number); if (!session || session.status !== 'active') return { lastInsertRowId: 0, changes: 0 }; session.status = params[0]!; session.completed_at = params[1]!; session.updated_at = params[2]!; return { lastInsertRowId: 0, changes: 1 }; }
@@ -125,7 +125,7 @@ describe('database foundation', () => {
 
   it('initializes a database on first launch', async () => {
     await initializeDatabase();
-    expect(mockDatabase.version).toBe(1);
+    expect(mockDatabase.version).toBe(LATEST_DATABASE_VERSION);
     await expect(getSettings(mockDatabase)).resolves.toMatchObject({ choiceLimit: 3, onboardingCompleted: false });
   });
 
@@ -146,8 +146,8 @@ describe('database foundation', () => {
   it('saves a toy with categories and reads them', async () => {
     const room = await createRoom(mockDatabase, 'Bedroom');
     const spot = await createStorageSpot(mockDatabase, room.id, 'Shelf');
-    const toy = await createToy(mockDatabase, { name: 'Blocks', imageUri: 'file:///blocks.jpg', roomId: room.id, storageSpotId: spot.id, isAvailable: true, isArchived: false, categories: ['building', 'creative'] });
-    await expect(getToy(mockDatabase, toy.id)).resolves.toMatchObject({ name: 'Blocks', categories: ['building', 'creative'] });
+    const toy = await createToy(mockDatabase, { name: 'Blocks', imageUri: 'file:///blocks.jpg', roomId: room.id, storageSpotId: spot.id, cleanupDifficulty: 'medium', adultHelpRequired: true, isAvailable: true, isArchived: false, categories: ['building', 'creative'] });
+    await expect(getToy(mockDatabase, toy.id)).resolves.toMatchObject({ name: 'Blocks', cleanupDifficulty: 'medium', adultHelpRequired: true, categories: ['building', 'creative'] });
   });
 
   it('creates and completes a play session', async () => {
@@ -301,7 +301,7 @@ describe('parent location management', () => {
     const database = new TestDatabase();
     const room = await createParentRoom(database, 'Playroom');
     const spot = await createParentStorageSpot(database, room.id, 'Bin');
-    await createToy(database, { name: 'Blocks', imageUri: null, roomId: room.id, storageSpotId: spot.id, isAvailable: true, isArchived: false, categories: ['building'] });
+    await createToy(database, { name: 'Blocks', imageUri: null, roomId: room.id, storageSpotId: spot.id, cleanupDifficulty: 'easy', adultHelpRequired: false, isAvailable: true, isArchived: false, categories: ['building'] });
     await expect(countToysAssignedToRoom(database, room.id)).resolves.toBe(1);
     await expect(removeParentStorageSpot(database, spot.id)).rejects.toThrow('toys are assigned');
     await expect(removeParentRoom(database, room.id)).rejects.toBeInstanceOf(LocationDeletionBlockedError);

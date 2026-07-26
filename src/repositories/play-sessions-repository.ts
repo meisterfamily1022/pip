@@ -15,6 +15,8 @@ type ActiveSessionRow = PlaySessionRow & {
   image_uri: string | null;
   room_id: number | null;
   storage_spot_id: number | null;
+  cleanup_difficulty: 'easy' | 'medium' | 'big' | null;
+  adult_help_required: number | null;
   is_available: number | null;
   is_archived: number | null;
 };
@@ -35,7 +37,7 @@ export async function getPlaySession(database: DatabaseConnection, id: number): 
 export async function getActivePlaySession(database: DatabaseConnection): Promise<ActivePlaySession | null> {
   const row = await database.getFirstAsync<ActiveSessionRow>(
     `SELECT p.id, p.toy_id, p.status, p.started_at, p.completed_at, p.created_at, p.updated_at,
-            t.name, t.image_uri, t.room_id, t.storage_spot_id, t.is_available, t.is_archived,
+            t.name, t.image_uri, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
             r.name AS room_name, s.name AS storage_spot_name
        FROM play_sessions p
        LEFT JOIN toys t ON t.id = p.toy_id
@@ -45,7 +47,7 @@ export async function getActivePlaySession(database: DatabaseConnection): Promis
   );
   if (!row) return null;
   const toy = typeof row.name === 'string' && typeof row.room_name === 'string' && typeof row.storage_spot_name === 'string' && typeof row.room_id === 'number' && typeof row.storage_spot_id === 'number'
-    ? { id: row.toy_id, name: row.name, imageUri: row.image_uri, roomId: row.room_id, storageSpotId: row.storage_spot_id, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories: [], createdAt: row.created_at, updatedAt: row.updated_at, roomName: row.room_name, storageSpotName: row.storage_spot_name }
+    ? { id: row.toy_id, name: row.name, imageUri: row.image_uri, roomId: row.room_id, storageSpotId: row.storage_spot_id, cleanupDifficulty: row.cleanup_difficulty ?? 'easy', adultHelpRequired: row.adult_help_required === 1, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories: [], createdAt: row.created_at, updatedAt: row.updated_at, roomName: row.room_name, storageSpotName: row.storage_spot_name }
     : null;
   return { ...toSession(row), toy };
 }

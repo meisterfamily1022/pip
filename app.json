@@ -30,6 +30,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "PlayMap lets you choose toy photos for your local toy library.",
+          "cameraPermission": "PlayMap lets you take toy photos for your local toy library.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",

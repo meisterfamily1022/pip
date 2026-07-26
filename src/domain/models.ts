@@ -23,6 +23,8 @@ export type Toy = {
   imageUri: string | null;
   roomId: number;
   storageSpotId: number;
+  cleanupDifficulty: 'easy' | 'medium' | 'big';
+  adultHelpRequired: boolean;
   isAvailable: boolean;
   isArchived: boolean;
   categories: PlayCategory[];

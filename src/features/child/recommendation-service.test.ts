@@ -1,7 +1,7 @@
 import type { ChildToy } from '@/repositories/toys-repository';
 import { recommendToys, safeChoiceLimit, surpriseToy } from './recommendation-service';
 
-const toy = (id: number, categories: ChildToy['categories'], available = true, archived = false): ChildToy => ({ id, name: `Toy ${id}`, imageUri: null, roomId: 1, storageSpotId: 1, categories, isAvailable: available, isArchived: archived, createdAt: '', updatedAt: '', roomName: 'Room', storageSpotName: 'Shelf' });
+const toy = (id: number, categories: ChildToy['categories'], available = true, archived = false): ChildToy => ({ id, name: `Toy ${id}`, imageUri: null, roomId: 1, storageSpotId: 1, cleanupDifficulty: 'easy', adultHelpRequired: false, categories, isAvailable: available, isArchived: archived, createdAt: '', updatedAt: '', roomName: 'Room', storageSpotName: 'Shelf' });
 const toys = [toy(1, ['quiet']), toy(2, ['quiet', 'building']), toy(3, ['active']), toy(4, ['quiet'], false), toy(5, ['quiet'], true, true)];
 
 describe('child recommendation service', () => {

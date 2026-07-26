@@ -31,6 +31,8 @@ const migrations: readonly Migration[] = [
         image_uri TEXT,
         room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
         storage_spot_id INTEGER NOT NULL REFERENCES storage_spots(id) ON DELETE RESTRICT,
+        cleanup_difficulty TEXT NOT NULL DEFAULT 'easy' CHECK (cleanup_difficulty IN ('easy', 'medium', 'big')),
+        adult_help_required INTEGER NOT NULL DEFAULT 0 CHECK (adult_help_required IN (0, 1)),
         is_available INTEGER NOT NULL DEFAULT 1 CHECK (is_available IN (0, 1)),
         is_archived INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1)),
         created_at TEXT NOT NULL,
@@ -74,6 +76,13 @@ const migrations: readonly Migration[] = [
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+    `,
+  },
+  {
+    version: 2,
+    source: `
+      ALTER TABLE toys ADD COLUMN cleanup_difficulty TEXT NOT NULL DEFAULT 'easy' CHECK (cleanup_difficulty IN ('easy', 'medium', 'big'));
+      ALTER TABLE toys ADD COLUMN adult_help_required INTEGER NOT NULL DEFAULT 0 CHECK (adult_help_required IN (0, 1));
     `,
   },
 ];
