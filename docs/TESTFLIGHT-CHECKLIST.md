@@ -1,0 +1,21 @@
+# PlayMap TestFlight Checklist
+
+- Confirm Apple Developer enrollment.
+- Decide legal ownership and seller name.
+- Decide final bundle identifier.
+- Create App Store Connect app record.
+- Confirm certificates and provisioning.
+- Configure EAS project access.
+- Test on physical iPhone.
+- Test on iPad if tablet support remains enabled.
+- Run a production EAS build.
+- Complete TestFlight internal testing.
+- Publish privacy-policy URL.
+- Publish support URL.
+- Prepare screenshots.
+- Complete App Privacy questionnaire.
+- Complete age-rating questionnaire.
+- Answer export-compliance questions.
+- Add reviewer notes.
+- Verify camera and photo-library permission copy.
+- Verify no cloud, analytics, ads, subscriptions, or accounts were added.

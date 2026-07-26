@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "playmap-mobile",
+    "name": "PlayMap",
     "slug": "playmap-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,6 +10,8 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.meister23.playmapmobile",
+      "buildNumber": "1",
+      "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
