@@ -176,8 +176,9 @@ describe('database foundation', () => {
 
   it('chooses startup destinations from onboarding state', () => {
     const settings = { onboardingCompleted: false, childNickname: null, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
-    expect(getStartupDestination(settings)).toBe('/onboarding');
-    expect(getStartupDestination({ ...settings, onboardingCompleted: true })).toBe('/parent/home');
+    expect(getStartupDestination(settings, false)).toBe('/onboarding');
+    expect(getStartupDestination({ ...settings, onboardingCompleted: true }, true)).toBe('/parent/home');
+    expect(getStartupDestination({ ...settings, onboardingCompleted: true }, false)).toBe('/onboarding');
   });
 });
 
@@ -234,6 +235,25 @@ describe('PIN and onboarding completion consistency', () => {
     await savePinThenCompleteOnboarding(onboardingInput, storage, saveOnboarding);
     expect(storage.pin).toBe('1234');
     expect(saveOnboarding).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves onboarding incomplete after an interrupted attempt and can retry safely', async () => {
+    const storage = new TestPinStorage();
+    const interrupted = savePinThenCompleteOnboarding(onboardingInput, storage, async () => {
+      throw new Error('App closed during SQLite completion.');
+    });
+    await expect(interrupted).rejects.toThrow('App closed during SQLite completion.');
+    expect(storage.pin).toBeNull();
+
+    const saveOnboarding = jest.fn(async (): Promise<void> => {});
+    await savePinThenCompleteOnboarding(onboardingInput, storage, saveOnboarding);
+    expect(storage.pin).toBe('1234');
+    expect(saveOnboarding).toHaveBeenCalledTimes(1);
+  });
+
+  it('never treats completed SQLite data without a PIN as a parent-ready state', () => {
+    const settings = { onboardingCompleted: true, childNickname: 'Ari', choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+    expect(getStartupDestination(settings, false)).toBe('/onboarding');
   });
 });
 
