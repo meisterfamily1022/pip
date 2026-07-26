@@ -46,7 +46,6 @@ export type ChoiceLimit = 1 | 3 | 5;
 
 export type AppSettings = {
   onboardingCompleted: boolean;
-  parentPin: string | null;
   childNickname: string | null;
   choiceLimit: ChoiceLimit;
   cleanupRequired: boolean;

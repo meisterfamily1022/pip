@@ -9,6 +9,6 @@ export type PlaySessionRow = {
   completed_at: string | null; created_at: string; updated_at: string;
 };
 export type SettingsRow = {
-  onboarding_completed: number; parent_pin: string | null; child_nickname: string | null;
+  onboarding_completed: number; child_nickname: string | null;
   choice_limit: number; cleanup_required: number; created_at: string; updated_at: string;
 };
