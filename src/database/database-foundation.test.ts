@@ -1,7 +1,7 @@
 import { initializeDatabase, resetDatabaseInitializationForTests } from './client';
 import { runMigrations } from './migrations';
 import type { DatabaseConnection, SqlParameters, SqlRunResult } from './types';
-import { createRoom, createStorageSpot, getRoom } from '@/repositories/rooms-repository';
+import { countToysAssignedToRoom, createRoom, createStorageSpot, getRoom } from '@/repositories/rooms-repository';
 import { createToy, getToy } from '@/repositories/toys-repository';
 import { completePlaySession, createPlaySession } from '@/repositories/play-sessions-repository';
 import { ensureSettings, getSettings, updateSettings } from '@/repositories/settings-repository';
@@ -10,6 +10,17 @@ import { completeOnboarding } from '@/features/onboarding/complete-onboarding';
 import { savePinThenCompleteOnboarding } from '@/features/onboarding/complete-onboarding-flow';
 import { DEFAULT_CHOICE_LIMIT, DEFAULT_CLEANUP_REQUIRED, validatePin, validatePinConfirmation, validateRequiredName } from '@/features/onboarding/validation';
 import type { PinStorage } from '@/services/pin-storage';
+import {
+  createParentRoom,
+  createParentStorageSpot,
+  loadLocationTree,
+  removeParentRoom,
+  removeParentStorageSpot,
+  renameParentRoom,
+  renameParentStorageSpot,
+  LocationConflictError,
+  LocationDeletionBlockedError,
+} from '@/features/locations/location-service';
 
 type RecordRow = Record<string, string | number | null>;
 
@@ -39,6 +50,10 @@ class TestDatabase implements DatabaseConnection {
     if (source.startsWith('UPDATE settings')) { if (!this.settings) throw new Error('Missing settings'); [this.settings.onboarding_completed, this.settings.child_nickname, this.settings.choice_limit, this.settings.cleanup_required, this.settings.updated_at] = params; return { lastInsertRowId: 1, changes: 1 }; }
     if (source.startsWith('INSERT INTO rooms')) { const rowId = id(); this.rooms.set(rowId, { id: rowId, name: params[0]!, created_at: params[1]!, updated_at: params[2]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO storage_spots')) { if (this.failStorageSpotCreation) throw new Error('Storage spot creation failed.'); const rowId = id(); this.spots.set(rowId, { id: rowId, room_id: params[0]!, name: params[1]!, created_at: params[2]!, updated_at: params[3]! }); return { lastInsertRowId: rowId, changes: 1 }; }
+    if (source.startsWith('UPDATE rooms')) { const row = this.rooms.get(params[2] as number); if (!row) return { lastInsertRowId: 0, changes: 0 }; row.name = params[0]!; row.updated_at = params[1]!; return { lastInsertRowId: 0, changes: 1 }; }
+    if (source.startsWith('UPDATE storage_spots')) { const row = this.spots.get(params[2] as number); if (!row) return { lastInsertRowId: 0, changes: 0 }; row.name = params[0]!; row.updated_at = params[1]!; return { lastInsertRowId: 0, changes: 1 }; }
+    if (source.startsWith('DELETE FROM rooms')) { const idToDelete = params[0] as number; const changes = this.rooms.delete(idToDelete) ? 1 : 0; return { lastInsertRowId: 0, changes }; }
+    if (source.startsWith('DELETE FROM storage_spots')) { const idToDelete = params[0] as number; const changes = this.spots.delete(idToDelete) ? 1 : 0; return { lastInsertRowId: 0, changes }; }
     if (source.startsWith('INSERT INTO toys')) { const rowId = id(); this.toys.set(rowId, { id: rowId, name: params[0]!, image_uri: params[1]!, room_id: params[2]!, storage_spot_id: params[3]!, is_available: params[4]!, is_archived: params[5]!, created_at: params[6]!, updated_at: params[7]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO toy_categories')) { const toyId = params[0] as number; this.categories.set(toyId, [...(this.categories.get(toyId) ?? []), params[1] as string]); return { lastInsertRowId: 0, changes: 1 }; }
     if (source.startsWith('INSERT INTO play_sessions')) { const rowId = id(); this.sessions.set(rowId, { id: rowId, toy_id: params[0]!, status: params[1]!, started_at: params[2]!, completed_at: params[3]!, created_at: params[4]!, updated_at: params[5]! }); return { lastInsertRowId: rowId, changes: 1 }; }
@@ -48,6 +63,20 @@ class TestDatabase implements DatabaseConnection {
 
   async getFirstAsync<T>(source: string, ...params: SqlParameters): Promise<T | null> {
     if (source.startsWith('PRAGMA user_version')) return { user_version: this.version } as T;
+    if (source.includes('FROM rooms WHERE name')) {
+      const name = String(params[0]).trim().toLowerCase();
+      const excluded = params.length > 1 ? params[1] : null;
+      const found = [...this.rooms.values()].find((row) => String(row.name).toLowerCase() === name && row.id !== excluded);
+      return (found ?? null) as T | null;
+    }
+    if (source.includes('FROM storage_spots WHERE room_id') && source.includes('name =')) {
+      const roomId = params[0]; const name = String(params[1]).trim().toLowerCase(); const excluded = params.length > 2 ? params[2] : null;
+      const found = [...this.spots.values()].find((row) => row.room_id === roomId && String(row.name).toLowerCase() === name && row.id !== excluded);
+      return (found ?? null) as T | null;
+    }
+    if (source.includes('COUNT(*) AS count FROM toys WHERE room_id')) return { count: [...this.toys.values()].filter((row) => row.room_id === params[0]).length } as T;
+    if (source.includes('COUNT(*) AS count FROM toys WHERE storage_spot_id')) return { count: [...this.toys.values()].filter((row) => row.storage_spot_id === params[0]).length } as T;
+    if (source.includes('COUNT(*) AS count FROM storage_spots')) return { count: [...this.spots.values()].filter((row) => row.room_id === params[0]).length } as T;
     if (source.includes('FROM settings')) return this.settings as T | null;
     if (source.includes('FROM rooms')) return (this.rooms.get(params[0] as number) ?? null) as T | null;
     if (source.includes('FROM storage_spots')) return (this.spots.get(params[0] as number) ?? null) as T | null;
@@ -57,6 +86,8 @@ class TestDatabase implements DatabaseConnection {
   }
 
   async getAllAsync<T>(source: string, ...params: SqlParameters): Promise<T[]> {
+    if (source.includes('FROM rooms')) return [...this.rooms.values()].sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
+    if (source.includes('FROM storage_spots')) return [...this.spots.values()].filter((row) => row.room_id === params[0]).sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM toy_categories')) return (this.categories.get(params[0] as number) ?? []).map((category) => ({ category }) as T);
     throw new Error(`Unhandled SQL: ${source}`);
   }
@@ -203,5 +234,48 @@ describe('PIN and onboarding completion consistency', () => {
     await savePinThenCompleteOnboarding(onboardingInput, storage, saveOnboarding);
     expect(storage.pin).toBe('1234');
     expect(saveOnboarding).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('parent location management', () => {
+  it('trims names, prevents case-insensitive duplicates, and sorts locations', async () => {
+    const database = new TestDatabase();
+    const bedroom = await createParentRoom(database, ' Bedroom ');
+    const playroom = await createParentRoom(database, 'Playroom');
+    await expect(createParentRoom(database, 'playROOM')).rejects.toBeInstanceOf(LocationConflictError);
+    await createParentStorageSpot(database, bedroom.id, 'Shelf');
+    await createParentStorageSpot(database, bedroom.id, 'Under Bed');
+    await expect(createParentStorageSpot(database, bedroom.id, 'shelf')).rejects.toBeInstanceOf(LocationConflictError);
+    await expect(createParentStorageSpot(database, playroom.id, 'Shelf')).resolves.toMatchObject({ roomId: playroom.id });
+    await expect(loadLocationTree(database)).resolves.toMatchObject([{ name: 'Bedroom', storageSpots: [{ name: 'Shelf' }, { name: 'Under Bed' }] }, { name: 'Playroom' }]);
+  });
+
+  it('updates room and storage-spot names while preserving IDs', async () => {
+    const database = new TestDatabase();
+    const room = await createParentRoom(database, 'Playroom');
+    const spot = await createParentStorageSpot(database, room.id, 'Blue Bin');
+    await expect(renameParentRoom(database, room.id, ' Main Room ')).resolves.toMatchObject({ id: room.id, name: 'Main Room' });
+    await expect(renameParentStorageSpot(database, spot.id, ' Bottom Shelf ')).resolves.toMatchObject({ id: spot.id, roomId: room.id, name: 'Bottom Shelf' });
+  });
+
+  it('deletes unused locations and blocks protected deletions', async () => {
+    const database = new TestDatabase();
+    const emptyRoom = await createParentRoom(database, 'Empty');
+    await removeParentRoom(database, emptyRoom.id);
+    const room = await createParentRoom(database, 'Playroom');
+    const spot = await createParentStorageSpot(database, room.id, 'Bin');
+    await expect(removeParentRoom(database, room.id)).rejects.toBeInstanceOf(LocationDeletionBlockedError);
+    await removeParentStorageSpot(database, spot.id);
+    await removeParentRoom(database, room.id);
+  });
+
+  it('blocks deletion when a storage spot or room has an assigned toy', async () => {
+    const database = new TestDatabase();
+    const room = await createParentRoom(database, 'Playroom');
+    const spot = await createParentStorageSpot(database, room.id, 'Bin');
+    await createToy(database, { name: 'Blocks', imageUri: null, roomId: room.id, storageSpotId: spot.id, isAvailable: true, isArchived: false, categories: ['building'] });
+    await expect(countToysAssignedToRoom(database, room.id)).resolves.toBe(1);
+    await expect(removeParentStorageSpot(database, spot.id)).rejects.toThrow('toys are assigned');
+    await expect(removeParentRoom(database, room.id)).rejects.toBeInstanceOf(LocationDeletionBlockedError);
   });
 });

@@ -6,6 +6,9 @@ const now = (): string => new Date().toISOString();
 const toRoom = (row: RoomRow): Room => ({ id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at });
 const toStorageSpot = (row: StorageSpotRow): StorageSpot => ({ id: row.id, roomId: row.room_id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at });
 
+type CountRow = { count: number };
+type IdRow = { id: number };
+
 export async function createRoom(database: DatabaseConnection, name: string): Promise<Room> {
   const timestamp = now();
   const result = await database.runAsync('INSERT INTO rooms (name, created_at, updated_at) VALUES (?, ?, ?);', name.trim(), timestamp, timestamp);
@@ -19,6 +22,42 @@ export async function getRoom(database: DatabaseConnection, id: number): Promise
   return row ? toRoom(row) : null;
 }
 
+export async function listRooms(database: DatabaseConnection): Promise<Room[]> {
+  const rows = await database.getAllAsync<RoomRow>('SELECT id, name, created_at, updated_at FROM rooms ORDER BY name COLLATE NOCASE ASC, id ASC;');
+  return rows.map(toRoom);
+}
+
+export async function roomNameExists(database: DatabaseConnection, name: string, excludingId?: number): Promise<boolean> {
+  const normalizedName = name.trim();
+  const row = excludingId === undefined
+    ? await database.getFirstAsync<IdRow>('SELECT id FROM rooms WHERE name = ? COLLATE NOCASE LIMIT 1;', normalizedName)
+    : await database.getFirstAsync<IdRow>('SELECT id FROM rooms WHERE name = ? COLLATE NOCASE AND id != ? LIMIT 1;', normalizedName, excludingId);
+  return row !== null;
+}
+
+export async function updateRoom(database: DatabaseConnection, id: number, name: string): Promise<Room> {
+  const result = await database.runAsync('UPDATE rooms SET name = ?, updated_at = ? WHERE id = ?;', name.trim(), now(), id);
+  if (result.changes !== 1) throw new Error('Room not found.');
+  const room = await getRoom(database, id);
+  if (!room) throw new Error('Updated room could not be loaded.');
+  return room;
+}
+
+export async function deleteRoom(database: DatabaseConnection, id: number): Promise<void> {
+  const result = await database.runAsync('DELETE FROM rooms WHERE id = ?;', id);
+  if (result.changes !== 1) throw new Error('Room not found.');
+}
+
+export async function countToysAssignedToRoom(database: DatabaseConnection, roomId: number): Promise<number> {
+  const row = await database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM toys WHERE room_id = ?;', roomId);
+  return row?.count ?? 0;
+}
+
+export async function countStorageSpots(database: DatabaseConnection, roomId: number): Promise<number> {
+  const row = await database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM storage_spots WHERE room_id = ?;', roomId);
+  return row?.count ?? 0;
+}
+
 export async function createStorageSpot(database: DatabaseConnection, roomId: number, name: string): Promise<StorageSpot> {
   const timestamp = now();
   const result = await database.runAsync('INSERT INTO storage_spots (room_id, name, created_at, updated_at) VALUES (?, ?, ?, ?);', roomId, name.trim(), timestamp, timestamp);
@@ -30,4 +69,35 @@ export async function createStorageSpot(database: DatabaseConnection, roomId: nu
 export async function getStorageSpot(database: DatabaseConnection, id: number): Promise<StorageSpot | null> {
   const row = await database.getFirstAsync<StorageSpotRow>('SELECT id, room_id, name, created_at, updated_at FROM storage_spots WHERE id = ?;', id);
   return row ? toStorageSpot(row) : null;
+}
+
+export async function listStorageSpots(database: DatabaseConnection, roomId: number): Promise<StorageSpot[]> {
+  const rows = await database.getAllAsync<StorageSpotRow>('SELECT id, room_id, name, created_at, updated_at FROM storage_spots WHERE room_id = ? ORDER BY name COLLATE NOCASE ASC, id ASC;', roomId);
+  return rows.map(toStorageSpot);
+}
+
+export async function storageSpotNameExists(database: DatabaseConnection, roomId: number, name: string, excludingId?: number): Promise<boolean> {
+  const normalizedName = name.trim();
+  const row = excludingId === undefined
+    ? await database.getFirstAsync<IdRow>('SELECT id FROM storage_spots WHERE room_id = ? AND name = ? COLLATE NOCASE LIMIT 1;', roomId, normalizedName)
+    : await database.getFirstAsync<IdRow>('SELECT id FROM storage_spots WHERE room_id = ? AND name = ? COLLATE NOCASE AND id != ? LIMIT 1;', roomId, normalizedName, excludingId);
+  return row !== null;
+}
+
+export async function updateStorageSpot(database: DatabaseConnection, id: number, name: string): Promise<StorageSpot> {
+  const result = await database.runAsync('UPDATE storage_spots SET name = ?, updated_at = ? WHERE id = ?;', name.trim(), now(), id);
+  if (result.changes !== 1) throw new Error('Storage spot not found.');
+  const spot = await getStorageSpot(database, id);
+  if (!spot) throw new Error('Updated storage spot could not be loaded.');
+  return spot;
+}
+
+export async function deleteStorageSpot(database: DatabaseConnection, id: number): Promise<void> {
+  const result = await database.runAsync('DELETE FROM storage_spots WHERE id = ?;', id);
+  if (result.changes !== 1) throw new Error('Storage spot not found.');
+}
+
+export async function countToysAssignedToStorageSpot(database: DatabaseConnection, storageSpotId: number): Promise<number> {
+  const row = await database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM toys WHERE storage_spot_id = ?;', storageSpotId);
+  return row?.count ?? 0;
 }
