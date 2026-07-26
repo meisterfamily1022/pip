@@ -53,6 +53,9 @@ const migrations: readonly Migration[] = [
         status TEXT NOT NULL CHECK (status IN ('active', 'completed')),
         started_at TEXT NOT NULL,
         completed_at TEXT,
+        cleanup_started_at TEXT,
+        help_requested INTEGER NOT NULL DEFAULT 0 CHECK (help_requested IN (0, 1)),
+        parent_override_used INTEGER NOT NULL DEFAULT 0 CHECK (parent_override_used IN (0, 1)),
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         CHECK ((status = 'active' AND completed_at IS NULL) OR (status = 'completed' AND completed_at IS NOT NULL))
@@ -83,6 +86,14 @@ const migrations: readonly Migration[] = [
     source: `
       ALTER TABLE toys ADD COLUMN cleanup_difficulty TEXT NOT NULL DEFAULT 'easy' CHECK (cleanup_difficulty IN ('easy', 'medium', 'big'));
       ALTER TABLE toys ADD COLUMN adult_help_required INTEGER NOT NULL DEFAULT 0 CHECK (adult_help_required IN (0, 1));
+    `,
+  },
+  {
+    version: 3,
+    source: `
+      ALTER TABLE play_sessions ADD COLUMN cleanup_started_at TEXT;
+      ALTER TABLE play_sessions ADD COLUMN help_requested INTEGER NOT NULL DEFAULT 0 CHECK (help_requested IN (0, 1));
+      ALTER TABLE play_sessions ADD COLUMN parent_override_used INTEGER NOT NULL DEFAULT 0 CHECK (parent_override_used IN (0, 1));
     `,
   },
 ];

@@ -40,6 +40,9 @@ export type PlaySession = {
   status: PlaySessionStatus;
   startedAt: Timestamp;
   completedAt: Timestamp | null;
+  cleanupStartedAt: Timestamp | null;
+  helpRequested: boolean;
+  parentOverrideUsed: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };

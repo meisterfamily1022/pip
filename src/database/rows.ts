@@ -7,7 +7,8 @@ export type ToyRow = {
 };
 export type PlaySessionRow = {
   id: number; toy_id: number; status: 'active' | 'completed'; started_at: string;
-  completed_at: string | null; created_at: string; updated_at: string;
+  completed_at: string | null; cleanup_started_at: string | null; help_requested: number;
+  parent_override_used: number; created_at: string; updated_at: string;
 };
 export type SettingsRow = {
   onboarding_completed: number; child_nickname: string | null;
