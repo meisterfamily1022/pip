@@ -28,6 +28,14 @@ export type SaveToyInput = {
   categories: readonly PlayCategory[];
 };
 
+export type ChildToy = Toy & { roomName: string; storageSpotName: string };
+
+type ChildToyRow = ToyRow & { room_name: string; storage_spot_name: string };
+
+function mapChildToy(row: ChildToyRow, categories: PlayCategory[]): ChildToy {
+  return { ...mapToy(row, categories), roomName: row.room_name, storageSpotName: row.storage_spot_name };
+}
+
 export async function createToy(database: DatabaseConnection, input: SaveToyInput): Promise<Toy> {
   if (input.categories.length === 0) throw new Error('A toy must have at least one play category.');
   const timestamp = now();
@@ -51,4 +59,17 @@ export async function createToy(database: DatabaseConnection, input: SaveToyInpu
 export async function getToy(database: DatabaseConnection, id: number): Promise<Toy | null> {
   const row = await database.getFirstAsync<ToyRow>('SELECT id, name, image_uri, room_id, storage_spot_id, is_available, is_archived, created_at, updated_at FROM toys WHERE id = ?;', id);
   return row ? mapToy(row, await getCategories(database, row.id)) : null;
+}
+
+export async function listChildToys(database: DatabaseConnection): Promise<ChildToy[]> {
+  const rows = await database.getAllAsync<ChildToyRow>(
+    `SELECT t.id, t.name, t.image_uri, t.room_id, t.storage_spot_id, t.is_available, t.is_archived,
+            t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
+       FROM toys t
+       JOIN rooms r ON r.id = t.room_id
+       JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
+      WHERE t.is_available = 1 AND t.is_archived = 0
+      ORDER BY t.name COLLATE NOCASE ASC, t.id ASC;`,
+  );
+  return Promise.all(rows.map(async (row) => mapChildToy(row, await getCategories(database, row.id))));
 }

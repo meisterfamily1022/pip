@@ -3,7 +3,7 @@ import { runMigrations } from './migrations';
 import type { DatabaseConnection, SqlParameters, SqlRunResult } from './types';
 import { countToysAssignedToRoom, createRoom, createStorageSpot, getRoom } from '@/repositories/rooms-repository';
 import { createToy, getToy } from '@/repositories/toys-repository';
-import { completePlaySession, createPlaySession } from '@/repositories/play-sessions-repository';
+import { completePlaySession, createPlaySession, startPlaySessionIfNoneActive } from '@/repositories/play-sessions-repository';
 import { ensureSettings, getSettings, updateSettings } from '@/repositories/settings-repository';
 import { getStartupDestination } from '@/startup/startup-routing';
 import { completeOnboarding } from '@/features/onboarding/complete-onboarding';
@@ -81,6 +81,7 @@ class TestDatabase implements DatabaseConnection {
     if (source.includes('FROM rooms')) return (this.rooms.get(params[0] as number) ?? null) as T | null;
     if (source.includes('FROM storage_spots')) return (this.spots.get(params[0] as number) ?? null) as T | null;
     if (source.includes('FROM toys')) return (this.toys.get(params[0] as number) ?? null) as T | null;
+    if (source.includes('FROM play_sessions') && source.includes('status = ?')) return ([...this.sessions.values()].find((row) => row.status === params[0]) ?? null) as T | null;
     if (source.includes('FROM play_sessions')) return (this.sessions.get(params[0] as number) ?? null) as T | null;
     throw new Error(`Unhandled SQL: ${source}`);
   }
@@ -152,6 +153,13 @@ describe('database foundation', () => {
   it('creates and completes a play session', async () => {
     const session = await createPlaySession(mockDatabase, 1);
     await expect(completePlaySession(mockDatabase, session.id)).resolves.toMatchObject({ status: 'completed', completedAt: expect.any(String) });
+  });
+
+  it('does not create a second active play session', async () => {
+    const fresh = new TestDatabase();
+    const first = await startPlaySessionIfNoneActive(fresh, 1);
+    const second = await startPlaySessionIfNoneActive(fresh, 2);
+    expect(second.id).toBe(first.id);
   });
 
   it('reads and updates settings', async () => {
