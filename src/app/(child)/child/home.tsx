@@ -13,11 +13,11 @@ export default function ChildHomeRoute() {
   if (loading) return <LoadingState label="Loading Child Mode…" />;
   if (error) return <ErrorStateCard message={error} action={<Pressable accessibilityRole="button" onPress={() => router.replace('/child/home')} style={styles.retry}><Text style={styles.parentText}>Try Again</Text></Pressable>} />;
   return <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.container}>
-    <View style={styles.sky}><Text style={styles.greeting}>🦁  Hi{nickname ? ` ${nickname}` : ''}!</Text><Text style={styles.cloud}>☁️</Text><Text style={styles.sun}>☀️</Text><Text accessibilityRole="header" style={styles.title}>What sounds fun today?</Text><Text style={styles.fox}>🦊</Text></View>
+    <View style={styles.sky}><Text style={styles.greeting}>Hi{nickname ? ` ${nickname}` : ''}! <Text style={styles.greetingIcon}>☀</Text></Text><Text style={styles.leaf}>❧</Text><Text style={styles.cloud}>☁</Text><Text accessibilityRole="header" style={styles.title}>What sounds{`\n`}fun today?</Text><Text accessibilityLabel="Friendly fox illustration" style={styles.fox}>🦊</Text><View style={styles.grass} /></View>
     <View style={styles.actions}>
-      <ChildActionCard icon="⌕" title="Find a Toy" description="Choose what sounds fun" tint={theme.colors.mintSoft} onPress={() => router.push('/child/categories')} />
-      <ChildActionCard icon="🎁" title="Surprise Me" description="Pick something random!" tint={theme.colors.yellowSoft} onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything', surprise: '1' } })} />
-      <ChildActionCard disabled={!hasActive} icon="★" title="Current Toy" description={hasActive ? 'See what you’re playing with' : 'Nothing is being played with'} tint={theme.colors.peachSoft} onPress={() => router.push('/child/current-toy')} />
+      <ChildActionCard icon="⌕" title="Find Something to Play With" description="Choose what sounds fun" tint={theme.colors.mintSoft} onPress={() => router.push('/child/categories')} />
+      <ChildActionCard icon="✦" title="Surprise Me" description="Pick something for me" tint={theme.colors.yellowSoft} onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything', surprise: '1' } })} />
+      <ChildActionCard disabled={!hasActive} icon="★" title="Current Toy" description={hasActive ? 'See what you’re playing with' : 'No toy right now'} tint={theme.colors.peachSoft} onPress={() => router.push('/child/current-toy')} />
     </View>
     <Pressable accessibilityRole="button" onPress={() => router.push('../child/parent-return')} style={styles.parent}><Text style={styles.parentText}>Grown-up area</Text></Pressable>
   </ScrollView>;
@@ -26,9 +26,9 @@ export default function ChildHomeRoute() {
 const styles = StyleSheet.create({
   retry: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
   container: { ...screenContentStyle, backgroundColor: theme.colors.childBackground, flexGrow: 1, gap: 16 },
-  sky: { alignItems: 'center', backgroundColor: '#EAF5F4', borderRadius: theme.radii.xl, minHeight: 290, overflow: 'hidden', padding: 22 },
-  greeting: { alignSelf: 'flex-start', color: theme.colors.text, fontSize: 17, fontWeight: '700' }, cloud: { fontSize: 46, left: 32, opacity: 0.8, position: 'absolute', top: 58 }, sun: { fontSize: 45, position: 'absolute', right: 30, top: 62 },
-  title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: theme.type.childTitle, fontWeight: '700', lineHeight: 43, maxWidth: 330, paddingTop: 48, textAlign: 'center' }, fox: { fontSize: 76, paddingTop: 14 },
+  sky: { alignItems: 'center', backgroundColor: theme.colors.surface, borderRadius: 30, minHeight: 330, overflow: 'hidden', padding: 22, position: 'relative' },
+  greeting: { alignSelf: 'flex-start', color: theme.colors.text, fontSize: 18, fontWeight: '700' }, greetingIcon: { color: theme.colors.coralAction, fontSize: 24 }, leaf: { color: theme.colors.sage, fontSize: 64, left: 28, position: 'absolute', top: 70, transform: [{ rotate: '-30deg' }] }, cloud: { color: theme.colors.surfaceSage, fontSize: 62, opacity: 0.8, position: 'absolute', right: 28, top: 50 },
+  title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: theme.type.childTitle, fontWeight: '700', lineHeight: 43, maxWidth: 330, paddingTop: 48, textAlign: 'center' }, fox: { fontSize: 82, paddingTop: 12 }, grass: { backgroundColor: theme.colors.surfaceSage, bottom: -30, height: 68, position: 'absolute', width: '120%' },
   actions: { gap: 12 },
   parent: { alignItems: 'center', minHeight: 48, justifyContent: 'center' }, parentText: { color: theme.colors.mutedText, fontSize: 15, fontWeight: '600' },
 });
