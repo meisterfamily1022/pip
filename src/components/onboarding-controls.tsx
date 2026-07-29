@@ -21,11 +21,11 @@ export function ChoiceControls({ choiceLimit, onChoiceLimitChange, cleanupRequir
 }
 
 const styles = StyleSheet.create({
-  primaryButton: { alignItems: 'center', backgroundColor: theme.colors.primary, borderRadius: theme.radii.lg, minHeight: 54, justifyContent: 'center', paddingHorizontal: 20 },
+  primaryButton: { ...theme.shadows.card, alignItems: 'center', backgroundColor: theme.colors.coral, borderRadius: theme.radii.lg, minHeight: theme.sizes.button, justifyContent: 'center', paddingHorizontal: 20 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  disabled: { backgroundColor: '#A8B8D9' }, pressed: { opacity: 0.82 },
+  disabled: { opacity: 0.45 }, pressed: { opacity: 0.82 },
   backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }, backButtonText: { color: theme.colors.primary, fontSize: 16, fontWeight: '600' },
   field: { gap: 6 }, label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
-  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, color: theme.colors.text, fontSize: 18, minHeight: 52, paddingHorizontal: 14 }, inputError: { borderColor: theme.colors.danger }, error: { color: theme.colors.danger, minHeight: 18 },
+  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, color: theme.colors.text, fontSize: 18, minHeight: theme.sizes.input, paddingHorizontal: 16 }, inputError: { borderColor: theme.colors.danger }, error: { color: theme.colors.danger, minHeight: 18 },
   choiceGroup: { gap: 12 }, optionRow: { flexDirection: 'row', gap: 10 }, option: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 52 }, optionSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft, borderWidth: 2 }, optionText: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
 });

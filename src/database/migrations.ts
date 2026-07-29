@@ -2,8 +2,34 @@ import type { DatabaseConnection } from './types';
 
 type Migration = {
   version: number;
-  source: string;
+  source?: string;
+  apply?: (database: DatabaseConnection) => Promise<void>;
 };
+
+type TableInfoRow = {
+  name: string;
+};
+
+async function hasColumn(database: DatabaseConnection, table: string, column: string): Promise<boolean> {
+  const columns = await database.getAllAsync<TableInfoRow>(`PRAGMA table_info("${table}");`);
+  return columns.some((candidate) => candidate.name === column);
+}
+
+async function addColumnIfMissing(database: DatabaseConnection, table: string, column: string, definition: string): Promise<void> {
+  if (await hasColumn(database, table, column)) return;
+  await database.execAsync(`ALTER TABLE "${table}" ADD COLUMN "${column}" ${definition};`);
+}
+
+async function ensureToyCleanupColumns(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'toys', 'cleanup_difficulty', "TEXT NOT NULL DEFAULT 'easy' CHECK (cleanup_difficulty IN ('easy', 'medium', 'big'))");
+  await addColumnIfMissing(database, 'toys', 'adult_help_required', 'INTEGER NOT NULL DEFAULT 0 CHECK (adult_help_required IN (0, 1))');
+}
+
+async function ensurePlaySessionCleanupColumns(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'play_sessions', 'cleanup_started_at', 'TEXT');
+  await addColumnIfMissing(database, 'play_sessions', 'help_requested', 'INTEGER NOT NULL DEFAULT 0 CHECK (help_requested IN (0, 1))');
+  await addColumnIfMissing(database, 'play_sessions', 'parent_override_used', 'INTEGER NOT NULL DEFAULT 0 CHECK (parent_override_used IN (0, 1))');
+}
 
 const migrations: readonly Migration[] = [
   {
@@ -83,18 +109,18 @@ const migrations: readonly Migration[] = [
   },
   {
     version: 2,
-    source: `
-      ALTER TABLE toys ADD COLUMN cleanup_difficulty TEXT NOT NULL DEFAULT 'easy' CHECK (cleanup_difficulty IN ('easy', 'medium', 'big'));
-      ALTER TABLE toys ADD COLUMN adult_help_required INTEGER NOT NULL DEFAULT 0 CHECK (adult_help_required IN (0, 1));
-    `,
+    apply: ensureToyCleanupColumns,
   },
   {
     version: 3,
-    source: `
-      ALTER TABLE play_sessions ADD COLUMN cleanup_started_at TEXT;
-      ALTER TABLE play_sessions ADD COLUMN help_requested INTEGER NOT NULL DEFAULT 0 CHECK (help_requested IN (0, 1));
-      ALTER TABLE play_sessions ADD COLUMN parent_override_used INTEGER NOT NULL DEFAULT 0 CHECK (parent_override_used IN (0, 1));
-    `,
+    apply: ensurePlaySessionCleanupColumns,
+  },
+  {
+    version: 4,
+    apply: async (database) => {
+      await ensureToyCleanupColumns(database);
+      await ensurePlaySessionCleanupColumns(database);
+    },
   },
 ];
 
@@ -107,7 +133,8 @@ export async function runMigrations(database: DatabaseConnection): Promise<void>
   for (const migration of migrations) {
     if (migration.version <= currentVersion) continue;
     await database.withTransactionAsync(async () => {
-      await database.execAsync(migration.source);
+      if (migration.source) await database.execAsync(migration.source);
+      if (migration.apply) await migration.apply(database);
       await database.execAsync(`PRAGMA user_version = ${migration.version};`);
     });
     currentVersion = migration.version;

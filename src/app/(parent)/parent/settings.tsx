@@ -6,6 +6,7 @@ import { ToyButton, ToyError, ToyLoading } from '@/components/toy-ui';
 import { initializeDatabase } from '@/database/client';
 import { changeParentPin, loadParentSettings, saveParentSettings, type ChangePinInput } from '@/features/settings/settings-service';
 import { pinStorage } from '@/services/pin-storage';
+import { playmapTheme as theme, screenContentStyle } from '@/theme/playmap-theme';
 
 export default function ParentSettingsRoute() {
   const [nickname, setNickname] = useState('');
@@ -71,7 +72,7 @@ export default function ParentSettingsRoute() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <Text accessibilityRole="header" style={styles.title}>Settings</Text>
         {error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
         {success && <Text accessibilityLiveRegion="polite" style={styles.success}>{success}</Text>}
@@ -113,16 +114,16 @@ export default function ParentSettingsRoute() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { gap: 18, padding: 24, paddingBottom: 52, paddingTop: 56 },
-  error: { color: '#C62828' },
-  input: { borderColor: '#B8B8C2', borderRadius: 8, borderWidth: 1, fontSize: 17, minHeight: 48, paddingHorizontal: 12 },
-  label: { fontSize: 15, fontWeight: '700' },
+  container: { backgroundColor: theme.colors.background, flex: 1 },
+  content: { ...screenContentStyle, gap: 18 },
+  error: { color: theme.colors.danger },
+  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, color: theme.colors.text, fontSize: 17, minHeight: theme.sizes.input, paddingHorizontal: 16 },
+  label: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  section: { backgroundColor: '#F6F7FA', borderRadius: 8, gap: 12, padding: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: '700' },
-  success: { color: '#246B3D' },
+  section: { ...theme.shadows.card, backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, gap: 12, padding: 18 },
+  sectionTitle: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
+  success: { color: theme.colors.success },
   switchRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   switchText: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 32, fontWeight: '700' },
+  title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: 32, fontWeight: '700' },
 });

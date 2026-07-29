@@ -7,6 +7,7 @@ import { PLAY_CATEGORIES, type PlayCategory } from '@/domain/play-category';
 import { loadLocationTree, type LocationTreeItem } from '@/features/locations/location-service';
 import { archiveParentToy, permanentlyDeleteParentToy, restoreParentToy, setParentToyAvailability } from '@/features/toys/toy-service';
 import { listParentToys, type ParentToy, type ToyFilters } from '@/repositories/toys-repository';
+import { playmapTheme as theme, screenContentStyle } from '@/theme/playmap-theme';
 
 const categoryLabels: Record<PlayCategory, string> = { quiet: 'Quiet', active: 'Active', creative: 'Creative', building: 'Building', pretend: 'Pretend', sensory: 'Sensory', independent: 'Independent', together: 'Play Together', indoor: 'Indoor', outdoor: 'Outdoor' };
 
@@ -64,7 +65,7 @@ export default function ParentToyLibraryRoute() {
   if (error && toys.length === 0) return <ToyError message={error} onRetry={() => { void reload(); }} />;
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text accessibilityRole="header" style={styles.title}>Toy Library</Text>
@@ -102,16 +103,16 @@ export default function ParentToyLibraryRoute() {
 }
 
 const styles = StyleSheet.create({
-  cardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  content: { gap: 16, padding: 24, paddingBottom: 52, paddingTop: 56 },
-  empty: { color: '#5C5C66', fontSize: 17 },
-  error: { color: '#C62828' },
+  cardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 8 },
+  content: { ...screenContentStyle, backgroundColor: theme.colors.background, flexGrow: 1, gap: 16 },
+  empty: { color: theme.colors.mutedText, fontSize: 17 },
+  error: { color: theme.colors.danger },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   header: { gap: 14 },
   headerText: { gap: 8 },
-  helper: { color: '#4B4B55', fontSize: 17, lineHeight: 25 },
-  search: { borderColor: '#B8B8C2', borderRadius: 8, borderWidth: 1, fontSize: 17, minHeight: 48, paddingHorizontal: 12 },
-  tile: { flexBasis: '48%', minWidth: 160 },
-  title: { fontSize: 32, fontWeight: '700' },
+  helper: { color: theme.colors.mutedText, fontSize: 17, lineHeight: 25 },
+  search: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.pill, borderWidth: 1, color: theme.colors.text, fontSize: 17, minHeight: 52, paddingHorizontal: 18 },
+  tile: { flexBasis: '47%', flexGrow: 1, minWidth: 160 },
+  title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: 32, fontWeight: '700' },
 });

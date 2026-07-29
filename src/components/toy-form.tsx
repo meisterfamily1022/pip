@@ -7,6 +7,7 @@ import type { LocationTreeItem } from '@/features/locations/location-service';
 import type { ToyFormInput } from '@/features/toys/toy-service';
 import type { ParentToy } from '@/repositories/toys-repository';
 import { ToyButton, ToyImagePreview } from './toy-ui';
+import { playmapTheme as theme, screenContentStyle } from '@/theme/playmap-theme';
 
 const CATEGORY_LABELS: Record<PlayCategory, string> = {
   quiet: 'Quiet',
@@ -68,7 +69,7 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
       <View style={styles.section}>
         <Text style={styles.label}>Photo</Text>
@@ -122,15 +123,15 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit }
 
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  content: { gap: 18, padding: 24, paddingBottom: 52, paddingTop: 24 },
-  error: { color: '#C62828', fontSize: 15 },
-  input: { borderColor: '#B8B8C2', borderRadius: 8, borderWidth: 1, fontSize: 17, minHeight: 48, paddingHorizontal: 12 },
-  label: { fontSize: 17, fontWeight: '700' },
-  option: { borderColor: '#C9CEDA', borderRadius: 8, borderWidth: 1, minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 8 },
+  content: { ...screenContentStyle, gap: 20 },
+  error: { backgroundColor: theme.colors.errorSoft, borderRadius: theme.radii.md, color: theme.colors.danger, fontSize: 15, padding: 12 },
+  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, color: theme.colors.text, fontSize: 17, minHeight: theme.sizes.input, paddingHorizontal: 16 },
+  label: { color: theme.colors.text, fontSize: 17, fontWeight: '700' },
+  option: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.pill, borderWidth: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 8 },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionSelected: { backgroundColor: '#E4F0FF', borderColor: '#2166D1' },
-  optionText: { color: '#20232B', fontSize: 15, textTransform: 'capitalize' },
-  section: { gap: 10 },
-  switchRow: { alignItems: 'center', borderColor: '#D9DDE7', borderRadius: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 48, paddingHorizontal: 12 },
+  optionSelected: { backgroundColor: theme.colors.mintSoft, borderColor: theme.colors.primary },
+  optionText: { color: theme.colors.text, fontSize: 15, textTransform: 'capitalize' },
+  section: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, gap: 12, padding: 16 },
+  switchRow: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 58, paddingHorizontal: 16 },
   switchText: { fontSize: 16, fontWeight: '600' },
 });

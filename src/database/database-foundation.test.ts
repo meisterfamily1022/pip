@@ -87,6 +87,8 @@ class TestDatabase implements DatabaseConnection {
   }
 
   async getAllAsync<T>(source: string, ...params: SqlParameters): Promise<T[]> {
+    if (source.includes('PRAGMA table_info("toys")')) return ['cleanup_difficulty', 'adult_help_required'].map((name) => ({ name }) as T);
+    if (source.includes('PRAGMA table_info("play_sessions")')) return ['cleanup_started_at', 'help_requested', 'parent_override_used'].map((name) => ({ name }) as T);
     if (source.includes('FROM rooms')) return [...this.rooms.values()].sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM storage_spots')) return [...this.spots.values()].filter((row) => row.room_id === params[0]).sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM toy_categories')) return (this.categories.get(params[0] as number) ?? []).map((category) => ({ category }) as T);
