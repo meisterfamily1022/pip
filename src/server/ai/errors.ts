@@ -9,6 +9,14 @@ export const AI_ERROR_CODES = [
   'PROVIDER_UNAVAILABLE',
   'INVALID_PROVIDER_RESPONSE',
   'INTERNAL_ERROR',
+  'INVALID_INSTALLATION_CREDENTIAL',
+  'INSTALLATION_REVOKED',
+  'AI_DISABLED',
+  'GLOBAL_LIMIT_REACHED',
+  'GLOBAL_BUDGET_REACHED',
+  'REQUEST_ID_REUSED',
+  'CREDENTIAL_ISSUANCE_FAILED',
+  'STORAGE_UNAVAILABLE',
 ] as const;
 
 export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
@@ -24,6 +32,14 @@ const defaults: Record<AiErrorCode, { message: string; retryable: boolean; statu
   PROVIDER_UNAVAILABLE: { message: 'Suggestions are unavailable right now.', retryable: true, status: 503 },
   INVALID_PROVIDER_RESPONSE: { message: 'Suggestions are unavailable right now.', retryable: true, status: 502 },
   INTERNAL_ERROR: { message: 'Suggestions are unavailable right now.', retryable: true, status: 500 },
+  INVALID_INSTALLATION_CREDENTIAL: { message: 'This installation credential is not valid.', retryable: false, status: 401 },
+  INSTALLATION_REVOKED: { message: 'This installation is no longer enabled.', retryable: false, status: 403 },
+  AI_DISABLED: { message: 'Suggestions are unavailable right now.', retryable: true, status: 503 },
+  GLOBAL_LIMIT_REACHED: { message: 'Suggestions are temporarily unavailable.', retryable: true, status: 429 },
+  GLOBAL_BUDGET_REACHED: { message: 'Suggestions are temporarily unavailable.', retryable: true, status: 429 },
+  REQUEST_ID_REUSED: { message: 'That request identifier was already used.', retryable: false, status: 409 },
+  CREDENTIAL_ISSUANCE_FAILED: { message: 'Suggestions are unavailable right now.', retryable: true, status: 503 },
+  STORAGE_UNAVAILABLE: { message: 'Suggestions are unavailable right now.', retryable: true, status: 503 },
 };
 
 export class AiApplicationError extends Error {

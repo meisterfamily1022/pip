@@ -1,5 +1,7 @@
 import { safeErrorBody, AiApplicationError } from '@/server/ai/errors';
-import { defaultToyAnalysisService } from '@/server/ai/toy-analysis-service';
+import { DurableToyAnalysisService } from '@/server/ai/durable-toy-analysis-service';
+
+const defaultToyAnalysisService = new DurableToyAnalysisService();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

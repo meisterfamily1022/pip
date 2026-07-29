@@ -30,7 +30,7 @@ const mockReferences = [
 const safeText = new RegExp(`^[^\\u0000-\\u001F\\u007F<>]{1,${MAX_NAME_LENGTH}}$`);
 
 export const toyAnalysisRequestSchema = z.object({
-  installationToken: z.string().regex(/^inst_[A-Za-z0-9_-]{16,128}$/),
+  installationToken: z.string().regex(/^inst_[A-Za-z0-9_.-]{16,1024}$/),
   image: z.object({
     mediaType: z.enum(['image/jpeg', 'image/png']),
     byteLength: z.number().int().positive().max(MAX_IMAGE_BYTES),
