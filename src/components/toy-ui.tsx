@@ -41,12 +41,9 @@ export function ToyError({ message, onRetry }: { message: string; onRetry(): voi
 const styles = StyleSheet.create({
   badge: { backgroundColor: theme.colors.mintSoft, borderRadius: theme.radii.pill, color: theme.colors.success, fontSize: 12, fontWeight: '700', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  button: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.mint, borderRadius: theme.radii.pill, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 16 },
-  buttonText: { color: theme.colors.primary, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   card: { ...theme.shadows.card, backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, flex: 1, minWidth: 150, overflow: 'hidden' },
   cardBody: { gap: 7, minHeight: 112, padding: 12 },
   cardLocation: { color: theme.colors.mutedText, fontSize: 13, lineHeight: 18 },
   cardTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '700', lineHeight: 22 },
-  center: { alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center', padding: 24 },
   pressed: { opacity: 0.75 },
 });

@@ -24,7 +24,7 @@ export function PrimaryButton(props: ButtonProps) { return <ActionButton {...pro
 export function SecondaryButton(props: ButtonProps) { return <ActionButton {...props} kind="secondary" />; }
 export function DestructiveButton(props: ButtonProps) { return <ActionButton {...props} kind="destructive" />; }
 
-export function PastelNavigationCard({ title, description, icon, tint = theme.colors.surfaceSage, onPress, disabled }: { title: string; description?: string; icon?: string; tint?: string; onPress(): void; disabled?: boolean }) {
+export function PastelNavigationCard({ title, description, icon, tint = theme.colors.surfaceSage, onPress, disabled }: { title: string; description?: string; icon?: string; tint?: string; onPress?: () => void; disabled?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={title} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.navigationCard, { backgroundColor: tint }, disabled && styles.disabled, pressed && !disabled && styles.pressed]}><Text style={styles.cardIcon}>{icon}</Text><View style={styles.cardCopy}><Text style={styles.cardTitle}>{title}</Text>{description && <Text style={styles.supporting}>{description}</Text>}</View><Text accessibilityElementsHidden style={styles.chevron}>›</Text></Pressable>;
 }
 

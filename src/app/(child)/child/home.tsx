@@ -26,11 +26,9 @@ export default function ChildHomeRoute() {
 const styles = StyleSheet.create({
   retry: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
   container: { ...screenContentStyle, backgroundColor: theme.colors.childBackground, flexGrow: 1, gap: 16 },
-  center: { alignItems: 'center', backgroundColor: theme.colors.childBackground, flex: 1, gap: 16, justifyContent: 'center', padding: 24 },
   sky: { alignItems: 'center', backgroundColor: '#EAF5F4', borderRadius: theme.radii.xl, minHeight: 290, overflow: 'hidden', padding: 22 },
   greeting: { alignSelf: 'flex-start', color: theme.colors.text, fontSize: 17, fontWeight: '700' }, cloud: { fontSize: 46, left: 32, opacity: 0.8, position: 'absolute', top: 58 }, sun: { fontSize: 45, position: 'absolute', right: 30, top: 62 },
   title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: theme.type.childTitle, fontWeight: '700', lineHeight: 43, maxWidth: 330, paddingTop: 48, textAlign: 'center' }, fox: { fontSize: 76, paddingTop: 14 },
-  actions: { gap: 12 }, action: { ...theme.shadows.card, alignItems: 'center', borderColor: 'rgba(85,95,80,0.08)', borderRadius: theme.radii.lg, borderWidth: 1, flexDirection: 'row', gap: 16, minHeight: 104, padding: 18 },
-  actionIcon: { color: theme.colors.primary, fontSize: 36, textAlign: 'center', width: 48 }, actionText: { flex: 1, gap: 5 }, actionTitle: { color: theme.colors.text, fontFamily: 'Georgia', fontSize: 22, fontWeight: '700' }, actionSubtitle: { color: theme.colors.mutedText, fontSize: 14 }, chevron: { color: theme.colors.mutedText, fontSize: 32 },
-  parent: { alignItems: 'center', minHeight: 48, justifyContent: 'center' }, parentText: { color: theme.colors.mutedText, fontSize: 15, fontWeight: '600' }, disabled: { opacity: 0.48 }, pressed: { opacity: 0.8 }, error: { color: theme.colors.danger, fontSize: 17, textAlign: 'center' },
+  actions: { gap: 12 },
+  parent: { alignItems: 'center', minHeight: 48, justifyContent: 'center' }, parentText: { color: theme.colors.mutedText, fontSize: 15, fontWeight: '600' },
 });

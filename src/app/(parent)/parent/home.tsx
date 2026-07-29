@@ -15,7 +15,7 @@ export default function ParentHomeRoute() {
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
       <View style={styles.header}><Text style={styles.eyebrow}>PLAYMAP · PARENT MODE</Text><Text accessibilityRole="header" style={styles.title}>Hello!</Text><Text style={styles.description}>Everything in its place, play starts with ease.</Text></View>
       <View style={styles.welcome}><Text style={styles.welcomeIcon}>✦</Text><View style={styles.welcomeText}><Text style={styles.welcomeTitle}>Your play space</Text><Text style={styles.welcomeBody}>Choose where you’d like to go.</Text></View></View>
-      <View style={styles.links}>{destinations.map((item) => <Link key={item.href} href={item.href} asChild><PastelNavigationCard description={item.description} icon={item.icon} onPress={() => undefined} tint={item.tint} title={item.title} /></Link>)}</View>
+      <View style={styles.links}>{destinations.map((item) => <Link key={item.href} href={item.href} asChild><PastelNavigationCard description={item.description} icon={item.icon} tint={item.tint} title={item.title} /></Link>)}</View>
     </ScrollView>
   );
 }
@@ -27,6 +27,5 @@ const styles = StyleSheet.create({
   description: { color: theme.colors.mutedText, fontSize: theme.type.body, lineHeight: 24 },
   welcome: { ...theme.shadows.card, alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, flexDirection: 'row', gap: 14, padding: 18 },
   welcomeIcon: { color: theme.colors.coral, fontSize: 38 }, welcomeText: { flex: 1, gap: 3 }, welcomeTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '700' }, welcomeBody: { color: theme.colors.mutedText, fontSize: 15 },
-  links: { gap: 12 }, link: { ...theme.shadows.card, alignItems: 'center', borderColor: 'rgba(100,90,75,0.08)', borderRadius: theme.radii.lg, borderWidth: 1, flexDirection: 'row', gap: 16, minHeight: 96, padding: 18 },
-  icon: { fontSize: 34, width: 44 }, linkText: { flex: 1, gap: 4 }, linkTitle: { color: theme.colors.text, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' }, linkDescription: { color: theme.colors.mutedText, fontSize: 14, lineHeight: 19 }, chevron: { color: theme.colors.mutedText, fontSize: 32 }, pressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
+  links: { gap: 12 },
 });

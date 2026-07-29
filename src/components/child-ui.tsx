@@ -17,5 +17,5 @@ export function ToyCard({ toy, onPress }: { toy: ChildToy; onPress(): void }) {
 
 const styles = StyleSheet.create({
   childButton: { minHeight: theme.sizes.childButton, width: '100%' },
-  card: { ...theme.shadows.card, backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, flex: 1, gap: 12, minWidth: 250, padding: 14 }, image: { aspectRatio: theme.images.hero, backgroundColor: theme.colors.photoFallback, borderRadius: theme.radii.md, width: '100%' }, imageFallback: { alignItems: 'center', justifyContent: 'center' }, fallbackText: { color: theme.colors.mutedText, fontWeight: '700' }, toyName: { color: theme.colors.text, fontSize: 22, fontWeight: '700' }, location: { color: theme.colors.mutedText, fontSize: 15, minHeight: 40 },
+  card: { ...theme.shadows.card, backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, flex: 1, gap: 12, minWidth: 250, padding: 14 }, toyName: { color: theme.colors.text, fontSize: 22, fontWeight: '700' }, location: { color: theme.colors.mutedText, fontSize: 15, minHeight: 40 },
 });
