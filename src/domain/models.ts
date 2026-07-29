@@ -2,6 +2,11 @@ import type { PlayCategory } from './play-category';
 
 export type Timestamp = string;
 
+export type PreferredImageVariant = 'original' | 'enhanced';
+export type AiMetadataStatus = 'manual' | 'suggested' | 'confirmed';
+export type ToySetupAnalysisStatus = 'not_requested' | 'queued' | 'processing' | 'ready' | 'failed';
+export type ToySetupEnhancementStatus = 'not_requested' | 'queued' | 'processing' | 'ready' | 'failed';
+
 export type Room = {
   id: number;
   name: string;
@@ -21,6 +26,14 @@ export type Toy = {
   id: number;
   name: string;
   imageUri: string | null;
+  originalImageUri: string | null;
+  enhancedImageUri: string | null;
+  preferredImageVariant: PreferredImageVariant;
+  aiMetadataStatus: AiMetadataStatus;
+  aiAnalysisId: string | null;
+  aiSchemaVersion: string | null;
+  aiConsentAt: Timestamp | null;
+  aiConfirmedAt: Timestamp | null;
   roomId: number;
   storageSpotId: number;
   cleanupDifficulty: 'easy' | 'medium' | 'big';
@@ -30,6 +43,25 @@ export type Toy = {
   categories: PlayCategory[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
+};
+
+export type ToySetupDraft = {
+  id: string;
+  originalImageUri: string;
+  enhancedImageUri: string | null;
+  draftName: string | null;
+  roomId: number | null;
+  storageSpotId: number | null;
+  categoriesJson: string;
+  cleanupDifficultyDraft: Toy['cleanupDifficulty'] | null;
+  adultHelpRequiredDraft: boolean | null;
+  analysisStatus: ToySetupAnalysisStatus;
+  enhancementStatus: ToySetupEnhancementStatus;
+  aiConsentAt: Timestamp | null;
+  parentReviewedAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  expiresAt: Timestamp | null;
 };
 
 export type PlaySessionStatus = 'active' | 'completed';

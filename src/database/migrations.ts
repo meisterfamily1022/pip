@@ -31,6 +31,44 @@ async function ensurePlaySessionCleanupColumns(database: DatabaseConnection): Pr
   await addColumnIfMissing(database, 'play_sessions', 'parent_override_used', 'INTEGER NOT NULL DEFAULT 0 CHECK (parent_override_used IN (0, 1))');
 }
 
+async function ensureAiToySetupColumns(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'toys', 'original_image_uri', 'TEXT');
+  await addColumnIfMissing(database, 'toys', 'enhanced_image_uri', 'TEXT');
+  await addColumnIfMissing(database, 'toys', 'preferred_image_variant', "TEXT NOT NULL DEFAULT 'original' CHECK (preferred_image_variant IN ('original', 'enhanced'))");
+  await addColumnIfMissing(database, 'toys', 'ai_metadata_status', "TEXT NOT NULL DEFAULT 'manual' CHECK (ai_metadata_status IN ('manual', 'suggested', 'confirmed'))");
+  await addColumnIfMissing(database, 'toys', 'ai_analysis_id', 'TEXT');
+  await addColumnIfMissing(database, 'toys', 'ai_schema_version', 'TEXT');
+  await addColumnIfMissing(database, 'toys', 'ai_consent_at', 'TEXT');
+  await addColumnIfMissing(database, 'toys', 'ai_confirmed_at', 'TEXT');
+  await database.runAsync('UPDATE toys SET original_image_uri = image_uri WHERE original_image_uri IS NULL AND image_uri IS NOT NULL;');
+  await database.runAsync("UPDATE toys SET preferred_image_variant = 'original' WHERE preferred_image_variant IS NULL;");
+  await database.runAsync("UPDATE toys SET ai_metadata_status = 'manual' WHERE ai_metadata_status IS NULL;");
+}
+
+async function ensureToySetupDraftsTable(database: DatabaseConnection): Promise<void> {
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS toy_setup_drafts (
+      id TEXT PRIMARY KEY NOT NULL,
+      original_image_uri TEXT NOT NULL CHECK (length(trim(original_image_uri)) > 0),
+      enhanced_image_uri TEXT,
+      draft_name TEXT,
+      room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
+      storage_spot_id INTEGER REFERENCES storage_spots(id) ON DELETE SET NULL,
+      categories_json TEXT NOT NULL DEFAULT '[]',
+      cleanup_difficulty_draft TEXT CHECK (cleanup_difficulty_draft IN ('easy', 'medium', 'big')),
+      adult_help_required_draft INTEGER CHECK (adult_help_required_draft IN (0, 1)),
+      analysis_status TEXT NOT NULL DEFAULT 'not_requested' CHECK (analysis_status IN ('not_requested', 'queued', 'processing', 'ready', 'failed')),
+      enhancement_status TEXT NOT NULL DEFAULT 'not_requested' CHECK (enhancement_status IN ('not_requested', 'queued', 'processing', 'ready', 'failed')),
+      ai_consent_at TEXT,
+      parent_reviewed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      expires_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS toy_setup_drafts_expires_at_index ON toy_setup_drafts(expires_at);
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -120,6 +158,13 @@ const migrations: readonly Migration[] = [
     apply: async (database) => {
       await ensureToyCleanupColumns(database);
       await ensurePlaySessionCleanupColumns(database);
+    },
+  },
+  {
+    version: 5,
+    apply: async (database) => {
+      await ensureAiToySetupColumns(database);
+      await ensureToySetupDraftsTable(database);
     },
   },
 ];

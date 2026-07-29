@@ -7,7 +7,9 @@ type CategoryRow = { category: string };
 const now = (): string => new Date().toISOString();
 
 function mapToy(row: ToyRow, categories: PlayCategory[]): Toy {
-  return { id: row.id, name: row.name, imageUri: row.image_uri, roomId: row.room_id, storageSpotId: row.storage_spot_id, cleanupDifficulty: row.cleanup_difficulty, adultHelpRequired: row.adult_help_required === 1, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories, createdAt: row.created_at, updatedAt: row.updated_at };
+  const originalImageUri = row.original_image_uri ?? row.image_uri;
+  const imageUri = row.preferred_image_variant === 'enhanced' && row.enhanced_image_uri ? row.enhanced_image_uri : originalImageUri;
+  return { id: row.id, name: row.name, imageUri, originalImageUri, enhancedImageUri: row.enhanced_image_uri, preferredImageVariant: row.preferred_image_variant ?? 'original', aiMetadataStatus: row.ai_metadata_status ?? 'manual', aiAnalysisId: row.ai_analysis_id, aiSchemaVersion: row.ai_schema_version, aiConsentAt: row.ai_consent_at, aiConfirmedAt: row.ai_confirmed_at, roomId: row.room_id, storageSpotId: row.storage_spot_id, cleanupDifficulty: row.cleanup_difficulty, adultHelpRequired: row.adult_help_required === 1, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 async function getCategories(database: DatabaseConnection, toyId: number): Promise<PlayCategory[]> {
@@ -44,8 +46,8 @@ export async function createToy(database: DatabaseConnection, input: SaveToyInpu
   let toyId: number | null = null;
   await database.withTransactionAsync(async () => {
     const result = await database.runAsync(
-      'INSERT INTO toys (name, image_uri, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
-      input.name.trim(), input.imageUri, input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, timestamp,
+      'INSERT INTO toys (name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      input.name.trim(), input.imageUri, input.imageUri, null, 'original', 'manual', null, null, null, null, input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, timestamp,
     );
     toyId = result.lastInsertRowId;
     for (const category of [...new Set(input.categories)]) {
@@ -59,13 +61,13 @@ export async function createToy(database: DatabaseConnection, input: SaveToyInpu
 }
 
 export async function getToy(database: DatabaseConnection, id: number): Promise<Toy | null> {
-  const row = await database.getFirstAsync<ToyRow>('SELECT id, name, image_uri, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at FROM toys WHERE id = ?;', id);
+  const row = await database.getFirstAsync<ToyRow>('SELECT id, name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at FROM toys WHERE id = ?;', id);
   return row ? mapToy(row, await getCategories(database, row.id)) : null;
 }
 
 export async function listChildToys(database: DatabaseConnection): Promise<ChildToy[]> {
   const rows = await database.getAllAsync<ChildToyRow>(
-    `SELECT t.id, t.name, t.image_uri, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
+    `SELECT t.id, t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.ai_metadata_status, t.ai_analysis_id, t.ai_schema_version, t.ai_consent_at, t.ai_confirmed_at, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
             t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
        FROM toys t
        JOIN rooms r ON r.id = t.room_id
@@ -104,7 +106,7 @@ export async function listParentToys(database: DatabaseConnection, filters: ToyF
   if (filters.category) appendFilter(clauses, parameters, 'EXISTS (SELECT 1 FROM toy_categories tc WHERE tc.toy_id = t.id AND tc.category = ?)', filters.category);
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const rows = await database.getAllAsync<ChildToyRow>(
-    `SELECT t.id, t.name, t.image_uri, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
+    `SELECT t.id, t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.ai_metadata_status, t.ai_analysis_id, t.ai_schema_version, t.ai_consent_at, t.ai_confirmed_at, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
             t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
        FROM toys t
        JOIN rooms r ON r.id = t.room_id
@@ -118,7 +120,7 @@ export async function listParentToys(database: DatabaseConnection, filters: ToyF
 
 export async function getParentToy(database: DatabaseConnection, id: number): Promise<ParentToy | null> {
   const row = await database.getFirstAsync<ChildToyRow>(
-    `SELECT t.id, t.name, t.image_uri, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
+    `SELECT t.id, t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.ai_metadata_status, t.ai_analysis_id, t.ai_schema_version, t.ai_consent_at, t.ai_confirmed_at, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
             t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
        FROM toys t
        JOIN rooms r ON r.id = t.room_id
@@ -134,8 +136,8 @@ export async function updateToy(database: DatabaseConnection, id: number, input:
   const timestamp = now();
   await database.withTransactionAsync(async () => {
     const result = await database.runAsync(
-      'UPDATE toys SET name = ?, image_uri = ?, room_id = ?, storage_spot_id = ?, cleanup_difficulty = ?, adult_help_required = ?, is_available = ?, is_archived = ?, updated_at = ? WHERE id = ?;',
-      input.name.trim(), input.imageUri, input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, id,
+      'UPDATE toys SET name = ?, image_uri = ?, original_image_uri = ?, enhanced_image_uri = NULL, preferred_image_variant = ?, ai_metadata_status = ?, ai_analysis_id = NULL, ai_schema_version = NULL, ai_consent_at = NULL, ai_confirmed_at = NULL, room_id = ?, storage_spot_id = ?, cleanup_difficulty = ?, adult_help_required = ?, is_available = ?, is_archived = ?, updated_at = ? WHERE id = ?;',
+      input.name.trim(), input.imageUri, input.imageUri, 'original', 'manual', input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, id,
     );
     if (result.changes !== 1) throw new Error('Toy not found.');
     await database.runAsync('DELETE FROM toy_categories WHERE toy_id = ?;', id);

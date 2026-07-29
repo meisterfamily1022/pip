@@ -11,7 +11,7 @@ import {
   type ParentToy,
   type SaveToyInput,
 } from '@/repositories/toys-repository';
-import { expoToyImageStorage, type ToyImageStorage } from './toy-image-storage';
+import { deleteUniqueManagedImages, expoToyImageStorage, type ToyImageStorage } from './toy-image-storage';
 
 export class ToyValidationError extends Error {}
 
@@ -88,7 +88,10 @@ export async function updateParentToy(
   const nextImageUri = copiedImageUri ?? input.existingImageUri ?? existing.imageUri;
   try {
     const toy = await updateToy(database, id, { ...validated, imageUri: nextImageUri, isArchived: existing.isArchived });
-    if (copiedImageUri) await storage.deleteManagedImage(existing.imageUri);
+    if (copiedImageUri) {
+      const cleanupFailures = await deleteUniqueManagedImages(storage, [existing.originalImageUri, existing.enhancedImageUri, existing.imageUri].filter((uri) => uri !== copiedImageUri));
+      if (cleanupFailures > 0) console.warn('Toy image cleanup incomplete after replacement.');
+    }
     const parentToy = await getParentToy(database, toy.id);
     if (!parentToy) throw new Error('Updated toy could not be loaded.');
     return parentToy;
@@ -119,7 +122,8 @@ export async function permanentlyDeleteParentToy(
   if (!existing) throw new Error('Toy not found.');
   await deleteToy(database, id);
   try {
-    await storage.deleteManagedImage(existing.imageUri);
+    const cleanupFailures = await deleteUniqueManagedImages(storage, [existing.originalImageUri, existing.enhancedImageUri, existing.imageUri]);
+    if (cleanupFailures > 0) console.warn('Toy image cleanup incomplete after deletion.');
   } catch {
     // Database deletion is authoritative; image cleanup can be retried by future maintenance.
   }

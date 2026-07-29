@@ -17,7 +17,7 @@ const v1SessionColumns = [
 class SchemaDatabase implements DatabaseConnection {
   public version: number;
   public readonly tables = new Map<string, string[]>();
-  public readonly toyRecords = [{ id: 7, name: 'Wooden Train', cleanup_difficulty: 'medium' }];
+  public readonly toyRecords = [{ id: 7, name: 'Wooden Train', image_uri: 'file:///train.jpg', original_image_uri: null as string | null, cleanup_difficulty: 'medium' }];
 
   constructor(version = 0, toyColumns: string[] = [], sessionColumns: string[] = []) {
     this.version = version;
@@ -32,6 +32,7 @@ class SchemaDatabase implements DatabaseConnection {
     if (source.includes('CREATE TABLE IF NOT EXISTS play_sessions') && !this.tables.has('play_sessions')) {
       this.tables.set('play_sessions', [...v1SessionColumns]);
     }
+    if (source.includes('CREATE TABLE IF NOT EXISTS toy_setup_drafts')) this.tables.set('toy_setup_drafts', ['id']);
 
     const alter = source.match(/ALTER TABLE "([^"]+)" ADD COLUMN "([^"]+)"/);
     if (alter?.[1] && alter[2]) {
@@ -48,7 +49,10 @@ class SchemaDatabase implements DatabaseConnection {
     if (version?.[1]) this.version = Number(version[1]);
   }
 
-  async runAsync(_source: string, ..._parameters: SqlParameters): Promise<SqlRunResult> {
+  async runAsync(source: string, ..._parameters: SqlParameters): Promise<SqlRunResult> {
+    if (source.startsWith('UPDATE toys SET original_image_uri')) {
+      for (const record of this.toyRecords) if (record.original_image_uri === null) record.original_image_uri = record.image_uri;
+    }
     return { lastInsertRowId: 0, changes: 0 };
   }
 
@@ -99,7 +103,14 @@ describe('SQLite migration compatibility', () => {
     const database = new SchemaDatabase(2, v1ToyColumns, v1SessionColumns);
     await runMigrations(database);
     expect(cleanupDifficultyCount(database)).toBe(1);
-    expect(database.toyRecords).toEqual([{ id: 7, name: 'Wooden Train', cleanup_difficulty: 'medium' }]);
+    expect(database.toyRecords).toEqual([{ id: 7, name: 'Wooden Train', image_uri: 'file:///train.jpg', original_image_uri: 'file:///train.jpg', cleanup_difficulty: 'medium' }]);
+  });
+
+  it('copies the legacy image into original_image_uri and keeps existing toys manual', async () => {
+    const database = new SchemaDatabase();
+    await runMigrations(database);
+    expect(database.toyRecords[0]).toMatchObject({ image_uri: 'file:///train.jpg', original_image_uri: 'file:///train.jpg' });
+    expect(database.tables.get('toys')).toEqual(expect.arrayContaining(['original_image_uri', 'enhanced_image_uri', 'preferred_image_variant', 'ai_metadata_status', 'ai_analysis_id', 'ai_schema_version', 'ai_consent_at', 'ai_confirmed_at']));
   });
 
   it('repairs a versioned database where cleanup_difficulty is missing', async () => {
@@ -107,6 +118,6 @@ describe('SQLite migration compatibility', () => {
     database.toyRecords[0]!.cleanup_difficulty = undefined as unknown as string;
     await runMigrations(database);
     expect(cleanupDifficultyCount(database)).toBe(1);
-    expect(database.toyRecords[0]).toMatchObject({ id: 7, name: 'Wooden Train', cleanup_difficulty: 'easy' });
+    expect(database.toyRecords[0]).toMatchObject({ id: 7, name: 'Wooden Train', cleanup_difficulty: 'easy', original_image_uri: 'file:///train.jpg' });
   });
 });

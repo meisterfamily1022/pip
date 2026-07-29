@@ -6,6 +6,14 @@ export interface ToyImageStorage {
   deleteManagedImage(uri: string | null): Promise<void>;
 }
 
+export async function deleteUniqueManagedImages(storage: ToyImageStorage, uris: readonly (string | null)[]): Promise<number> {
+  let failures = 0;
+  for (const uri of [...new Set(uris.filter((candidate): candidate is string => Boolean(candidate)))]) {
+    try { await storage.deleteManagedImage(uri); } catch { failures += 1; /* Attempt every distinct image; caller owns error reporting. */ }
+  }
+  return failures;
+}
+
 function extensionFromUri(uri: string): string {
   const clean = uri.split('?')[0]?.split('#')[0] ?? uri;
   const match = clean.match(/\.([a-zA-Z0-9]{1,8})$/);

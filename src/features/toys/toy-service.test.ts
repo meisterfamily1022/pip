@@ -50,14 +50,14 @@ class ToyTestDatabase implements DatabaseConnection {
     if (source.startsWith('INSERT INTO toys')) {
       if (this.failToyCreate) throw new Error('toy insert failed');
       const id = this.id();
-      this.toys.set(id, { id, name: params[0]!, image_uri: params[1]!, room_id: params[2]!, storage_spot_id: params[3]!, cleanup_difficulty: params[4]!, adult_help_required: params[5]!, is_available: params[6]!, is_archived: params[7]!, created_at: params[8]!, updated_at: params[9]! });
+      this.toys.set(id, { id, name: params[0]!, image_uri: params[1]!, original_image_uri: params[2]!, enhanced_image_uri: params[3]!, preferred_image_variant: params[4]!, ai_metadata_status: params[5]!, room_id: params[10]!, storage_spot_id: params[11]!, cleanup_difficulty: params[12]!, adult_help_required: params[13]!, is_available: params[14]!, is_archived: params[15]!, created_at: params[16]!, updated_at: params[17]! });
       return { lastInsertRowId: id, changes: 1 };
     }
     if (source.startsWith('UPDATE toys SET name')) {
-      const id = params[9] as number;
+      const id = params[12] as number;
       const row = this.toys.get(id);
       if (!row) return { lastInsertRowId: 0, changes: 0 };
-      row.name = params[0]!; row.image_uri = params[1]!; row.room_id = params[2]!; row.storage_spot_id = params[3]!; row.cleanup_difficulty = params[4]!; row.adult_help_required = params[5]!; row.is_available = params[6]!; row.is_archived = params[7]!; row.updated_at = params[8]!;
+      row.name = params[0]!; row.image_uri = params[1]!; row.original_image_uri = params[2]!; row.preferred_image_variant = params[3]!; row.ai_metadata_status = params[4]!; row.room_id = params[5]!; row.storage_spot_id = params[6]!; row.cleanup_difficulty = params[7]!; row.adult_help_required = params[8]!; row.is_available = params[9]!; row.is_archived = params[10]!; row.updated_at = params[11]!;
       return { lastInsertRowId: 0, changes: 1 };
     }
     if (source.startsWith('UPDATE toys SET is_archived')) {
@@ -228,6 +228,18 @@ describe('parent toy mutation compensation', () => {
     expect(storage.deleted).toContain('file:///managed/blocks.jpg');
   });
 
+  it('attempts both distinct image variants when permanently deleting a toy', async () => {
+    const database = new ToyTestDatabase();
+    const storage = new TestImageStorage();
+    const toy = await createParentToy(database, validInput(), storage);
+    const row = database.toys.get(toy.id)!;
+    row.original_image_uri = 'file:///managed/original.jpg';
+    row.enhanced_image_uri = 'file:///managed/enhanced.png';
+    await permanentlyDeleteParentToy(database, toy.id, storage);
+    expect(storage.deleted).toEqual(expect.arrayContaining(['file:///managed/original.jpg', 'file:///managed/enhanced.png']));
+    expect(storage.deleted.filter((uri) => uri === 'file:///managed/original.jpg')).toHaveLength(1);
+  });
+
   it('preserves managed image when database delete fails and does not recreate toy when cleanup fails', async () => {
     const database = new ToyTestDatabase();
     const storage = new TestImageStorage();
@@ -238,7 +250,9 @@ describe('parent toy mutation compensation', () => {
     expect(storage.deleted).not.toContain('file:///managed/blocks.jpg');
     database.failToyDelete = false;
     storage.failDelete = true;
+    const warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     await expect(permanentlyDeleteParentToy(database, toy.id, storage)).resolves.toBeUndefined();
+    warning.mockRestore();
     expect(database.toys.has(toy.id)).toBe(false);
   });
 

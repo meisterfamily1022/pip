@@ -2,6 +2,7 @@ import type { PlaySession } from '@/domain/models';
 import type { PlaySessionRow } from '@/database/rows';
 import type { DatabaseConnection } from '@/database/types';
 import type { ChildToy } from './toys-repository';
+import { selectToyImageUri } from '@/features/toys/toy-image-selection';
 
 const now = (): string => new Date().toISOString();
 const toSession = (row: PlaySessionRow): PlaySession => ({ id: row.id, toyId: row.toy_id, status: row.status, startedAt: row.started_at, completedAt: row.completed_at, cleanupStartedAt: row.cleanup_started_at, helpRequested: row.help_requested === 1, parentOverrideUsed: row.parent_override_used === 1, createdAt: row.created_at, updatedAt: row.updated_at });
@@ -13,6 +14,9 @@ type ActiveSessionRow = PlaySessionRow & {
   storage_spot_name: string | null;
   name: string | null;
   image_uri: string | null;
+  original_image_uri: string | null;
+  enhanced_image_uri: string | null;
+  preferred_image_variant: 'original' | 'enhanced';
   room_id: number | null;
   storage_spot_id: number | null;
   cleanup_difficulty: 'easy' | 'medium' | 'big' | null;
@@ -37,7 +41,7 @@ export async function getPlaySession(database: DatabaseConnection, id: number): 
 export async function getActivePlaySession(database: DatabaseConnection): Promise<ActivePlaySession | null> {
   const row = await database.getFirstAsync<ActiveSessionRow>(
     `SELECT p.id, p.toy_id, p.status, p.started_at, p.completed_at, p.cleanup_started_at, p.help_requested, p.parent_override_used, p.created_at, p.updated_at,
-            t.name, t.image_uri, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
+            t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
             r.name AS room_name, s.name AS storage_spot_name
        FROM play_sessions p
        LEFT JOIN toys t ON t.id = p.toy_id
@@ -47,7 +51,7 @@ export async function getActivePlaySession(database: DatabaseConnection): Promis
   );
   if (!row) return null;
   const toy = typeof row.name === 'string' && typeof row.room_name === 'string' && typeof row.storage_spot_name === 'string' && typeof row.room_id === 'number' && typeof row.storage_spot_id === 'number'
-    ? { id: row.toy_id, name: row.name, imageUri: row.image_uri, roomId: row.room_id, storageSpotId: row.storage_spot_id, cleanupDifficulty: row.cleanup_difficulty ?? 'easy', adultHelpRequired: row.adult_help_required === 1, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories: [], createdAt: row.created_at, updatedAt: row.updated_at, roomName: row.room_name, storageSpotName: row.storage_spot_name }
+    ? { id: row.toy_id, name: row.name, imageUri: selectToyImageUri({ originalImageUri: row.original_image_uri, enhancedImageUri: row.enhanced_image_uri, preferredImageVariant: row.preferred_image_variant, imageUri: row.image_uri }), originalImageUri: row.original_image_uri ?? row.image_uri, enhancedImageUri: row.enhanced_image_uri, preferredImageVariant: row.preferred_image_variant ?? 'original', aiMetadataStatus: 'manual' as const, aiAnalysisId: null, aiSchemaVersion: null, aiConsentAt: null, aiConfirmedAt: null, roomId: row.room_id, storageSpotId: row.storage_spot_id, cleanupDifficulty: row.cleanup_difficulty ?? 'easy', adultHelpRequired: row.adult_help_required === 1, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories: [], createdAt: row.created_at, updatedAt: row.updated_at, roomName: row.room_name, storageSpotName: row.storage_spot_name }
     : null;
   return { ...toSession(row), toy };
 }
