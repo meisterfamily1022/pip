@@ -1,5 +1,6 @@
 import { Link } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PastelNavigationCard } from '@/components/playmap-ui';
 import { playmapTheme as theme, screenContentStyle } from '@/theme/playmap-theme';
 
 const destinations = [
@@ -12,9 +13,9 @@ const destinations = [
 export default function ParentHomeRoute() {
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
-      <View style={styles.header}><Text style={styles.eyebrow}>PLAYMAP</Text><Text accessibilityRole="header" style={styles.title}>Hello!</Text><Text style={styles.description}>Everything in its place, play starts with ease.</Text></View>
-      <View style={styles.welcome}><Text style={styles.welcomeIcon}>♡</Text><View style={styles.welcomeText}><Text style={styles.welcomeTitle}>Your play space</Text><Text style={styles.welcomeBody}>Choose where you’d like to go.</Text></View></View>
-      <View style={styles.links}>{destinations.map((item) => <Link key={item.href} href={item.href} asChild><Pressable accessibilityRole="button" style={StyleSheet.flatten([styles.link, { backgroundColor: item.tint }])}><Text style={styles.icon}>{item.icon}</Text><View style={styles.linkText}><Text style={styles.linkTitle}>{item.title}</Text><Text style={styles.linkDescription}>{item.description}</Text></View><Text style={styles.chevron}>›</Text></Pressable></Link>)}</View>
+      <View style={styles.header}><Text style={styles.eyebrow}>PLAYMAP · PARENT MODE</Text><Text accessibilityRole="header" style={styles.title}>Hello!</Text><Text style={styles.description}>Everything in its place, play starts with ease.</Text></View>
+      <View style={styles.welcome}><Text style={styles.welcomeIcon}>✦</Text><View style={styles.welcomeText}><Text style={styles.welcomeTitle}>Your play space</Text><Text style={styles.welcomeBody}>Choose where you’d like to go.</Text></View></View>
+      <View style={styles.links}>{destinations.map((item) => <Link key={item.href} href={item.href} asChild><PastelNavigationCard description={item.description} icon={item.icon} onPress={() => undefined} tint={item.tint} title={item.title} /></Link>)}</View>
     </ScrollView>
   );
 }

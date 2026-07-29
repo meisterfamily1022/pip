@@ -77,15 +77,15 @@ export default function ParentToyLibraryRoute() {
       <TextInput accessibilityLabel="Search toys" onChangeText={(search) => setFilters((current) => ({ ...current, search }))} placeholder="Search toys" style={styles.search} value={filters.search ?? ''} />
       <View style={styles.filters}>
         <ToyButton label="All Rooms" onPress={() => setFilters((current) => ({ ...current, roomId: null }))} />
-        {locations.map((room) => <ToyButton key={room.id} label={room.name} onPress={() => setFilters((current) => ({ ...current, roomId: room.id }))} />)}
+        {locations.map((room) => <ToyButton key={room.id} label={room.name} selected={filters.roomId === room.id} onPress={() => setFilters((current) => ({ ...current, roomId: room.id }))} />)}
       </View>
       <View style={styles.filters}>
         <ToyButton label="All Categories" onPress={() => setFilters((current) => ({ ...current, category: null }))} />
-        {PLAY_CATEGORIES.map((category) => <ToyButton key={category} label={categoryLabels[category]} onPress={() => setFilters((current) => ({ ...current, category }))} />)}
+        {PLAY_CATEGORIES.map((category) => <ToyButton key={category} label={categoryLabels[category]} selected={filters.category === category} onPress={() => setFilters((current) => ({ ...current, category }))} />)}
       </View>
       <View style={styles.filters}>
-        {(['all', 'available', 'hidden'] as const).map((availability) => <ToyButton key={availability} label={availability === 'all' ? 'Available + Hidden' : availability} onPress={() => setFilters((current) => ({ ...current, availability }))} />)}
-        {(['active', 'archived', 'all'] as const).map((archived) => <ToyButton key={archived} label={archived === 'active' ? 'Not Archived' : archived} onPress={() => setFilters((current) => ({ ...current, archived }))} />)}
+        {(['all', 'available', 'hidden'] as const).map((availability) => <ToyButton key={availability} label={availability === 'all' ? 'Available + Hidden' : availability} selected={filters.availability === availability} onPress={() => setFilters((current) => ({ ...current, availability }))} />)}
+        {(['active', 'archived', 'all'] as const).map((archived) => <ToyButton key={archived} label={archived === 'active' ? 'Not Archived' : archived} selected={filters.archived === archived} onPress={() => setFilters((current) => ({ ...current, archived }))} />)}
       </View>
       {toys.length === 0 ? <Text style={styles.empty}>No toys match these filters yet.</Text> : <View style={styles.grid}>{toys.map((toy) => (
         <View key={toy.id} style={styles.tile}>

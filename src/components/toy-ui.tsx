@@ -1,19 +1,17 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ParentToy } from '@/repositories/toys-repository';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { DestructiveButton, ErrorStateCard, FilterChip, LoadingState, SecondaryButton, ToyImage } from './playmap-ui';
 
-type ToyButtonProps = { label: string; onPress(): void; destructive?: boolean; disabled?: boolean };
+type ToyButtonProps = { label: string; onPress(): void; destructive?: boolean; disabled?: boolean; selected?: boolean };
 
-export function ToyButton({ label, onPress, destructive = false, disabled = false }: ToyButtonProps) {
-  return (
-    <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, destructive && styles.destructiveButton, disabled && styles.disabled, pressed && styles.pressed]}>
-      <Text style={[styles.buttonText, destructive && styles.destructiveText]}>{label}</Text>
-    </Pressable>
-  );
+export function ToyButton({ label, onPress, destructive = false, disabled = false, selected = false }: ToyButtonProps) {
+  if (selected) return <FilterChip label={label} onPress={onPress} selected />;
+  return destructive ? <DestructiveButton disabled={disabled} label={label} onPress={onPress} /> : <SecondaryButton disabled={disabled} label={label} onPress={onPress} />;
 }
 
 export function ToyImagePreview({ uri }: { uri: string | null }) {
-  return uri ? <Image source={{ uri }} style={styles.image} /> : <View style={[styles.image, styles.imageEmpty]}><Text style={styles.emptyImageText}>Photo required</Text></View>;
+  return <ToyImage accessibilityLabel="Toy photo" uri={uri} />;
 }
 
 export function ToyGridCard({ toy, onPress }: { toy: ParentToy; onPress(): void }) {
@@ -33,11 +31,11 @@ export function ToyGridCard({ toy, onPress }: { toy: ParentToy; onPress(): void 
 }
 
 export function ToyLoading() {
-  return <View style={styles.center}><Text>Loading toys…</Text></View>;
+  return <LoadingState label="Loading toys…" />;
 }
 
 export function ToyError({ message, onRetry }: { message: string; onRetry(): void }) {
-  return <View style={styles.center}><Text accessibilityLiveRegion="polite" style={styles.error}>{message}</Text><ToyButton label="Retry" onPress={onRetry} /></View>;
+  return <ErrorStateCard action={<ToyButton label="Retry" onPress={onRetry} />} message={message} />;
 }
 
 const styles = StyleSheet.create({
@@ -50,12 +48,5 @@ const styles = StyleSheet.create({
   cardLocation: { color: theme.colors.mutedText, fontSize: 13, lineHeight: 18 },
   cardTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '700', lineHeight: 22 },
   center: { alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center', padding: 24 },
-  destructiveButton: { borderColor: theme.colors.danger },
-  destructiveText: { color: theme.colors.danger },
-  disabled: { opacity: 0.45 },
-  emptyImageText: { color: theme.colors.mutedText, fontWeight: '700' },
-  error: { color: theme.colors.danger, textAlign: 'center' },
-  image: { aspectRatio: theme.images.toyCard, backgroundColor: theme.colors.photoFallback, width: '100%' },
-  imageEmpty: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.75 },
 });

@@ -1,26 +1,17 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { DestructiveButton, EmptyStateCard, ErrorStateCard, LoadingState, PrimaryButton, SecondaryButton } from './playmap-ui';
 
-type LocationButtonProps = { label: string; onPress(): void; destructive?: boolean };
-export function LocationButton({ label, onPress, destructive = false }: LocationButtonProps) {
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.button, destructive && styles.destructiveButton, pressed && styles.pressed]}><Text style={[styles.buttonText, destructive && styles.destructiveText]}>{label}</Text></Pressable>;
+type LocationButtonProps = { label: string; onPress(): void; destructive?: boolean; primary?: boolean };
+export function LocationButton({ label, onPress, destructive = false, primary = false }: LocationButtonProps) {
+  if (primary) return <PrimaryButton label={label} onPress={onPress} />;
+  return destructive ? <DestructiveButton label={label} onPress={onPress} /> : <SecondaryButton label={label} onPress={onPress} />;
 }
 
 export function LocationError({ message, onRetry }: { message: string; onRetry(): void }) {
-  return <View style={styles.errorBox}><Text accessibilityLiveRegion="polite" style={styles.errorText}>{message}</Text><LocationButton label="Retry" onPress={onRetry} /></View>;
+  return <ErrorStateCard action={<LocationButton label="Retry" onPress={onRetry} />} message={message} />;
 }
 
-export function LocationLoading() { return <View style={styles.center}><Text>Loading locations…</Text></View>; }
+export function LocationLoading() { return <LoadingState label="Loading locations…" />; }
 
 export function LocationEmpty({ onAddRoom }: { onAddRoom(): void }) {
-  return <View style={styles.empty}><Text style={styles.emptyTitle}>No rooms yet</Text><Text>Add your first room to start organizing where toys belong.</Text><LocationButton label="Add Room" onPress={onAddRoom} /></View>;
+  return <EmptyStateCard action={<LocationButton label="Add Room" onPress={onAddRoom} />} message="Add your first room to start organizing where toys belong." title="No rooms yet" />;
 }
-
-const styles = StyleSheet.create({
-  button: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.primary, borderRadius: theme.radii.md, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
-  buttonText: { color: theme.colors.primary, fontSize: 15, fontWeight: '700' },
-  destructiveButton: { borderColor: theme.colors.danger }, destructiveText: { color: theme.colors.danger }, pressed: { opacity: 0.75 },
-  center: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
-  empty: { alignItems: 'center', gap: 14, justifyContent: 'center', padding: 24 }, emptyTitle: { fontSize: 20, fontWeight: '700' },
-  errorBox: { alignItems: 'center', gap: 12, padding: 24 }, errorText: { color: theme.colors.danger, textAlign: 'center' },
-});

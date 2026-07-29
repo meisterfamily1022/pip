@@ -77,7 +77,7 @@ export default function ParentSettingsRoute() {
         {error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
         {success && <Text accessibilityLiveRegion="polite" style={styles.success}>{success}</Text>}
 
-        <View style={styles.section}>
+        <View style={[styles.section, styles.childSection]}>
           <Text style={styles.sectionTitle}>Child Experience</Text>
           <Text style={styles.label}>Child nickname</Text>
           <TextInput accessibilityLabel="Child nickname" onChangeText={setNickname} placeholder="Ari" style={styles.input} value={nickname} />
@@ -87,7 +87,7 @@ export default function ParentSettingsRoute() {
           <ToyButton disabled={savingSettings} label={savingSettings ? 'Saving…' : 'Save Settings'} onPress={() => { void saveSettings(); }} />
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, styles.accessSection]}>
           <Text style={styles.sectionTitle}>Parent Access</Text>
           <TextInput accessibilityLabel="Current PIN" keyboardType="number-pad" maxLength={4} onChangeText={(value) => setPinInput((current) => ({ ...current, currentPin: value.replace(/\D/g, '') }))} placeholder="Current PIN" secureTextEntry style={styles.input} value={pinInput.currentPin} />
           <TextInput accessibilityLabel="New PIN" keyboardType="number-pad" maxLength={4} onChangeText={(value) => setPinInput((current) => ({ ...current, newPin: value.replace(/\D/g, '') }))} placeholder="New PIN" secureTextEntry style={styles.input} value={pinInput.newPin} />
@@ -95,14 +95,14 @@ export default function ParentSettingsRoute() {
           <ToyButton disabled={savingPin} label={savingPin ? 'Changing…' : 'Change Parent PIN'} onPress={() => { void changePin(); }} />
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, styles.dataSection]}>
           <Text style={styles.sectionTitle}>Data and Privacy</Text>
           <Text>PlayMap stores your toy library and photos on this device.</Text>
           <Text>Deleting PlayMap may delete your saved toy library.</Text>
           <Text>PlayMap V1 does not upload toy photos or require an account.</Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, styles.supportSection]}>
           <Text style={styles.sectionTitle}>Support</Text>
           <Text>App version: {Constants.expoConfig?.version ?? '1.0.0'}</Text>
           <Text>Privacy Policy: Not configured yet.</Text>
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, color: theme.colors.text, fontSize: 17, minHeight: theme.sizes.input, paddingHorizontal: 16 },
   label: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  section: { ...theme.shadows.card, backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, gap: 12, padding: 18 },
+  section: { ...theme.shadows.card, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, gap: 12, padding: 18 }, childSection: { backgroundColor: theme.colors.peachSoft }, accessSection: { backgroundColor: theme.colors.lavenderSoft }, dataSection: { backgroundColor: theme.colors.sageSoft }, supportSection: { backgroundColor: theme.colors.yellowSoft },
   sectionTitle: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
   success: { color: theme.colors.success },
   switchRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },

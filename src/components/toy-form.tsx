@@ -73,7 +73,10 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit }
       {error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
       <View style={styles.section}>
         <Text style={styles.label}>Photo</Text>
-        <ToyImagePreview uri={selectedImageUri} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Choose a toy photo" onPress={() => { void chooseFromLibrary(); }} style={styles.uploadZone}>
+          <ToyImagePreview uri={selectedImageUri} />
+          {!selectedImageUri && <View style={styles.uploadHint}><Text style={styles.cameraIcon}>⌾</Text><Text style={styles.uploadTitle}>Add a toy photo</Text><Text style={styles.uploadCaption}>Choose from photos or take a picture</Text></View>}
+        </Pressable>
         <View style={styles.actions}>
           {Platform.OS !== 'web' && <ToyButton label="Take Photo" onPress={() => { void takePhoto(); }} />}
           <ToyButton label={Platform.OS === 'web' ? 'Select Image' : 'Choose Photo'} onPress={() => { void chooseFromLibrary(); }} />
@@ -129,9 +132,11 @@ const styles = StyleSheet.create({
   label: { color: theme.colors.text, fontSize: 17, fontWeight: '700' },
   option: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.pill, borderWidth: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 8 },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionSelected: { backgroundColor: theme.colors.mintSoft, borderColor: theme.colors.primary },
+  optionSelected: { backgroundColor: theme.colors.mintSoft, borderColor: theme.colors.primary, borderWidth: 2 },
   optionText: { color: theme.colors.text, fontSize: 15, textTransform: 'capitalize' },
   section: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, gap: 12, padding: 16 },
+  uploadZone: { alignItems: 'center', backgroundColor: theme.colors.surfaceWarm, borderColor: theme.colors.peach, borderRadius: theme.radii.lg, borderStyle: 'dashed', borderWidth: 2, minHeight: 210, overflow: 'hidden', justifyContent: 'center' },
+  uploadHint: { alignItems: 'center', gap: 5, padding: 24 }, cameraIcon: { color: theme.colors.coral, fontSize: 38 }, uploadTitle: { color: theme.colors.text, fontSize: 18, fontWeight: '700' }, uploadCaption: { color: theme.colors.mutedText, fontSize: 13, textAlign: 'center' },
   switchRow: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 58, paddingHorizontal: 16 },
   switchText: { fontSize: 16, fontWeight: '600' },
 });

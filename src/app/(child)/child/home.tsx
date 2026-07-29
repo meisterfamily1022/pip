@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ChildButton } from '@/components/child-ui';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ChildActionCard, ErrorStateCard, LoadingState } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import { getActivePlaySession } from '@/repositories/play-sessions-repository';
 import { getSettings } from '@/repositories/settings-repository';
@@ -10,23 +10,21 @@ import { playmapTheme as theme, screenContentStyle } from '@/theme/playmap-theme
 export default function ChildHomeRoute() {
   const [nickname, setNickname] = useState<string | null>(null); const [hasActive, setHasActive] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   useEffect(() => { initializeDatabase().then(async (db) => { const [settings, active] = await Promise.all([getSettings(db), getActivePlaySession(db)]); setNickname(settings.childNickname); setHasActive(active !== null); }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Could not load Child Mode.')).finally(() => setLoading(false)); }, []);
-  if (loading) return <View style={styles.center}><ActivityIndicator /><Text>Loading Child Mode…</Text></View>;
-  if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text><ChildButton label="Try Again" onPress={() => router.replace('/child/home')} /></View>;
+  if (loading) return <LoadingState label="Loading Child Mode…" />;
+  if (error) return <ErrorStateCard message={error} action={<Pressable accessibilityRole="button" onPress={() => router.replace('/child/home')} style={styles.retry}><Text style={styles.parentText}>Try Again</Text></Pressable>} />;
   return <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.container}>
     <View style={styles.sky}><Text style={styles.greeting}>🦁  Hi{nickname ? ` ${nickname}` : ''}!</Text><Text style={styles.cloud}>☁️</Text><Text style={styles.sun}>☀️</Text><Text accessibilityRole="header" style={styles.title}>What sounds fun today?</Text><Text style={styles.fox}>🦊</Text></View>
     <View style={styles.actions}>
-      <ActionCard icon="⌕" title="Find a Toy" subtitle="Choose what sounds fun" tint={theme.colors.mintSoft} onPress={() => router.push('/child/categories')} />
-      <ActionCard icon="🎁" title="Surprise Me" subtitle="Pick something random!" tint={theme.colors.yellowSoft} onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything', surprise: '1' } })} />
-      <ActionCard icon="★" title="Current Toy" subtitle={hasActive ? 'See what you’re playing with' : 'Nothing is being played with'} tint={theme.colors.peachSoft} disabled={!hasActive} onPress={() => router.push('/child/current-toy')} />
+      <ChildActionCard icon="⌕" title="Find a Toy" description="Choose what sounds fun" tint={theme.colors.mintSoft} onPress={() => router.push('/child/categories')} />
+      <ChildActionCard icon="🎁" title="Surprise Me" description="Pick something random!" tint={theme.colors.yellowSoft} onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything', surprise: '1' } })} />
+      <ChildActionCard disabled={!hasActive} icon="★" title="Current Toy" description={hasActive ? 'See what you’re playing with' : 'Nothing is being played with'} tint={theme.colors.peachSoft} onPress={() => router.push('/child/current-toy')} />
     </View>
     <Pressable accessibilityRole="button" onPress={() => router.push('../child/parent-return')} style={styles.parent}><Text style={styles.parentText}>Grown-up area</Text></Pressable>
   </ScrollView>;
 }
 
-function ActionCard({ icon, title, subtitle, tint, onPress, disabled = false }: { icon: string; title: string; subtitle: string; tint: string; onPress(): void; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.action, { backgroundColor: tint }, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.actionIcon}>{icon}</Text><View style={styles.actionText}><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionSubtitle}>{subtitle}</Text></View><Text style={styles.chevron}>›</Text></Pressable>;
-}
 const styles = StyleSheet.create({
+  retry: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
   container: { ...screenContentStyle, backgroundColor: theme.colors.childBackground, flexGrow: 1, gap: 16 },
   center: { alignItems: 'center', backgroundColor: theme.colors.childBackground, flex: 1, gap: 16, justifyContent: 'center', padding: 24 },
   sky: { alignItems: 'center', backgroundColor: '#EAF5F4', borderRadius: theme.radii.xl, minHeight: 290, overflow: 'hidden', padding: 22 },

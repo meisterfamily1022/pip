@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ChoiceLimit } from '@/domain/models';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { PrimaryButton as SharedPrimaryButton, RoundedTextInput, SegmentedControl } from './playmap-ui';
 
 type PrimaryButtonProps = { label: string; onPress(): void; disabled?: boolean; accessibilityLabel?: string };
 export function PrimaryButton({ label, onPress, disabled = false, accessibilityLabel }: PrimaryButtonProps) {
-  return <Pressable accessibilityLabel={accessibilityLabel ?? label} accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.primaryButton, disabled && styles.disabled, pressed && !disabled && styles.pressed]}><Text style={styles.primaryButtonText}>{label}</Text></Pressable>;
+  return <SharedPrimaryButton accessibilityLabel={accessibilityLabel} disabled={disabled} label={label} onPress={onPress} />;
 }
 
 type BackButtonProps = { onPress(): void };
@@ -12,12 +13,12 @@ export function BackButton({ onPress }: BackButtonProps) { return <Pressable acc
 
 type FieldProps = { label: string; value: string; onChangeText(value: string): void; error?: string | null; placeholder?: string; keyboardType?: 'default' | 'number-pad'; secureTextEntry?: boolean; maxLength?: number };
 export function Field({ label, value, onChangeText, error, placeholder, keyboardType, secureTextEntry, maxLength }: FieldProps) {
-  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} placeholder={placeholder} keyboardType={keyboardType} secureTextEntry={secureTextEntry} maxLength={maxLength} style={[styles.input, error && styles.inputError]} /><Text accessibilityLiveRegion="polite" style={styles.error}>{error ?? ''}</Text></View>;
+  return <RoundedTextInput accessibilityLabel={label} error={error} keyboardType={keyboardType} label={label} maxLength={maxLength} onChangeText={onChangeText} placeholder={placeholder} secureTextEntry={secureTextEntry} value={value} />;
 }
 
 type ChoiceControlProps = { choiceLimit: ChoiceLimit; onChoiceLimitChange(value: ChoiceLimit): void; cleanupRequired: boolean; onCleanupRequiredChange(value: boolean): void };
 export function ChoiceControls({ choiceLimit, onChoiceLimitChange, cleanupRequired, onCleanupRequiredChange }: ChoiceControlProps) {
-  return <View style={styles.choiceGroup}><Text style={styles.label}>Toy choices</Text><View style={styles.optionRow}>{([1, 3, 5] as const).map((value) => <Pressable key={value} accessibilityLabel={`${value} toy choices`} accessibilityRole="radio" accessibilityState={{ selected: choiceLimit === value }} onPress={() => onChoiceLimitChange(value)} style={[styles.option, choiceLimit === value && styles.optionSelected]}><Text style={styles.optionText}>{value}</Text></Pressable>)}</View><Text style={styles.label}>Require cleanup before another choice?</Text><View style={styles.optionRow}>{([true, false] as const).map((value) => <Pressable key={String(value)} accessibilityLabel={value ? 'Cleanup required on' : 'Cleanup required off'} accessibilityRole="radio" accessibilityState={{ selected: cleanupRequired === value }} onPress={() => onCleanupRequiredChange(value)} style={[styles.option, cleanupRequired === value && styles.optionSelected]}><Text style={styles.optionText}>{value ? 'On' : 'Off'}</Text></Pressable>)}</View></View>;
+  return <View style={styles.choiceGroup}><Text style={styles.label}>Toy choices</Text><SegmentedControl accessibilityLabel="Toy choices" onChange={onChoiceLimitChange} options={[1, 3, 5]} value={choiceLimit} /><Text style={styles.label}>Require cleanup before another choice?</Text><SegmentedControl accessibilityLabel="Cleanup requirement" onChange={onCleanupRequiredChange} options={[true, false]} value={cleanupRequired} /></View>;
 }
 
 const styles = StyleSheet.create({
