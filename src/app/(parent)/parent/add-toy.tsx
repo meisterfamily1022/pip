@@ -6,6 +6,7 @@ import { ToyError, ToyLoading } from '@/components/toy-ui';
 import { initializeDatabase } from '@/database/client';
 import { loadLocationTree, type LocationTreeItem } from '@/features/locations/location-service';
 import { createParentToy, type ToyFormInput } from '@/features/toys/toy-service';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 export default function AddToyRoute() {
   const [locations, setLocations] = useState<LocationTreeItem[]>([]);
@@ -24,8 +25,8 @@ export default function AddToyRoute() {
   };
   if (loading) return <ToyLoading />;
   if (error && locations.length === 0) return <ToyError message={error} onRetry={() => { void load(); }} />;
-  if (locations.every((room) => room.storageSpots.length === 0)) return <SafeAreaView style={styles.center}><Text>Add a room and storage spot before saving toys.</Text></SafeAreaView>;
+  if (locations.every((room) => room.storageSpots.length === 0)) return <SafeAreaView style={styles.center}><Text style={styles.emptyText}>Add a room and storage spot before saving toys.</Text></SafeAreaView>;
   return <SafeAreaView style={styles.container}><Text accessibilityRole="header" style={styles.title}>Add Toy</Text><ToyForm error={error} locations={locations} onSubmit={submit} saving={saving} submitLabel="Save Toy" /></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({ center: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 }, container: { flex: 1 }, title: { fontSize: 32, fontWeight: '700', paddingHorizontal: 24, paddingTop: 56 } });
+const styles = StyleSheet.create({ center: { alignItems: 'center', backgroundColor: theme.colors.background, flex: 1, justifyContent: 'center', padding: 24 }, container: { backgroundColor: theme.colors.background, flex: 1 }, emptyText: { color: theme.colors.secondaryText, fontSize: 17, textAlign: 'center' }, title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: theme.type.title, fontWeight: '700', paddingHorizontal: 24, paddingTop: 32 } });

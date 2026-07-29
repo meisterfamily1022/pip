@@ -23,7 +23,7 @@ export function ChoiceControls({ choiceLimit, onChoiceLimitChange, cleanupRequir
 
 const styles = StyleSheet.create({
   primaryButton: { ...theme.shadows.card, alignItems: 'center', backgroundColor: theme.colors.coral, borderRadius: theme.radii.lg, minHeight: theme.sizes.button, justifyContent: 'center', paddingHorizontal: 20 },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  primaryButtonText: { color: theme.colors.white, fontSize: 17, fontWeight: '700' },
   disabled: { opacity: 0.45 }, pressed: { opacity: 0.82 },
   backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }, backButtonText: { color: theme.colors.primary, fontSize: 16, fontWeight: '600' },
   field: { gap: 6 }, label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },

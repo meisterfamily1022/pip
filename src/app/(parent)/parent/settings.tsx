@@ -82,7 +82,7 @@ export default function ParentSettingsRoute() {
           <Text style={styles.label}>Child nickname</Text>
           <TextInput accessibilityLabel="Child nickname" onChangeText={setNickname} placeholder="Ari" style={styles.input} value={nickname} />
           <Text style={styles.label}>Choice limit</Text>
-          <View style={styles.row}>{([1, 3, 5] as const).map((limit) => <ToyButton key={limit} label={`${limit} toy${limit === 1 ? '' : 's'}`} onPress={() => setChoiceLimit(limit)} />)}</View>
+          <View style={styles.row}>{([1, 3, 5] as const).map((limit) => <ToyButton key={limit} label={`${limit} toy${limit === 1 ? '' : 's'}`} selected={choiceLimit === limit} onPress={() => setChoiceLimit(limit)} />)}</View>
           <View style={styles.switchRow}><Text style={styles.switchText}>Cleanup required</Text><Switch value={cleanupRequired} onValueChange={setCleanupRequired} /></View>
           <ToyButton disabled={savingSettings} label={savingSettings ? 'Saving…' : 'Save Settings'} onPress={() => { void saveSettings(); }} />
         </View>

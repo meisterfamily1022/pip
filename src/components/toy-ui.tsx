@@ -20,7 +20,7 @@ export function ToyGridCard({ toy, onPress }: { toy: ParentToy; onPress(): void 
       <ToyImagePreview uri={toy.imageUri} />
       <View style={styles.cardBody}>
         <Text numberOfLines={2} style={styles.cardTitle}>{toy.name}</Text>
-        <Text style={styles.cardLocation}>{toy.roomName} → {toy.storageSpotName}</Text>
+        <Text numberOfLines={2} style={styles.cardLocation}>{toy.roomName} → {toy.storageSpotName}</Text>
         <View style={styles.badges}>
           {!toy.isAvailable && <Text style={styles.badge}>Hidden</Text>}
           {toy.isArchived && <Text style={styles.badge}>Archived</Text>}

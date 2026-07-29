@@ -7,6 +7,7 @@ import { initializeDatabase } from '@/database/client';
 import { loadLocationTree, type LocationTreeItem } from '@/features/locations/location-service';
 import { updateParentToy, type ToyFormInput } from '@/features/toys/toy-service';
 import { getParentToy, type ParentToy } from '@/repositories/toys-repository';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 export default function EditToyRoute() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -41,4 +42,4 @@ export default function EditToyRoute() {
   return <SafeAreaView style={styles.container}><Text accessibilityRole="header" style={styles.title}>Edit Toy</Text><ToyForm error={error} locations={locations} onSubmit={submit} saving={saving} submitLabel="Save Changes" toy={toy} /></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({ container: { flex: 1 }, title: { fontSize: 32, fontWeight: '700', paddingHorizontal: 24, paddingTop: 56 } });
+const styles = StyleSheet.create({ container: { backgroundColor: theme.colors.background, flex: 1 }, title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: theme.type.title, fontWeight: '700', paddingHorizontal: 24, paddingTop: 32 } });

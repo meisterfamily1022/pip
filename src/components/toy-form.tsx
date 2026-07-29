@@ -92,14 +92,14 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit }
       <View style={styles.section}>
         <Text style={styles.label}>Room</Text>
         <View style={styles.optionRow}>
-          {locations.map((room) => <Pressable key={room.id} accessibilityRole="button" onPress={() => { setRoomId(room.id); setStorageSpotId(room.storageSpots[0]?.id ?? null); }} style={[styles.option, room.id === roomId && styles.optionSelected]}><Text style={styles.optionText}>{roomLabel(room)}</Text></Pressable>)}
+          {locations.map((room) => <Pressable key={room.id} accessibilityRole="button" accessibilityState={{ selected: room.id === roomId }} onPress={() => { setRoomId(room.id); setStorageSpotId(room.storageSpots[0]?.id ?? null); }} style={[styles.option, room.id === roomId && styles.optionSelected]}><Text style={styles.optionText}>{roomLabel(room)}</Text></Pressable>)}
         </View>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.label}>Storage spot</Text>
         <View style={styles.optionRow}>
-          {availableSpots.map((spot) => <Pressable key={spot.id} accessibilityRole="button" onPress={() => setStorageSpotId(spot.id)} style={[styles.option, spot.id === effectiveStorageSpotId && styles.optionSelected]}><Text style={styles.optionText}>{spot.name}</Text></Pressable>)}
+          {availableSpots.map((spot) => <Pressable key={spot.id} accessibilityRole="button" accessibilityState={{ selected: spot.id === effectiveStorageSpotId }} onPress={() => setStorageSpotId(spot.id)} style={[styles.option, spot.id === effectiveStorageSpotId && styles.optionSelected]}><Text style={styles.optionText}>{spot.name}</Text></Pressable>)}
         </View>
       </View>
 
@@ -113,7 +113,7 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit }
       <View style={styles.section}>
         <Text style={styles.label}>Cleanup difficulty</Text>
         <View style={styles.optionRow}>
-          {(['easy', 'medium', 'big'] as const).map((difficulty) => <Pressable key={difficulty} accessibilityRole="button" onPress={() => setCleanupDifficulty(difficulty)} style={[styles.option, cleanupDifficulty === difficulty && styles.optionSelected]}><Text style={styles.optionText}>{difficulty}</Text></Pressable>)}
+          {(['easy', 'medium', 'big'] as const).map((difficulty) => <Pressable key={difficulty} accessibilityRole="button" accessibilityState={{ selected: cleanupDifficulty === difficulty }} onPress={() => setCleanupDifficulty(difficulty)} style={[styles.option, cleanupDifficulty === difficulty && styles.optionSelected]}><Text style={styles.optionText}>{difficulty}</Text></Pressable>)}
         </View>
       </View>
 

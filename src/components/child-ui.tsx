@@ -25,7 +25,7 @@ export function ChildLink({ label, onPress }: { label: string; onPress(): void }
 }
 
 export function ToyCard({ toy, onPress }: { toy: ChildToy; onPress(): void }) {
-  return <View style={styles.card}><ToyImage uri={toy.imageUri} /><Text style={styles.toyName}>{toy.name}</Text><Text style={styles.location}>{toy.roomName} → {toy.storageSpotName}</Text><ChildButton label="Play With This" onPress={onPress} /></View>;
+  return <View style={styles.card}><ToyImage uri={toy.imageUri} /><Text numberOfLines={2} style={styles.toyName}>{toy.name}</Text><Text numberOfLines={2} style={styles.location}>{toy.roomName} → {toy.storageSpotName}</Text><ChildButton label="Play With This" onPress={onPress} /></View>;
 }
 
 const styles = StyleSheet.create({

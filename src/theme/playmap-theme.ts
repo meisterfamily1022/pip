@@ -11,6 +11,8 @@ export const playmapTheme = {
     surfaceMint: '#E1F2EC',
     surfaceYellow: '#FFF2CC',
     surfaceLavender: '#EEE8F3',
+    surfaceBlush: '#F7E6E7',
+    surfaceSky: '#E7F1F3',
     coralAction: '#D97963',
     sageAction: '#5E8F7E',
     primaryText: '#3F4A43',
@@ -66,7 +68,7 @@ export const playmapTheme = {
   measurements: { minimumTouchTarget: 44, inputHeight: 54, primaryButtonHeight: 56, cardPadding: 18, screenHorizontalPadding: 20, toyImageAspectRatio: 1.12 },
   sizes: { button: 56, childButton: 72, input: 54 },
   shadows: {
-    card: { shadowColor: '#594836', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 2 } as const,
+    card: { boxShadow: '0px 4px 16px rgba(89,72,52,0.08)', elevation: 2 } as const,
   },
   images: { toyCard: 1.12, hero: 1.25, upload: 1.65 },
 } as const;
