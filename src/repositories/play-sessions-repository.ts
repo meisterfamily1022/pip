@@ -18,6 +18,17 @@ export async function getPlaySession(database: DatabaseConnection, id: number): 
   return row ? toSession(row) : null;
 }
 
+/**
+ * The single active session, if any. A partial unique index on the table keeps
+ * at most one session in the 'active' state, which is the V1 "current toy".
+ */
+export async function getActivePlaySession(database: DatabaseConnection): Promise<PlaySession | null> {
+  const row = await database.getFirstAsync<PlaySessionRow>(
+    "SELECT id, toy_id, status, started_at, completed_at, created_at, updated_at FROM play_sessions WHERE status = 'active' LIMIT 1;",
+  );
+  return row ? toSession(row) : null;
+}
+
 export async function completePlaySession(database: DatabaseConnection, id: number): Promise<PlaySession> {
   const timestamp = now();
   const result = await database.runAsync('UPDATE play_sessions SET status = ?, completed_at = ?, updated_at = ? WHERE id = ? AND status = ?;', 'completed', timestamp, timestamp, id, 'active');

@@ -32,13 +32,20 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFF9F0",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
       ],
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "PlayMap uses your photo library so you can add pictures of your child's toys. Photos stay on this device.",
+          "cameraPermission": "PlayMap uses the camera so you can photograph your child's toys. Photos stay on this device."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

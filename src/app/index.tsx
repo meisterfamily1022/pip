@@ -1,35 +1,47 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 
+import { ErrorState, LoadingState, Screen } from '@/design/primitives';
 import { initializeApp } from '@/startup/initialize-app';
 
 type StartupState = 'loading' | 'error';
 
-export default function StartupScreen() {
+export default function StartupRoute() {
   const [state, setState] = useState<StartupState>('loading');
   const [error, setError] = useState<Error | null>(null);
 
-  const start = (): void => {
-    setState('loading');
-    setError(null);
-    initializeApp().then((destination) => router.replace(destination)).catch((caught: unknown) => {
-      const startupError = caught instanceof Error ? caught : new Error('App startup failed.');
-      setError(startupError);
-      setState('error');
-    });
-  };
-
-  useEffect(() => {
-    initializeApp().then((destination) => router.replace(destination)).catch((caught: unknown) => {
-      const startupError = caught instanceof Error ? caught : new Error('App startup failed.');
-      setError(startupError);
-      setState('error');
-    });
+  const run = useCallback((): void => {
+    initializeApp()
+      .then((destination) => router.replace(destination))
+      .catch((caught: unknown) => {
+        setError(caught instanceof Error ? caught : new Error('App startup failed.'));
+        setState('error');
+      });
   }, []);
 
-  if (state === 'loading') return <View style={styles.container}><ActivityIndicator /><Text>Starting PlayMap…</Text></View>;
-  return <View style={styles.container}><Text style={styles.errorTitle}>PlayMap could not start.</Text><Text>{error?.message}</Text><Button title="Try again" onPress={start} /></View>;
+  const retry = useCallback((): void => {
+    setState('loading');
+    setError(null);
+    run();
+  }, [run]);
+
+  useEffect(() => {
+    run();
+  }, [run]);
+
+  return (
+    <Screen contentStyle={styles.fill} mode="parent" scroll={false}>
+      {state === 'loading' ? (
+        <LoadingState label="Starting PlayMap…" />
+      ) : (
+        <ErrorState
+          message={`PlayMap could not start. ${error?.message ?? 'App startup failed.'}`}
+          onRetry={retry}
+        />
+      )}
+    </Screen>
+  );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }, errorTitle: { fontSize: 20, fontWeight: '700' } });
+const styles = StyleSheet.create({ fill: { flex: 1 } });
