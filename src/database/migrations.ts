@@ -226,6 +226,20 @@ async function ensureHouseholdsAndProfileDetail(database: DatabaseConnection): P
   `);
 }
 
+/**
+ * Marks rows created by "Explore with sample toys".
+ *
+ * A flag rather than a separate household, so sample toys appear in the real
+ * library where a parent can actually try the product, while staying removable
+ * in one action and impossible to mistake for their own toys.
+ */
+async function ensureSampleFlags(database: DatabaseConnection): Promise<void> {
+  for (const table of ['rooms', 'storage_spots', 'toys']) {
+    await addColumnIfMissing(database, table, 'is_sample', 'INTEGER NOT NULL DEFAULT 0 CHECK (is_sample IN (0, 1))');
+  }
+  await database.execAsync('CREATE INDEX IF NOT EXISTS toys_is_sample_index ON toys(is_sample);');
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -354,6 +368,10 @@ const migrations: readonly Migration[] = [
   {
     version: 9,
     apply: ensureHouseholdsAndProfileDetail,
+  },
+  {
+    version: 10,
+    apply: ensureSampleFlags,
   },
 ];
 

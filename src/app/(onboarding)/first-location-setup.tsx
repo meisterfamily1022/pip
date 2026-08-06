@@ -25,7 +25,7 @@ export default function FirstLocationSetupRoute() {
     if (nextRoomError || nextStorageError) return;
     setSubmitting(true);
     setSubmitError(null);
-    initializeDatabase().then((database) => completeOnboardingFlow(database, draft)).then(() => { markOnboardingComplete(); router.replace('/parent/home'); }).catch((caught: unknown) => {
+    initializeDatabase().then((database) => completeOnboardingFlow(database, draft)).then(() => { markOnboardingComplete(); router.replace('/start-choice'); }).catch((caught: unknown) => {
       const message = caught instanceof Error ? caught.message : 'Please try again.';
       setSubmitError(message.includes('UNIQUE constraint failed') ? 'That room already exists. Try a different room name.' : `Could not finish setup: ${message}`);
       setSubmitting(false);

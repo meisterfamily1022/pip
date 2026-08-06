@@ -190,6 +190,14 @@ export async function deleteToy(database: DatabaseConnection, id: number): Promi
   });
 }
 
+/** Toys in the library, excluding archived ones. */
+export async function countToys(database: DatabaseConnection, includeArchived = false): Promise<number> {
+  const row = await database.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM toys${includeArchived ? '' : ' WHERE is_archived = 0'};`,
+  );
+  return row?.count ?? 0;
+}
+
 export async function countPlaySessionsForToy(database: DatabaseConnection, id: number): Promise<number> {
   const row = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM play_sessions WHERE toy_id = ?;', id);
   return row?.count ?? 0;

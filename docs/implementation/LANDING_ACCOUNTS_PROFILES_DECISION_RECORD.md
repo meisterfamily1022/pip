@@ -311,6 +311,38 @@ landing test was updated to match — that mechanism working as designed.
 Onboarding's child step became "Who will use Pip?" with avatar, colour and
 reading support, and a "Skip for now" action, since profiles are optional.
 
+## 8e. Prompt 7 outcomes — setup choice, sample mode, local-only path
+
+Finishing setup now lands on `/start-choice` rather than Parent Home, offering
+the brief's four options. Every one reaches a working destination, including
+"I'll set it up later", which goes to Parent Home rather than a dead end.
+
+**Sample toys are flagged, not faked.** Migration 10 adds `is_sample` to rooms,
+storage spots and toys. A flag rather than a separate household, so sample toys
+appear in the real library where a parent can actually try the product, while
+staying removable in one action.
+
+Three properties, each tested against real SQLite:
+
+- *Unmistakable*: every seeded row is named with a visible "Sample" prefix.
+- *Isolated*: removal deletes only flagged rows, so a test proves the family's
+  own room, spot and toy survive untouched.
+- *Idempotent*: seeding twice adds nothing, so a double tap or a retry after a
+  dropped connection cannot produce two sample sets.
+
+Removal clears play sessions referencing a sample toy first, because
+`play_sessions.toy_id` is RESTRICT; a test would fail on the foreign key
+otherwise. Samples can be re-seeded after removal, and removing nothing is
+harmless.
+
+Settings grows a "Sample toys" card, shown only when samples exist, stating the
+count and that removing them leaves the parent's own toys untouched.
+
+`/ready` is the completion screen with the brief's three actions. It reports
+whether the library currently holds real toys or only samples, so a parent is
+never unsure what they are looking at. Its counts are reassurance rather than a
+gate: a failure to read them does not block leaving the screen.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

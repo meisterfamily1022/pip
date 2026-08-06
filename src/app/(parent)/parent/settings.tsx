@@ -7,6 +7,7 @@ import { ConfirmationDialog, DestructiveButton, FormCard, PageShell, PrimaryButt
 import { PipBrandMark } from '@/components/pip-brand-mark';
 import { pipBrand } from '@/brand/pip-brand';
 import { initializeDatabase } from '@/database/client';
+import { countSampleToys, removeSampleLibrary } from '@/features/samples/sample-library';
 import { changeParentPin, listChildProfiles, loadParentSettings, saveParentSettings, type ChangePinInput } from '@/features/settings/settings-service';
 import { pinStorage } from '@/services/pin-storage';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
@@ -33,6 +34,8 @@ export default function ParentSettingsRoute() {
   const [pinSuccess, setPinSuccess] = useState<string | null>(null);
   const [resetConfirming, setResetConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [sampleCount, setSampleCount] = useState(0);
+  const [clearingSamples, setClearingSamples] = useState(false);
   const savingSettingsRef = useRef(false);
   const savingPinRef = useRef(false);
   const resettingRef = useRef(false);
@@ -41,8 +44,8 @@ export default function ParentSettingsRoute() {
     setLoading(true); setPageError(null);
     try {
       const database = await initializeDatabase();
-      const [settings, profiles] = await Promise.all([loadParentSettings(database), listChildProfiles(database)]);
-      setChildren(profiles); setActiveChildId(settings.activeChildId);
+      const [settings, profiles, samples] = await Promise.all([loadParentSettings(database), listChildProfiles(database), countSampleToys(database)]);
+      setChildren(profiles); setActiveChildId(settings.activeChildId); setSampleCount(samples);
       setNickname(profiles.find((child) => child.id === settings.activeChildId)?.name ?? settings.childNickname ?? '');
       setChoiceLimit(settings.choiceLimit);
       setCleanupRequired(settings.cleanupRequired);
@@ -76,6 +79,19 @@ export default function ParentSettingsRoute() {
   const chooseChild = async (child: ChildProfile): Promise<void> => {
     try { const database = await initializeDatabase(); await setActiveChild(database, child.id); setActiveChildId(child.id); setNickname(child.name); setSettingsError(null); }
     catch (caught: unknown) { setSettingsError(caught instanceof Error ? caught.message : 'Could not select this child.'); }
+  };
+
+  const clearSamples = async (): Promise<void> => {
+    if (clearingSamples) return;
+    setClearingSamples(true); setSettingsError(null); setSettingsSuccess(null);
+    try {
+      const database = await initializeDatabase();
+      const removed = await removeSampleLibrary(database);
+      setSampleCount(0);
+      setSettingsSuccess(`Removed ${removed} sample ${removed === 1 ? 'toy' : 'toys'}. Your own toys were not touched.`);
+    }
+    catch (caught: unknown) { setSettingsError(caught instanceof Error ? caught.message : 'Could not remove the sample toys.'); }
+    finally { setClearingSamples(false); }
   };
 
   const changePin = async (): Promise<void> => {
@@ -161,6 +177,14 @@ export default function ParentSettingsRoute() {
         <DestructiveButton disabled={resetting} label={resetting ? 'Resetting…' : 'Reset Pip'} onPress={() => setResetConfirming(true)} />
       </FormCard>
 
+      {sampleCount > 0 && (
+        <FormCard tone="sage">
+          <Text style={styles.cardTitle}>Sample toys</Text>
+          <Text style={styles.cardBody}>{`Your library has ${sampleCount} sample ${sampleCount === 1 ? 'toy' : 'toys'}. They are labelled "Sample" and are separate from anything you added.`}</Text>
+          <PrimaryButton disabled={clearingSamples} label={clearingSamples ? 'Removing…' : 'Remove sample toys'} onPress={() => { void clearSamples(); }} />
+        </FormCard>
+      )}
+
       <ConfirmationDialog confirmLabel="Reset Pip" destructive message="This permanently removes all toys, photos, rooms, settings, play history, and the parent PIN from this device." onCancel={() => setResetConfirming(false)} onConfirm={() => { void resetData(); }} title="Reset all Pip data?" visible={resetConfirming} />
     </PageShell>
   );
@@ -175,4 +199,6 @@ const styles = StyleSheet.create({
   sectionTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
   supporting: { color: theme.colors.secondaryText, fontSize: 15, lineHeight: 22 },
   success: { color: theme.colors.success },
+  cardTitle: { color: theme.colors.primaryText, ...theme.typography.sectionTitle },
+  cardBody: { color: theme.colors.secondaryText, ...theme.typography.supporting },
 });
