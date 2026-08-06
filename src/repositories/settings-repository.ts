@@ -34,6 +34,16 @@ export async function updateSettings(database: DatabaseConnection, update: Setti
   return getSettings(database);
 }
 
+/**
+ * Enters Guest play by recording no active child.
+ *
+ * A visitor leaves no permanent profile behind, and only toys shared with
+ * everyone are offered to them.
+ */
+export async function clearActiveChild(database: DatabaseConnection): Promise<AppSettings> {
+  return updateSettings(database, { activeChildId: null });
+}
+
 export async function setActiveChild(database: DatabaseConnection, childId: number): Promise<AppSettings> {
   const child = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE id = ?;', childId);
   if (!child) throw new Error('Choose a valid child profile.');

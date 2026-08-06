@@ -93,16 +93,15 @@ describe('landing copy', () => {
 });
 
 describe('feature claims', () => {
-  it('only advertises features that are actually built', () => {
+  it('advertises every feature, now that all of them are built', () => {
     const shown = availableFeatures().map((feature) => feature.id);
     expect(shown).toContain('child-mode');
     expect(shown).toContain('library');
-    // Child profiles and per-child settings ship with the profile management
-    // screens, so these claims are now true.
+    // Every advertised feature now exists: profiles and per-child settings from
+    // the management screens, Guest from Child Mode entry.
     expect(shown).toContain('profiles');
     expect(shown).toContain('per-child');
-    // Guest play reaches Child Mode later; the claim stays hidden until then.
-    expect(shown).not.toContain('guest');
+    expect(shown).toContain('guest');
   });
 
   it('keeps every feature id unique', () => {

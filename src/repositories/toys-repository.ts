@@ -66,7 +66,29 @@ export async function getToy(database: DatabaseConnection, id: number): Promise<
   return row ? mapToy(row, await getCategories(database, row.id)) : null;
 }
 
-export async function listChildToys(database: DatabaseConnection): Promise<ChildToy[]> {
+/**
+ * Who is playing. `null` is Guest — a visitor with no stored profile.
+ */
+export type ChildAudience = { childId: number | null };
+
+/**
+ * Toys this child may currently be offered.
+ *
+ * Availability is enforced here rather than in the UI, so a stale screen or a
+ * direct service call cannot surface a toy the parent put out of reach. Four
+ * rules apply, in SQL:
+ *
+ * - hidden and archived toys never appear
+ * - a toy already in someone else's active session never appears, so two
+ *   children are not sent to the same physical object
+ * - 'parent_only' and 'temporarily_unavailable' toys never appear
+ * - 'selected' toys appear only for the children they were chosen for, and
+ *   never for Guest, who is nobody's selected child
+ */
+export async function listChildToys(
+  database: DatabaseConnection,
+  audience: ChildAudience = { childId: null },
+): Promise<ChildToy[]> {
   const rows = await database.getAllAsync<ChildToyRow>(
     `SELECT t.id, t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.ai_metadata_status, t.ai_analysis_id, t.ai_schema_version, t.ai_consent_at, t.ai_confirmed_at, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
             t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
@@ -74,10 +96,55 @@ export async function listChildToys(database: DatabaseConnection): Promise<Child
        JOIN rooms r ON r.id = t.room_id
        JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
       WHERE t.is_available = 1 AND t.is_archived = 0
+        AND t.availability_scope IN ('everyone', 'selected')
+        AND (
+          t.availability_scope = 'everyone'
+          OR (? IS NOT NULL AND EXISTS (
+            SELECT 1 FROM toy_child_visibility v WHERE v.toy_id = t.id AND v.child_id = ?
+          ))
+        )
         AND NOT EXISTS (SELECT 1 FROM play_sessions p WHERE p.toy_id = t.id AND p.status = 'active')
       ORDER BY t.name COLLATE NOCASE ASC, t.id ASC;`,
+    audience.childId,
+    audience.childId,
   );
   return Promise.all(rows.map(async (row) => mapChildToy(row, await getCategories(database, row.id))));
+}
+
+/** Replaces which children a 'selected' toy is visible to. */
+export async function setToyChildVisibility(
+  database: DatabaseConnection,
+  toyId: number,
+  childIds: readonly number[],
+): Promise<void> {
+  const timestamp = now();
+  await database.withTransactionAsync(async () => {
+    await database.runAsync('DELETE FROM toy_child_visibility WHERE toy_id = ?;', toyId);
+    for (const childId of new Set(childIds)) {
+      await database.runAsync(
+        'INSERT OR IGNORE INTO toy_child_visibility (toy_id, child_id, created_at) VALUES (?, ?, ?);',
+        toyId,
+        childId,
+        timestamp,
+      );
+    }
+  });
+}
+
+export type ToyAvailabilityScope = 'everyone' | 'selected' | 'parent_only' | 'temporarily_unavailable';
+
+export async function setToyAvailabilityScope(
+  database: DatabaseConnection,
+  toyId: number,
+  scope: ToyAvailabilityScope,
+): Promise<void> {
+  const result = await database.runAsync(
+    'UPDATE toys SET availability_scope = ?, updated_at = ? WHERE id = ?;',
+    scope,
+    now(),
+    toyId,
+  );
+  if (result.changes !== 1) throw new Error('Toy not found.');
 }
 
 export type ParentToy = ChildToy;

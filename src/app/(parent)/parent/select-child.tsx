@@ -6,7 +6,8 @@ import { ErrorStateCard, LoadingState, PageShell, PastelNavigationCard } from '@
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
 import { listChildProfiles } from '@/repositories/child-profiles-repository';
-import { setActiveChild } from '@/repositories/settings-repository';
+import { clearActiveChild, setActiveChild } from '@/repositories/settings-repository';
+import { ProfileAvatar } from '@/components/profile-ui';
 import { enterChildMode } from '@/startup/route-access';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
@@ -20,7 +21,18 @@ export default function SelectChildRoute() {
     try { const database = await initializeDatabase(); await setActiveChild(database, childId); router.replace('/child/home'); await enterChildMode(); }
     catch (caught: unknown) { router.replace('/parent/select-child'); setError(caught instanceof Error ? caught.message : 'Could not open Child Mode.'); }
   };
+
+  /**
+   * Guest play. Clearing the active child means no profile is recorded, so a
+   * visiting friend leaves no permanent child data behind, and only toys shared
+   * with everyone are offered.
+   */
+  const playAsGuest = async (): Promise<void> => {
+    setError(null);
+    try { const database = await initializeDatabase(); await clearActiveChild(database); router.replace('/child/home'); await enterChildMode(); }
+    catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not open Child Mode.'); }
+  };
   if (loading) return <PageShell scroll={false}><LoadingState label="Loading child profiles…" /></PageShell>;
-  return <PageShell><ParentModeHeader backTo="/parent/home" title="Who is playing?" subtitle="Choose a child. Each profile keeps its own current toy and cleanup progress." />{error && <ErrorStateCard message={error} />}{children.length === 0 ? <ErrorStateCard message="Add a child profile in Settings before opening Child Mode." /> : <View style={styles.list}>{children.map((child) => <PastelNavigationCard key={child.id} title={child.name} description="Open their own Child Mode" tint={theme.colors.brandPrimarySoft} onPress={() => { void choose(child.id); }} />)}</View>}<Text style={styles.help}>You can add more child profiles in Settings.</Text></PageShell>;
+  return <PageShell><ParentModeHeader backTo="/parent/home" title="Who is playing?" subtitle="Choose a child. Each profile keeps its own current toy and cleanup progress." />{error && <ErrorStateCard message={error} />}<View style={styles.list}>{children.map((child) => <View key={child.id} style={styles.cardRow}><ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} name={child.name} size={56} /><View style={styles.cardBody}><PastelNavigationCard title={child.name} description={`${child.choiceLimit} choice${child.choiceLimit === 1 ? '' : 's'} at a time`} tint={theme.colors.brandPrimarySoft} onPress={() => { void choose(child.id); }} /></View></View>)}<PastelNavigationCard title="Guest" description="Play without a profile. Nothing is saved." tint={theme.colors.surfaceYellow} onPress={() => { void playAsGuest(); }} /></View><Text style={styles.help}>{children.length === 0 ? 'No profiles yet. Guest works right away, and you can add profiles in Settings.' : 'You can add or edit profiles in Settings.'}</Text></PageShell>;
 }
-const styles = StyleSheet.create({ list: { gap: 10 }, help: { color: theme.colors.secondaryText, fontSize: 15, lineHeight: 22 } });
+const styles = StyleSheet.create({ list: { gap: 10 }, cardRow: { alignItems: 'center', flexDirection: 'row', gap: 12 }, cardBody: { flex: 1 }, help: { color: theme.colors.secondaryText, fontSize: 15, lineHeight: 22 } });

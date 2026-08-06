@@ -75,9 +75,7 @@ export const landingFeatures: readonly LandingFeature[] = [
   { id: 'hidden', title: 'Hidden and archived toys', body: 'Keep some things out of rotation without deleting them.', available: true },
   { id: 'profiles', title: 'Multiple child profiles', body: 'Each child gets their own choices and play history.', available: true },
   { id: 'per-child', title: 'Per-child settings', body: 'Choice count and reading support, tuned per child.', available: true },
-  // Guest play reaches Child Mode in a later prompt; the claim stays hidden
-  // until a visitor can actually use it.
-  { id: 'guest', title: 'Guest mode', body: 'A visiting friend can play without creating a profile.', available: false },
+  { id: 'guest', title: 'Guest mode', body: 'A visiting friend can play without creating a profile.', available: true },
 ];
 
 export function availableFeatures(): readonly LandingFeature[] {

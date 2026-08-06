@@ -343,6 +343,39 @@ whether the library currently holds real toys or only samples, so a parent is
 never unsure what they are looking at. Its counts are reassurance rather than a
 gate: a failure to read them does not block leaving the screen.
 
+## 8f. Prompt 8 outcomes — Child Mode profile selection and independent play
+
+**Availability is enforced in the query, never the interface.** `listChildToys`
+now takes an audience (`{ childId }`, where `null` is Guest) and applies four
+rules in SQL: hidden and archived toys never appear; a toy already in someone
+else's active session never appears; `parent_only` and
+`temporarily_unavailable` never appear; and `selected` toys appear only for the
+children chosen for them.
+
+The tests call the repository directly, which is exactly the bypass a stale
+screen represents — if any rule lived only in the UI, every one of them would
+fail.
+
+Two decisions worth recording:
+
+- **Guest is nobody's selected child.** A visitor sees only `everyone`-scoped
+  toys, never a toy earmarked for a particular child.
+- **The default audience is Guest, not "everything".** Calling `listChildToys`
+  with no audience returns the most restrictive result, so a caller that forgets
+  to say who is playing under-shares rather than over-shares. There is a test
+  pinning that.
+
+Guest play records no active child, so a visiting friend leaves no permanent
+profile behind. The "Who's playing?" screen shows each profile with its avatar
+and choice count plus a Guest card, and when no profiles exist it says Guest
+works right away rather than sending the parent back to Settings.
+
+One physical toy cannot be in two active sessions — already enforced by the
+`active_play_session_per_toy` index from migration 8 and by the query — so two
+children are never sent to the same object.
+
+Landing flag `guest` flipped to available. Every advertised feature now exists.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

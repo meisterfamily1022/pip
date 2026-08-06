@@ -18,7 +18,9 @@ export function childSuggestionLimit(choiceLimit: number, surprise: boolean): nu
 
 async function loadRecommendations(category: PlayType, dismissed: readonly number[], surprise: boolean): Promise<LoadedRecommendations> {
   const database = await initializeDatabase();
-  const [allToys, settings] = await Promise.all([listChildToys(database), getSettings(database)]);
+  const settings = await getSettings(database);
+  // Ask as the child who is playing; null means Guest.
+  const allToys = await listChildToys(database, { childId: settings.activeChildId });
   const toys = recommendToys(allToys, { category, choiceLimit: childSuggestionLimit(settings.choiceLimit, surprise), dismissedIds: dismissed });
   return { toys, shown: [...dismissed, ...toys.map((toy) => toy.id)] };
 }
