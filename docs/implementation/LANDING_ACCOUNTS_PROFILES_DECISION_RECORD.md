@@ -37,7 +37,9 @@ Missing against the brief: per-child choice count, reading mode, avatar/colour, 
 
 Local SQLite at schema version 8. Canonical tables: `rooms`, `storage_spots`, `toys`, `toy_categories`, `play_sessions`, `settings`, `toy_setup_drafts`, `child_profiles`. Migrations are versioned and restart-safe via `PRAGMA user_version`.
 
-`play_sessions` has a partial unique index enforcing **one** active session globally. This is the central obstacle to independent per-child play state and must become per-child.
+`play_sessions` originally had a partial unique index enforcing **one** active session globally.
+
+> **Correction (Prompt 2).** The Prompt 0 audit recorded this as still outstanding. It was already fixed: migration **version 8** (`ensureMultiChildSessions`) drops `active_play_session` and creates `active_play_session_per_child` plus `active_play_session_per_toy`, and backfills `play_sessions.child_id`. The audit read the version 1 schema and missed the later replacement. Prompt 2's remaining session work was therefore only Guest support, not the per-child swap.
 
 Settings is a single row (`id = 1`) holding `choice_limit` and `cleanup_required` — currently device-wide, must become per-child.
 

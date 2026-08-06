@@ -28,4 +28,12 @@ export type SettingsRow = {
   active_child_id: number | null;
   choice_limit: number; cleanup_required: number; created_at: string; updated_at: string;
 };
-export type ChildProfileRow = { id: number; name: string; created_at: string; updated_at: string };
+export type ChildProfileRow = {
+  id: number; name: string; household_id: string; avatar_id: string; accent_color_id: string;
+  age_range: string | null; choice_limit: number; reading_support: string; display_order: number;
+  hidden_at: string | null; created_at: string; updated_at: string;
+};
+export type HouseholdRow = {
+  id: string; name: string; is_local_only: number; remote_id: string | null;
+  created_at: string; updated_at: string;
+};

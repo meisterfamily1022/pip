@@ -117,6 +117,115 @@ async function ensureMultiChildSessions(database: DatabaseConnection): Promise<v
   `);
 }
 
+/**
+ * The household every pre-account record belongs to.
+ *
+ * A fixed literal rather than a generated id, so re-running the migration
+ * re-selects the same row instead of creating a second household.
+ */
+export const LOCAL_HOUSEHOLD_ID = 'local';
+
+/**
+ * Household scope, richer child profiles, per-child toy visibility, and Guest
+ * play.
+ *
+ * Everything here is additive except one index swap: the per-child active
+ * session index is replaced by one that also covers Guest. That drops and
+ * recreates an *index*, never a row.
+ */
+async function ensureHouseholdsAndProfileDetail(database: DatabaseConnection): Promise<void> {
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS households (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+      -- Cleared once the household is connected to a parent account.
+      is_local_only INTEGER NOT NULL DEFAULT 1 CHECK (is_local_only IN (0, 1)),
+      -- Server-side id, set when the library is connected. Unique so a retried
+      -- connect cannot attach one household to two remote records.
+      remote_id TEXT UNIQUE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- Tombstones so a later sync can replicate deletions instead of
+    -- resurrecting rows that one device already removed.
+    CREATE TABLE IF NOT EXISTS deleted_records (
+      entity TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      household_id TEXT,
+      deleted_at TEXT NOT NULL,
+      PRIMARY KEY (entity, entity_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS toy_child_visibility (
+      toy_id INTEGER NOT NULL REFERENCES toys(id) ON DELETE CASCADE,
+      child_id INTEGER NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (toy_id, child_id)
+    );
+    CREATE INDEX IF NOT EXISTS toy_child_visibility_child_index ON toy_child_visibility(child_id);
+  `);
+
+  // One household for everything that already exists on this device.
+  await database.runAsync(
+    `INSERT OR IGNORE INTO households (id, name, is_local_only, created_at, updated_at)
+     VALUES (?, 'My Pip', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    LOCAL_HOUSEHOLD_ID,
+  );
+
+  for (const table of ['rooms', 'storage_spots', 'toys', 'child_profiles', 'play_sessions']) {
+    await addColumnIfMissing(database, table, 'household_id', 'TEXT REFERENCES households(id) ON DELETE RESTRICT');
+    await database.runAsync(`UPDATE "${table}" SET household_id = ? WHERE household_id IS NULL;`, LOCAL_HOUSEHOLD_ID);
+    await database.execAsync(`CREATE INDEX IF NOT EXISTS ${table}_household_index ON "${table}"(household_id);`);
+  }
+
+  // Per-child presentation and preferences. Each is nullable or defaulted, so
+  // existing profiles stay valid without a backfill they cannot supply.
+  await addColumnIfMissing(database, 'child_profiles', 'avatar_id', "TEXT NOT NULL DEFAULT 'circle-dot'");
+  await addColumnIfMissing(database, 'child_profiles', 'accent_color_id', "TEXT NOT NULL DEFAULT 'mint'");
+  await addColumnIfMissing(database, 'child_profiles', 'age_range', 'TEXT');
+  await addColumnIfMissing(database, 'child_profiles', 'choice_limit', 'INTEGER NOT NULL DEFAULT 3 CHECK (choice_limit IN (1, 3, 5))');
+  await addColumnIfMissing(
+    database,
+    'child_profiles',
+    'reading_support',
+    "TEXT NOT NULL DEFAULT 'pictures-words' CHECK (reading_support IN ('pictures', 'pictures-words', 'pictures-words-audio'))",
+  );
+  await addColumnIfMissing(database, 'child_profiles', 'display_order', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing(database, 'child_profiles', 'hidden_at', 'TEXT');
+
+  // The device-wide choice limit becomes each existing child's own setting, so
+  // nobody's Child Mode silently changes shape on upgrade.
+  await database.execAsync(`
+    UPDATE child_profiles
+       SET choice_limit = COALESCE((SELECT choice_limit FROM settings WHERE id = 1), 3)
+     WHERE choice_limit IS NULL OR choice_limit = 3;
+
+    UPDATE child_profiles SET display_order = id WHERE display_order = 0;
+  `);
+
+  // Availability replaces the is_available flag as the source of truth while
+  // preserving what it already meant: hidden toys were hidden from the child.
+  await addColumnIfMissing(
+    database,
+    'toys',
+    'availability_scope',
+    "TEXT NOT NULL DEFAULT 'everyone' CHECK (availability_scope IN ('everyone', 'selected', 'parent_only', 'temporarily_unavailable'))",
+  );
+  await database.execAsync(`
+    UPDATE toys SET availability_scope = 'parent_only' WHERE is_available = 0 AND availability_scope = 'everyone';
+  `);
+
+  // Guest play stores child_id NULL. SQLite treats NULLs as distinct in a
+  // unique index, so keying on child_id alone would allow unlimited concurrent
+  // Guest sessions. COALESCE collapses Guest to one reserved key.
+  await database.execAsync(`
+    DROP INDEX IF EXISTS active_play_session_per_child;
+    CREATE UNIQUE INDEX IF NOT EXISTS active_play_session_per_participant
+      ON play_sessions(COALESCE(child_id, -1)) WHERE status = 'active';
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -242,9 +351,20 @@ const migrations: readonly Migration[] = [
     version: 8,
     apply: ensureMultiChildSessions,
   },
+  {
+    version: 9,
+    apply: ensureHouseholdsAndProfileDetail,
+  },
 ];
 
-export async function runMigrations(database: DatabaseConnection): Promise<void> {
+/**
+ * Applies every pending migration.
+ *
+ * `upTo` stops at a given version. Production always leaves it unset; tests use
+ * it to build a database as an older release left it, so the upgrade path — not
+ * just the final schema — can be exercised.
+ */
+export async function runMigrations(database: DatabaseConnection, upTo = Number.POSITIVE_INFINITY): Promise<void> {
   await database.execAsync('PRAGMA foreign_keys = ON;');
   await database.execAsync('PRAGMA journal_mode = WAL;');
   const versionRow = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;');
@@ -252,6 +372,7 @@ export async function runMigrations(database: DatabaseConnection): Promise<void>
 
   for (const migration of migrations) {
     if (migration.version <= currentVersion) continue;
+    if (migration.version > upTo) break;
     await database.withTransactionAsync(async () => {
       if (migration.source) await database.execAsync(migration.source);
       if (migration.apply) await migration.apply(database);

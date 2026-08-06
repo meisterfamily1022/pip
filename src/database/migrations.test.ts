@@ -27,6 +27,13 @@ class SchemaDatabase implements DatabaseConnection {
     if (toyColumns.length > 0) this.tables.set('toys', [...toyColumns]);
     if (sessionColumns.length > 0) this.tables.set('play_sessions', [...sessionColumns]);
     if (version > 0) this.tables.set('settings', ['id', 'onboarding_completed', 'child_nickname', 'choice_limit', 'cleanup_required', 'created_at', 'updated_at']);
+    // Present since version 1, so an upgrade starting above 1 never re-creates
+    // them yet version 9 still adds a household column to each.
+    if (version > 0) {
+      this.tables.set('rooms', ['id', 'name', 'created_at', 'updated_at']);
+      this.tables.set('storage_spots', ['id', 'room_id', 'name', 'created_at', 'updated_at']);
+    }
+    if (version >= 8) this.tables.set('child_profiles', ['id', 'name', 'created_at', 'updated_at']);
   }
 
   async execAsync(source: string): Promise<void> {
@@ -44,6 +51,19 @@ class SchemaDatabase implements DatabaseConnection {
     if (source.includes('CREATE TABLE IF NOT EXISTS settings') && !this.tables.has('settings')) this.tables.set('settings', ['id', 'onboarding_completed', 'child_nickname', 'choice_limit', 'cleanup_required', 'created_at', 'updated_at']);
     if (source.includes('CREATE TABLE IF NOT EXISTS child_profiles') && !this.tables.has('child_profiles')) this.tables.set('child_profiles', ['id', 'name', 'created_at', 'updated_at']);
     if (source.includes('CREATE TABLE IF NOT EXISTS toy_setup_drafts')) this.tables.set('toy_setup_drafts', ['id']);
+    // Version 9 scopes these to a household, so the fake has to know they exist
+    // before an ALTER can add the column.
+    if (source.includes('CREATE TABLE IF NOT EXISTS rooms') && !this.tables.has('rooms')) {
+      this.tables.set('rooms', ['id', 'name', 'created_at', 'updated_at']);
+    }
+    if (source.includes('CREATE TABLE IF NOT EXISTS storage_spots') && !this.tables.has('storage_spots')) {
+      this.tables.set('storage_spots', ['id', 'room_id', 'name', 'created_at', 'updated_at']);
+    }
+    if (source.includes('CREATE TABLE IF NOT EXISTS households') && !this.tables.has('households')) {
+      this.tables.set('households', ['id', 'name', 'is_local_only', 'remote_id', 'created_at', 'updated_at']);
+      this.tables.set('deleted_records', ['entity', 'entity_id', 'household_id', 'deleted_at']);
+      this.tables.set('toy_child_visibility', ['toy_id', 'child_id', 'created_at']);
+    }
 
     const alter = source.match(/ALTER TABLE "([^"]+)" ADD COLUMN "([^"]+)"/);
     if (alter?.[1] && alter[2]) {

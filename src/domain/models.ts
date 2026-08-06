@@ -85,10 +85,36 @@ export type PlaySession = {
 
 export type ChildProfile = {
   id: number;
+  householdId: string;
   name: string;
+  avatarId: string;
+  accentColorId: string;
+  /** Broad band such as "4-5". Never an exact birthday. */
+  ageRange: string | null;
+  choiceLimit: ChoiceLimit;
+  readingSupport: string;
+  displayOrder: number;
+  /** Set while the parent has temporarily hidden this profile. */
+  hiddenAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
+
+/**
+ * The container every room, storage spot, toy, profile and session belongs to.
+ * Local-only until the parent connects it to an account.
+ */
+export type Household = {
+  id: string;
+  name: string;
+  isLocalOnly: boolean;
+  remoteId: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+/** Who may currently be offered a toy in Child Mode. */
+export type ToyAvailabilityScope = 'everyone' | 'selected' | 'parent_only' | 'temporarily_unavailable';
 
 export type ChoiceLimit = 1 | 3 | 5;
 

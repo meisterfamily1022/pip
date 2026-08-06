@@ -63,6 +63,10 @@ class TestDatabase implements DatabaseConnection {
     if (source.startsWith('INSERT INTO toy_categories')) { const toyId = params[0] as number; this.categories.set(toyId, [...(this.categories.get(toyId) ?? []), params[1] as string]); return { lastInsertRowId: 0, changes: 1 }; }
     if (source.startsWith('INSERT INTO play_sessions')) { const rowId = id(); this.sessions.set(rowId, { id: rowId, child_id: params[0]!, toy_id: params[1]!, status: params[2]!, started_at: params[3]!, completed_at: params[4]!, cleanup_started_at: params[5]!, help_requested: params[6]!, parent_override_used: params[7]!, created_at: params[8]!, updated_at: params[9]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('UPDATE play_sessions')) { const session = this.sessions.get(params[3] as number); if (!session || session.status !== 'active') return { lastInsertRowId: 0, changes: 0 }; session.status = params[0]!; session.completed_at = params[1]!; session.updated_at = params[2]!; return { lastInsertRowId: 0, changes: 1 }; }
+    // Version 9 migration statements. They scope existing rows to a household,
+    // which this fake does not model, so they are accepted and ignored.
+    if (source.startsWith('INSERT OR IGNORE INTO households')) return { lastInsertRowId: 0, changes: 1 };
+    if (/^UPDATE "\w+" SET household_id/.test(source)) return { lastInsertRowId: 0, changes: 0 };
     throw new Error(`Unhandled SQL: ${source}`);
   }
 
@@ -100,6 +104,10 @@ class TestDatabase implements DatabaseConnection {
     if (source.includes('FROM rooms')) return [...this.rooms.values()].sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM storage_spots')) return [...this.spots.values()].filter((row) => row.room_id === params[0]).sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM toy_categories')) return (this.categories.get(params[0] as number) ?? []).map((category) => ({ category }) as T);
+    // This fake models records, not schema. Reporting no columns lets the
+    // migration's add-column-if-missing helper run without needing a schema
+    // model here; migrations.test.ts and migration-integrity.test.ts cover that.
+    if (source.startsWith('PRAGMA table_info')) return [];
     throw new Error(`Unhandled SQL: ${source}`);
   }
 }
