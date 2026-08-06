@@ -166,6 +166,46 @@ npx expo export --platform web
 4. Email delivery is interface-backed; production credential is a deployment step.
 5. One household per account for now; the membership table admits multi-adult sharing later without migration.
 
+## 8a. Prompt 3 outcomes — authentication
+
+Built inside the existing Expo Router server as planned, following the
+`src/server/ai/**` shape (repository interfaces + in-memory development
+storage + a thin `+api.ts` route per operation).
+
+- `src/server/auth/credentials.ts` — scrypt password hashing (N=16384) with a
+  per-account salt and self-describing parameters, so the work factor can rise
+  later without invalidating stored hashes. Every comparison is
+  `timingSafeEqual`. Session tokens are HMAC-signed and carry a session id that
+  is loaded on each request, so revocation takes effect immediately.
+- `src/server/auth/auth-service.ts` — sign up, verify, resend, sign in, sign
+  out, restore, password reset, re-authentication, email change, and household
+  authorisation.
+- `src/server/auth/errors.ts` — one normalised body for every failure.
+- `src/services/auth-session-storage.ts` — token in `expo-secure-store` on
+  device. On web there is no keystore, so the token is memory-only rather than
+  in `localStorage`, where any script could read it. It therefore does not
+  survive a browser reload; that is a deliberate trade.
+
+**Anti-enumeration is structural, not cosmetic.** Sign-up with an existing
+address returns the identical success shape and sends no second code. Sign-in
+spends a decoy scrypt comparison when no account matches, so response timing
+does not distinguish an unknown address from a wrong password. Password reset
+and email change always report success. Tests assert each of these.
+
+**Email delivery remains the one external dependency.** `MailSender` is
+implemented and fully tested; `ConsoleMailSender` logs only that a message was
+queued, deliberately omitting the address, code, and reset token, because logs
+get pasted into issues and a logged code is a working credential. Configuring a
+provider is a deployment step, recorded in `.env.example`.
+
+Apple and Google sign-in are read from configuration and reported through
+`availableProviders()`. With no client id set, both are false and the UI must
+not render the buttons.
+
+Removed `src/types/node-crypto.d.ts`: it was a hand-written shim that shadowed
+`@types/node` and lacked `scrypt`. Prompt 2 added `"node"` to the tsconfig
+`types` array, so the real declarations are now available.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

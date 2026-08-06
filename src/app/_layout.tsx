@@ -7,6 +7,7 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { ErrorStateCard, PageShell, PrimaryButton } from '@/components/playmap-ui';
 import { PipLaunchState } from '@/components/pip-brand-mark';
 import { pipBrand } from '@/brand/pip-brand';
+import { createSessionRestorer } from '@/features/auth/auth-client';
 import { getSessionSnapshot, restoreSession, subscribeSession } from '@/features/auth/session-state';
 import { getRouteAccessSnapshot, initializeRouteAccess, subscribeRouteAccess } from '@/startup/route-access';
 import { isPublicGroup, resolveRouteGuard, type RouteGroup } from '@/startup/route-guards';
@@ -37,7 +38,9 @@ export default function RootLayout() {
   const group = segments[0] as RouteGroup;
 
   useEffect(() => {
-    void restoreSession();
+    // A stored session is restored once per launch; failure degrades to
+    // signed out, which is a fully usable local-only state.
+    void restoreSession(createSessionRestorer());
   }, []);
 
   // Public pages render without local startup, so the marketing surface never
