@@ -128,3 +128,12 @@ export const landingNav = {
    */
   signIn: { label: 'Sign in', href: '/sign-in' },
 } as const;
+
+/**
+ * Footer links.
+ *
+ * Every one must resolve to a page that exists. A privacy link that 404s is
+ * worse than no privacy link, so `landing.test.ts` asserts each target has a
+ * route file behind it.
+ */
+export const landingFooterLinks = [{ id: 'privacy', label: 'Privacy notice', href: '/privacy' }] as const;

@@ -10,6 +10,7 @@ import {
   earlyAccessForm,
   landingFamilies,
   landingFinalCta,
+  landingFooterLinks,
   landingHero,
   landingNav,
   landingPrivacy,
@@ -253,15 +254,18 @@ export function LandingPage() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>{`${pipBrand.name} — ${pipBrand.primaryTagline}`}</Text>
-          <Pressable
-            accessibilityLabel="Read the privacy notice"
-            accessibilityRole="link"
-            onPress={() => {
-              void Linking.openURL('/privacy');
-            }}
-          >
-            <Text style={styles.footerLink}>Privacy notice</Text>
-          </Pressable>
+          {landingFooterLinks.map((link) => (
+            <Pressable
+              accessibilityLabel={link.label}
+              accessibilityRole="link"
+              key={link.id}
+              onPress={() => {
+                void Linking.openURL(link.href);
+              }}
+            >
+              <Text style={styles.footerLink}>{link.label}</Text>
+            </Pressable>
+          ))}
         </View>
       </View>
     </ScrollView>

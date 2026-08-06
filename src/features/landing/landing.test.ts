@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { pipBrand } from '@/brand/pip-brand';
 import {
   EarlyAccessService,
@@ -11,6 +14,7 @@ import {
   landingFamilies,
   landingFeatures,
   landingFinalCta,
+  landingFooterLinks,
   landingHero,
   landingNav,
   landingPrivacy,
@@ -67,6 +71,19 @@ describe('landing copy', () => {
       earlyAccessForm.submitLabel,
     ].join('\n');
     expect(offers).not.toMatch(/download/i);
+  });
+
+  it('points every footer link at a route that exists', () => {
+    // A privacy link that 404s is worse than no privacy link at all.
+    const appDir = join(__dirname, '..', '..', 'app');
+    for (const link of landingFooterLinks) {
+      const route = link.href.replace(/^\//, '');
+      const candidates = [
+        join(appDir, `${route}.tsx`),
+        join(appDir, route, 'index.tsx'),
+      ];
+      expect(candidates.some((candidate) => existsSync(candidate))).toBe(true);
+    }
   });
 
   it('offers sign in now that the screen exists', () => {
