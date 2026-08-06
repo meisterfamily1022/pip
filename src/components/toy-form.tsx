@@ -28,7 +28,12 @@ import {
 import { colors, fontSizes, radii, spacing } from '@/design/tokens';
 import type { Room, StorageSpot } from '@/domain/models';
 import { PLAY_CATEGORIES, playCategoryLabel, type PlayCategory } from '@/domain/play-category';
-import { ToyValidationError, type ToyFormInput } from '@/features/toys/toy-service';
+import {
+  ToyValidationError,
+  validateToyForm,
+  type ToyFormInput,
+  type ToyFormValidationErrors,
+} from '@/features/toys/toy-service';
 import { listRooms, listStorageSpots } from '@/repositories/rooms-repository';
 
 /**
@@ -79,6 +84,7 @@ export function ToyForm({ submitLabel, initialValue, onSubmit, footer }: ToyForm
   const [loadError, setLoadError] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<ToyFormValidationErrors>({});
   const [saving, setSaving] = useState(false);
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -129,9 +135,11 @@ export function ToyForm({ submitLabel, initialValue, onSubmit, footer }: ToyForm
     if (id === roomId) return;
     setRoomId(id);
     setStorageSpotId(null);
+    setValidationErrors((current) => ({ ...current, roomId: undefined, storageSpotId: undefined }));
   };
 
   const toggleCategory = (category: PlayCategory): void => {
+    setValidationErrors((current) => ({ ...current, categories: undefined }));
     setCategories((current) =>
       current.includes(category) ? current.filter((item) => item !== category) : [...current, category],
     );
@@ -190,12 +198,17 @@ export function ToyForm({ submitLabel, initialValue, onSubmit, footer }: ToyForm
   };
 
   const submit = async (): Promise<void> => {
-    setSaving(true);
+    const input = { name, imageUri, roomId, storageSpotId, categories, isAvailable };
+    const errors = validateToyForm(input);
     setSaveError(null);
+    setValidationErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setSaving(true);
     try {
-      await onSubmit({ name, imageUri, roomId, storageSpotId, categories, isAvailable });
+      await onSubmit(input);
     } catch (caught: unknown) {
-      if (caught instanceof ToyValidationError) setSaveError(caught.message);
+      if (caught instanceof ToyValidationError) setValidationErrors(caught.errors);
       else setSaveError(caught instanceof Error ? caught.message : 'Could not save this toy.');
     } finally {
       setSaving(false);
@@ -267,8 +280,12 @@ export function ToyForm({ submitLabel, initialValue, onSubmit, footer }: ToyForm
 
       <TintPanel style={styles.panel} tint="peach">
         <TextField
+          error={validationErrors.name}
           label="Toy name"
-          onChangeText={setName}
+          onChangeText={(value) => {
+            setName(value);
+            setValidationErrors((current) => ({ ...current, name: undefined }));
+          }}
           placeholder="e.g. Magnetic Tile Set"
           value={name}
         />
@@ -285,6 +302,7 @@ export function ToyForm({ submitLabel, initialValue, onSubmit, footer }: ToyForm
               />
             ))}
           </View>
+          {validationErrors.roomId ? <ErrorText>{validationErrors.roomId}</ErrorText> : null}
         </View>
 
         <View style={styles.field}>
@@ -307,12 +325,16 @@ export function ToyForm({ submitLabel, initialValue, onSubmit, footer }: ToyForm
                 <SelectPill
                   key={spot.id}
                   label={spot.name}
-                  onPress={() => setStorageSpotId(spot.id)}
+                  onPress={() => {
+                    setStorageSpotId(spot.id);
+                    setValidationErrors((current) => ({ ...current, storageSpotId: undefined }));
+                  }}
                   selected={spot.id === storageSpotId}
                 />
               ))}
             </View>
           )}
+          {validationErrors.storageSpotId ? <ErrorText>{validationErrors.storageSpotId}</ErrorText> : null}
         </View>
 
         <View style={styles.field}>
@@ -329,6 +351,7 @@ export function ToyForm({ submitLabel, initialValue, onSubmit, footer }: ToyForm
               />
             ))}
           </View>
+          {validationErrors.categories ? <ErrorText>{validationErrors.categories}</ErrorText> : null}
         </View>
 
         <ToggleRow

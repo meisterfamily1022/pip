@@ -23,8 +23,6 @@ import { deleteToyPhoto, replaceToyPhoto, saveToyPhoto } from '@/services/toy-ph
  * validation stay in one place.
  */
 
-export class ToyValidationError extends Error {}
-
 /** What the Add/Edit Toy form collects. `imageUri` may be a freshly picked URI. */
 export type ToyFormInput = {
   name: string;
@@ -35,19 +33,38 @@ export type ToyFormInput = {
   isAvailable: boolean;
 };
 
+export type ToyFormValidationErrors = Partial<
+  Record<'name' | 'roomId' | 'storageSpotId' | 'categories', string>
+>;
+
+export class ToyValidationError extends Error {
+  constructor(readonly errors: ToyFormValidationErrors) {
+    super(Object.values(errors)[0] ?? 'Check the toy details and try again.');
+    this.name = 'ToyValidationError';
+  }
+}
+
 type ValidatedInput = Omit<SaveToyInput, 'isArchived' | 'imageUri'> & { imageUri: string | null };
+
+/** Shared field-level validation for the Add/Edit form and persistence boundary. */
+export function validateToyForm(input: ToyFormInput): ToyFormValidationErrors {
+  const errors: ToyFormValidationErrors = {};
+  if (!input.name.trim()) errors.name = 'Enter a name for this toy.';
+  if (input.roomId === null) errors.roomId = 'Choose the room where this toy belongs.';
+  if (input.storageSpotId === null) errors.storageSpotId = 'Choose the storage spot where this toy belongs.';
+  if (input.categories.length === 0) errors.categories = 'Choose at least one play category.';
+  return errors;
+}
 
 function validate(input: ToyFormInput): ValidatedInput {
   const name = input.name.trim();
-  if (!name) throw new ToyValidationError('Toy name is required.');
-  if (input.roomId === null) throw new ToyValidationError('Choose the room where this toy belongs.');
-  if (input.storageSpotId === null) throw new ToyValidationError('Choose the storage spot where this toy belongs.');
-  if (input.categories.length === 0) throw new ToyValidationError('Choose at least one play category.');
+  const errors = validateToyForm(input);
+  if (Object.keys(errors).length > 0) throw new ToyValidationError(errors);
   return {
     name,
     imageUri: input.imageUri,
-    roomId: input.roomId,
-    storageSpotId: input.storageSpotId,
+    roomId: input.roomId!,
+    storageSpotId: input.storageSpotId!,
     categories: input.categories,
     isAvailable: input.isAvailable,
   };

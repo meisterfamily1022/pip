@@ -326,7 +326,7 @@ export const DiceIcon: Icon = (props) => {
 /** The small rotated square that precedes the PARENT MODE / CHILD MODE label. */
 export const ModeDiamondIcon: Icon = ({ size = 9, color = colors.terracotta }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
-    <G rotation={45} origin="12, 12">
+    <G transform="rotate(45 12 12)">
       <Rect x={4} y={4} width={16} height={16} rx={2} fill={color} />
     </G>
   </Svg>

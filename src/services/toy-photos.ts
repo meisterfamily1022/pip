@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 /**
  * Toy photo storage.
@@ -21,11 +22,30 @@ function extensionFor(uri: string): string {
   return match ? match[1].toLowerCase() : 'jpg';
 }
 
+async function persistWebPhoto(sourceUri: string): Promise<string> {
+  if (sourceUri.startsWith('data:')) return sourceUri;
+  const response = await fetch(sourceUri);
+  if (!response.ok) throw new Error('Could not read the selected photo.');
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read the selected photo.'));
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Could not read the selected photo.'));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
  * Copies a picked image into permanent storage and returns the stored URI.
  * The caller keeps that URI on the toy record.
  */
 export async function saveToyPhoto(sourceUri: string): Promise<string> {
+  // SDK 57's File/Directory API is native-only. On web, image-picker URIs are
+  // converted to persistent data URLs instead of reaching the native shim.
+  if (Platform.OS === 'web') return persistWebPhoto(sourceUri);
   const directory = photoDirectory();
   const name = `toy-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}.${extensionFor(sourceUri)}`;
   const destination = new File(directory, name);
@@ -36,6 +56,7 @@ export async function saveToyPhoto(sourceUri: string): Promise<string> {
 /** Removes a stored photo. Missing files are ignored so deletes stay idempotent. */
 export async function deleteToyPhoto(storedUri: string | null): Promise<void> {
   if (!storedUri) return;
+  if (Platform.OS === 'web') return;
   if (!storedUri.includes(PHOTO_DIRECTORY)) return;
   try {
     const file = new File(storedUri);
