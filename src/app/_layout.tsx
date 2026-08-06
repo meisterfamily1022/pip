@@ -1,6 +1,7 @@
 import { Redirect, Stack, useSegments } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 
@@ -36,6 +37,9 @@ export default function RootLayout() {
   const access = useSyncExternalStore(subscribeRouteAccess, getRouteAccessSnapshot, getRouteAccessSnapshot);
   const session = useSyncExternalStore(subscribeSession, getSessionSnapshot, getSessionSnapshot);
   const group = segments[0] as RouteGroup;
+  // On web the root path is the public landing page; on native it is app
+  // startup, which must wait for the local database.
+  const isPublic = isPublicGroup(group) || (Platform.OS === 'web' && group === undefined);
 
   useEffect(() => {
     // A stored session is restored once per launch; failure degrades to
@@ -46,11 +50,12 @@ export default function RootLayout() {
   // Public pages render without local startup, so the marketing surface never
   // waits on SQLite. Every other surface needs the database open first.
   useEffect(() => {
-    if (!isPublicGroup(group)) void initializeRouteAccess();
-  }, [group]);
+    if (!isPublic) void initializeRouteAccess();
+  }, [isPublic]);
 
   const decision = resolveRouteGuard({
     group,
+    isPublic,
     initialized: access.initialized,
     initializationError: access.initializationError,
     onboardingComplete: access.onboardingComplete,

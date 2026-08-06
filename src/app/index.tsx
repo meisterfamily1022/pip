@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, StyleSheet, Text, View } from 'react-native';
+import { Button, Platform, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { initializeApp } from '@/startup/initialize-app';
 import { PipLaunchState } from '@/components/pip-brand-mark';
+import { LandingPage } from '@/features/landing/landing-page';
 
 type StartupState = 'loading' | 'error';
 
-export default function StartupScreen() {
+/**
+ * The root route serves two audiences.
+ *
+ * On the web it is the public landing page, so a visitor who has never used Pip
+ * lands on marketing rather than an app loader. In the native app the same path
+ * is startup, which opens the local database and routes onward.
+ */
+export default function RootRoute() {
+  if (Platform.OS === 'web') return <LandingPage />;
+  return <StartupScreen />;
+}
+
+function StartupScreen() {
   const [state, setState] = useState<StartupState>('loading');
   const [error, setError] = useState<Error | null>(null);
 

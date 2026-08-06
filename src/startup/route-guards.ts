@@ -23,6 +23,14 @@ export type SessionStatus = 'restoring' | 'signedOut' | 'signedIn' | 'expired';
 
 export type GuardInput = {
   group: RouteGroup;
+  /**
+   * Whether this route is a public marketing surface.
+   *
+   * Passed in rather than derived from `group` alone because the web root `/`
+   * is the landing page while the native root is app startup. The caller knows
+   * the platform; this module stays pure.
+   */
+  isPublic: boolean;
   /** Local startup (database, settings, PIN) has finished. */
   initialized: boolean;
   initializationError: string | null;
@@ -54,7 +62,7 @@ export function isPublicGroup(group: RouteGroup): boolean {
 export function resolveRouteGuard(input: GuardInput): GuardDecision {
   // Public pages short-circuit everything: no startup wait, no guard, no
   // redirect. A visitor who has never opened the app still gets the page.
-  if (isPublicGroup(input.group)) return { kind: 'render' };
+  if (input.isPublic) return { kind: 'render' };
 
   if (!input.initialized) return { kind: 'launching' };
   if (input.initializationError) return { kind: 'error', message: input.initializationError };

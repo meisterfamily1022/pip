@@ -206,6 +206,40 @@ Removed `src/types/node-crypto.d.ts`: it was a hand-written shim that shadowed
 `@types/node` and lacked `scrypt`. Prompt 2 added `"node"` to the tsconfig
 `types` array, so the real declarations are now available.
 
+## 8b. Prompt 4 outcomes — public landing page
+
+Lives at the web root. `src/app/index.tsx` now serves two audiences: on web it
+renders `LandingPage`, on native it stays app startup. One route, no redirect,
+so the marketing page is the server-rendered document a crawler receives.
+
+The route guard gained an explicit `isPublic` input rather than deriving public
+status from the route group alone, because the web root is the landing page
+while the native root is startup. The layout knows the platform; `route-guards`
+stays pure and fully tested.
+
+**Claims are data, not prose.** `src/features/landing/landing-copy.ts` holds
+every public claim, and each feature carries an `available` flag. The page
+renders only available features, so it cannot advertise something the build
+does not do. Multiple child profiles, per-child settings and Guest mode are
+present in that list but flagged unavailable; the prompts that ship them flip
+the flag. Tests assert the unshipped three are not rendered.
+
+Other claims locked down by test: no "PlayMap" anywhere in user-facing copy, no
+download or sign-in offer in the nav or calls to action, no present-tense
+backup or sync claim, no legal-compliance claims.
+
+Copy was rewritten rather than find-and-replaced. The brief's "Create a PlayMap
+for your whole family" does not survive the rename, so it reads "Set up Pip for
+your whole family…".
+
+The CTA is backed by a real endpoint (`/v1/early-access`) with consent, a
+honeypot, validation, and duplicate-tolerant registration that stores only an
+address and a timestamp. Re-registering returns the same success, so the
+endpoint cannot be used to test whether an address is on the list.
+
+Verified by exporting the web build: the root document contains the headline
+and CTA as server-rendered HTML, with zero occurrences of the legacy name.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

@@ -8,6 +8,7 @@ import {
 } from "./route-guards";
 
 const ready: Omit<GuardInput, "group"> = {
+  isPublic: false,
   initialized: true,
   initializationError: null,
   onboardingComplete: true,
@@ -20,13 +21,14 @@ const SESSIONS: SessionStatus[] = ["restoring", "signedOut", "signedIn", "expire
 
 describe("public routes", () => {
   it("renders before local startup finishes", () => {
-    expect(resolveRouteGuard({ ...ready, group: "(public)", initialized: false })).toEqual({ kind: "render" });
+    expect(resolveRouteGuard({ ...ready, group: "(public)", isPublic: true, initialized: false })).toEqual({ kind: "render" });
   });
 
   it("renders even when local startup failed", () => {
     const decision = resolveRouteGuard({
       ...ready,
       group: "(public)",
+      isPublic: true,
       initialized: true,
       initializationError: "Database is unavailable.",
     });
@@ -39,6 +41,7 @@ describe("public routes", () => {
         for (const childModeLocked of [true, false]) {
           const decision = resolveRouteGuard({
             group: "(public)",
+            isPublic: true,
             initialized: false,
             initializationError: "boom",
             onboardingComplete,
@@ -150,6 +153,7 @@ describe("redirect loops", () => {
             for (let hop = 0; hop <= GROUPS.length + 1; hop += 1) {
               const decision = resolveRouteGuard({
                 group: current,
+                isPublic: isPublicGroup(current),
                 initialized: true,
                 initializationError: null,
                 onboardingComplete,
