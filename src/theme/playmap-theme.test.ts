@@ -15,9 +15,18 @@ function contrast(foreground: string, background: string): number {
   return (light + 0.05) / (dark + 0.05);
 }
 
-describe('PlayMap visual tokens', () => {
+describe('Pip visual tokens', () => {
+  it('uses the approved Pip logo colors exactly', () => {
+    expect(theme.colors.brandPrimary).toBe('#72B8C5');
+    expect(theme.colors.accentSage).toBe('#91A489');
+    expect(theme.colors.accentMint).toBe('#83BDD0');
+    expect(theme.colors.accentYellow).toBe('#F9BD4B');
+    expect(theme.colors.accentLavender).toBe('#9B83D2');
+  });
+
   it('keeps primary actions readable', () => {
-    expect(contrast(theme.colors.white, theme.colors.coralAction)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(theme.colors.primaryText, theme.colors.brandPrimary)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(theme.colors.brandInk, theme.colors.backgroundCream)).toBeGreaterThanOrEqual(4.5);
   });
 
   it.each([
@@ -31,7 +40,7 @@ describe('PlayMap visual tokens', () => {
   });
 
   it('distinguishes enabled and disabled action surfaces', () => {
-    expect(theme.colors.disabled).not.toBe(theme.colors.coralAction);
+    expect(theme.colors.disabled).not.toBe(theme.colors.brandPrimary);
     expect(contrast(theme.colors.disabledText, theme.colors.disabled)).toBeGreaterThanOrEqual(4.5);
   });
 });

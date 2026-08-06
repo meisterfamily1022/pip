@@ -127,7 +127,7 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, 
         setIntakeFeedback({ tone: warning ? 'error' : 'success', message: `${added.drafts.length} ${added.drafts.length === 1 ? 'photo is' : 'photos are'} ready to review.${warning ? ` ${warning}` : ''}` });
       } else {
         setSourceImageUri(result.uris[0]!);
-        setIntakeFeedback({ tone: 'success', message: 'Photo selected. It will be copied into PlayMap when you save.' });
+        setIntakeFeedback({ tone: 'success', message: 'Photo selected. It will be copied into Pip when you save.' });
       }
     } catch (caught: unknown) {
       setIntakeFeedback({ tone: 'error', message: caught instanceof Error ? caught.message : 'The photo action failed. Please try again.' });
@@ -149,7 +149,7 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, 
         setManualFeedback({ tone: 'error', message: result.error });
       } else if (result.uris[0]) {
         setSourceImageUri(result.uris[0]);
-        setManualFeedback({ tone: 'success', message: 'Photo captured. It will be copied into PlayMap when you save.' });
+        setManualFeedback({ tone: 'success', message: 'Photo captured. It will be copied into Pip when you save.' });
       } else {
         setManualFeedback({ tone: 'error', message: 'The camera did not return a usable photo.' });
       }

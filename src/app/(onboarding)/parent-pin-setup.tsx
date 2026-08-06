@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 
 import { BackButton, Field, PrimaryButton } from '@/components/onboarding-controls';
 import { OnboardingScreen } from '@/components/onboarding-screen';
+import { PipBrandMark } from '@/components/pip-brand-mark';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { validatePinConfirmation } from '@/features/onboarding/validation';
 
@@ -16,5 +17,5 @@ export default function ParentPinSetupRoute() {
     if (validationError) { setError(validationError); return; }
     router.push('/child-profile-setup');
   };
-  return <OnboardingScreen step="Step 1 of 3" title="Create a parent PIN" description="Use a four-digit PIN to protect parent controls." footer={<PrimaryButton label="Continue" onPress={continueToProfile} />}><BackButton onPress={() => router.canGoBack() ? router.back() : router.replace('/onboarding')} /><Field label="PIN" value={draft.pin} onChangeText={(value) => { updateDraft({ pin: digitsOnly(value) }); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={4} /><Field label="Confirm PIN" value={draft.pinConfirmation} onChangeText={(value) => { updateDraft({ pinConfirmation: digitsOnly(value) }); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={4} error={error} /></OnboardingScreen>;
+  return <OnboardingScreen step="Step 1 of 3" title="Create a parent PIN" description="Use a four-digit PIN to protect parent controls." footer={<PrimaryButton label="Continue" onPress={continueToProfile} />}><PipBrandMark variant="symbol" style={{ width: 64 }} /><BackButton onPress={() => router.canGoBack() ? router.back() : router.replace('/onboarding')} /><Field label="PIN" value={draft.pin} onChangeText={(value) => { updateDraft({ pin: digitsOnly(value) }); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={4} /><Field label="Confirm PIN" value={draft.pinConfirmation} onChangeText={(value) => { updateDraft({ pinConfirmation: digitsOnly(value) }); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={4} error={error} /></OnboardingScreen>;
 }

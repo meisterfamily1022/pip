@@ -52,7 +52,7 @@ export function initializeRouteAccess(
         initialization = null;
         publish({
           initialized: true,
-          initializationError: caught instanceof Error ? caught.message : 'PlayMap could not start.',
+          initializationError: caught instanceof Error ? caught.message : 'Pip could not start.',
         });
       });
   }

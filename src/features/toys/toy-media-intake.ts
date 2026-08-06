@@ -48,7 +48,7 @@ export async function recoverPendingToyImages(): Promise<ImageIntakeResult | nul
 type CameraPickerApi = Pick<typeof ImagePicker, 'requestCameraPermissionsAsync' | 'launchCameraAsync'>;
 
 export async function captureWithSystemCamera(api: CameraPickerApi = ImagePicker, platform: typeof Platform.OS = Platform.OS): Promise<ImageIntakeResult> {
-  if (platform === 'web') return { uris: [], assets: [], cancelled: false, error: 'Camera capture requires the PlayMap iOS or Android app. You can choose a photo in this browser.' };
+  if (platform === 'web') return { uris: [], assets: [], cancelled: false, error: 'Camera capture requires the Pip iOS or Android app. You can choose a photo in this browser.' };
   try {
     const permission = await api.requestCameraPermissionsAsync();
     if (!permission.granted) return {

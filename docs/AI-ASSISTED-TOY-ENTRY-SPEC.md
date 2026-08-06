@@ -4,7 +4,7 @@ Status: planning only. This document does not authorize a mobile API key, automa
 
 ## Purpose and non-goals
 
-AI-assisted toy entry is an optional Parent Mode helper. A parent may explicitly submit one chosen toy photograph to a PlayMap-controlled service and receive editable suggestions for the existing Add Toy form. Manual entry remains immediately available and fully functional with no internet connection.
+AI-assisted toy entry is an optional Parent Mode helper. A parent may explicitly submit one chosen toy photograph to a Pip-controlled service and receive editable suggestions for the existing Add Toy form. Manual entry remains immediately available and fully functional with no internet connection.
 
 The child's real toy photo remains the child-facing image. The feature does not generate or replace images, save or update a toy automatically, make medical, therapeutic, developmental, safety, age, identity, preference, price, or brand claims, or provide play instructions.
 
@@ -77,7 +77,7 @@ The backend response may additionally use an HTTP header or envelope for `reques
 1. Parent opens Add Toy and takes or selects a photo using the existing controls.
 2. Manual fields remain editable immediately. If there is no photo, the secondary action is disabled with the explanation “Add a photo to get suggestions.”
 3. After a photo is selected, show the secondary button **Suggest Details**, separate from the primary **Save Toy** action.
-4. Nearby explanation: “PlayMap can analyze this photo to suggest a toy name and categories. You can review and change everything before saving.” First use also links to the AI privacy notice.
+4. Nearby explanation: “Pip can analyze this photo to suggest a toy name and categories. You can review and change everything before saving.” First use also links to the AI privacy notice.
 5. Tapping Suggest Details is the explicit consent/action for that one request. The button becomes disabled while the request is active; do not submit when the form is saving.
 6. Show a calm, non-blocking loading state: “Looking at the photo…” with Cancel. Keep the photo and every manually entered form value visible and editable where practical.
 7. On success, show an “AI suggestions” label and per-field provenance. Apply high- or medium-confidence values only to untouched/empty fields; for populated fields, present an accept control rather than overwriting. Low-confidence values are available for review but not automatically applied.

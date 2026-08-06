@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+// Rebrand compatibility: changing this legacy key would lose the saved Child Mode lock state.
 const CHILD_MODE_LOCK_KEY = 'playmap.child-mode-locked';
 
 export type ChildModeLockStorage = {

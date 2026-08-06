@@ -4,6 +4,7 @@ import { runMigrations } from './migrations';
 import { ensureSettings } from '@/repositories/settings-repository';
 import type { DatabaseConnection } from './types';
 
+// Rebrand compatibility: keep this legacy filename so existing Pip installs load their saved data.
 const DATABASE_NAME = 'playmap-v1.db';
 
 let initializedDatabase: DatabaseConnection | null = null;

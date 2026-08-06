@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
+// Rebrand compatibility: these legacy keys preserve existing AI installation credentials.
 const KEY = 'playmap.ai.installation-credential.v1';
 let memoryCredential: string | null = null;
 const isWeb = typeof document !== 'undefined';

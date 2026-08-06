@@ -1,6 +1,6 @@
-# PlayMap
+# Pip
 
-PlayMap is a local-first family toy library. Parents photograph and organize toys by room and storage spot; Child Mode offers a deliberately simple, picture-led way to choose and return a toy.
+Pip is a local-first family toy library. Less deciding. More playing. Parents photograph and organize toys by room and storage spot; Child Mode offers a deliberately simple, picture-led way to choose and return a toy.
 
 ## Commands
 
@@ -17,7 +17,7 @@ npm run web
 
 ## Local data and media
 
-PlayMap stores its SQLite database and toy photos on the device. Photos selected or captured in the native app are copied into PlayMap-managed storage before a toy is saved. On web, selected blob URLs are converted to durable data URLs before persistence, so they survive an app reload while browser storage remains intact.
+Pip stores its SQLite database and toy photos on the device. Photos selected or captured in the native app are copied into Pip-managed storage before a toy is saved. On web, selected blob URLs are converted to durable data URLs before persistence, so they survive an app reload while browser storage remains intact.
 
 ## Image intake
 
@@ -27,6 +27,6 @@ See [the product-quality audit](docs/PRODUCT-QUALITY-AUDIT-2026-07-29.md) for cu
 
 ## Review and reset data
 
-Settings includes a confirmed **Reset PlayMap** action that removes family data, managed photos, play history, settings, and the parent PIN without touching project source files. The old Expo starter `reset-project` source-deletion command is intentionally not available.
+Settings includes a confirmed **Reset Pip** action that removes family data, managed photos, play history, settings, and the parent PIN without touching project source files. The old Expo starter `reset-project` source-deletion command is intentionally not available.
 
 `seedReviewFixture` in `src/features/testing/review-fixture.ts` provides deterministic, idempotent rooms, storage spots, and toy states for automated review environments. It is not connected to production UI.

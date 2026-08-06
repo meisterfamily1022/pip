@@ -1,4 +1,4 @@
-# PlayMap iOS Release Commands
+# Pip iOS Release Commands
 
 Do not run these until the owner has completed Apple Developer, App Store Connect, bundle identifier, privacy URL, and support URL decisions.
 

@@ -5,7 +5,7 @@ This roadmap is intentionally staged. No stage authorizes dependency upgrades, A
 ## Stage 1 — Backend skeleton and strict request/response schema
 
 - Areas: new backend repository/service, API route, runtime schema package/service, contract fixtures, threat model, CI secret scanning.
-- Acceptance: authenticated request reaches a PlayMap endpoint; it accepts one bounded image; a mock response is independently validated to the V1.1 allowlist; no provider integration exists yet.
+- Acceptance: authenticated request reaches a Pip endpoint; it accepts one bounded image; a mock response is independently validated to the V1.1 allowlist; no provider integration exists yet.
 - Tests: valid contract, missing/extra fields, invalid JSON, unsupported category/cleanup, text limits, file signature/type/size, idempotency.
 - Security review: public API surface, auth/token design, secret storage, log redaction, schema projection.
 - Cost review: request-size/max-dimension defaults and global cap configuration exist before provider traffic.
@@ -72,7 +72,7 @@ This roadmap is intentionally staged. No stage authorizes dependency upgrades, A
 - Tests: entitlement changes, restore, renewal/expiration, allowance reset, family/household policy, refund/revocation, server-side verification, app-store sandbox.
 - Security review: purchase-token verification on server, account takeover protections, entitlement audit trail, privacy update.
 - Cost review: commission, hosting, storage, support, refunds, heavy-user distributions, annual founder pricing, and explicit $2 cap all remain viable.
-- Commit boundary: `Add measured PlayMap Plus AI entitlements`.
+- Commit boundary: `Add measured Pip Plus AI entitlements`.
 
 ## Release gates
 

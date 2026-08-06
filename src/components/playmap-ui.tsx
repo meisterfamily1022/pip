@@ -1,99 +1,1226 @@
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ImageSourcePropType, type PressableProps, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, type ReactNode } from 'react';
-import { playmapTheme as theme } from '@/theme/playmap-theme';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type ImageSourcePropType,
+  type PressableProps,
+  type StyleProp,
+  type TextInputProps,
+  type ViewStyle,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useState, type ReactNode } from "react";
+import { playmapTheme as theme } from "@/theme/playmap-theme";
 
-type ButtonProps = Omit<PressableProps, 'children' | 'style'> & { label: string; accessibilityLabel?: string; style?: StyleProp<ViewStyle> };
+type ButtonProps = Omit<PressableProps, "children" | "style"> & {
+  label: string;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+};
 
-export function ScreenContainer({ children, child = false }: { children: ReactNode; child?: boolean }) {
-  return <View style={[styles.screen, child && styles.childScreen]}>{children}</View>;
+export function ScreenContainer({
+  children,
+  child = false,
+}: {
+  children: ReactNode;
+  child?: boolean;
+}) {
+  return (
+    <View style={[styles.screen, child && styles.childScreen]}>{children}</View>
+  );
 }
 
 /** Shared safe, centered page surface for phone through desktop. */
-export function PageShell({ children, child = false, scroll = true }: { children: ReactNode; child?: boolean; scroll?: boolean }) {
+export function PageShell({
+  children,
+  child = false,
+  scroll = true,
+}: {
+  children: ReactNode;
+  child?: boolean;
+  scroll?: boolean;
+}) {
   const content = <View style={styles.pageContent}>{children}</View>;
-  return <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={[styles.safePage, child && styles.childScreen]}>{scroll ? <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.pageScroll} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">{content}</ScrollView> : content}</SafeAreaView>;
+  return (
+    <SafeAreaView
+      edges={["top", "right", "bottom", "left"]}
+      style={[styles.safePage, child && styles.childScreen]}
+    >
+      {scroll ? (
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.pageScroll}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+        >
+          {content}
+        </ScrollView>
+      ) : (
+        content
+      )}
+    </SafeAreaView>
+  );
 }
 
-export function BackNavigation({ label = 'Back', onPress }: { label?: string; onPress(): void }) { return <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><Text style={styles.backText}>‹</Text><Text style={styles.backLabel}>{label}</Text></Pressable>; }
-
-export function PageHeader({ title, subtitle, eyebrow, action }: { title: string; subtitle?: string; eyebrow?: string; action?: ReactNode }) {
-  return <View style={styles.pageHeader}>{action ? <View style={styles.headerRow}><View style={styles.headerCopy}>{eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}<Text accessibilityRole="header" style={styles.pageTitle}>{title}</Text>{subtitle && <Text style={styles.body}>{subtitle}</Text>}</View>{action}</View> : <>{eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}<Text accessibilityRole="header" style={styles.pageTitle}>{title}</Text>{subtitle && <Text style={styles.body}>{subtitle}</Text>}</>}</View>;
+export function BackNavigation({
+  label = "Back",
+  onPress,
+}: {
+  label?: string;
+  onPress(): void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.backButton,
+        focused && styles.focused,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={styles.backText}>‹</Text>
+      <Text style={styles.backLabel}>{label}</Text>
+    </Pressable>
+  );
 }
 
-export function SectionHeading({ title, supporting, action }: { title: string; supporting?: string; action?: ReactNode }) {
-  return <View style={styles.sectionHeading}>{<View style={styles.headerRow}><View style={styles.headerCopy}><Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>{supporting && <Text style={styles.supporting}>{supporting}</Text>}</View>{action}</View>}</View>;
+export function PageHeader({
+  title,
+  subtitle,
+  eyebrow,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  eyebrow?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <View style={styles.pageHeader}>
+      {action ? (
+        <View style={styles.headerRow}>
+          <View style={styles.headerCopy}>
+            {eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
+            <Text accessibilityRole="header" style={styles.pageTitle}>
+              {title}
+            </Text>
+            {subtitle && <Text style={styles.body}>{subtitle}</Text>}
+          </View>
+          {action}
+        </View>
+      ) : (
+        <>
+          {eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
+          <Text accessibilityRole="header" style={styles.pageTitle}>
+            {title}
+          </Text>
+          {subtitle && <Text style={styles.body}>{subtitle}</Text>}
+        </>
+      )}
+    </View>
+  );
 }
 
-function ActionButton({ label, kind, accessibilityLabel, style, ...props }: ButtonProps & { kind: 'primary' | 'secondary' | 'quiet' | 'destructive' }) {
-  return <Pressable accessibilityLabel={accessibilityLabel ?? label} accessibilityRole="button" accessibilityState={{ disabled: Boolean(props.disabled) }} {...props} style={({ pressed }) => [styles.button, styles[`${kind}Button`], props.disabled && styles[`${kind}Disabled`], pressed && !props.disabled && styles.pressed, style]}><Text style={[styles.buttonText, styles[`${kind}Text`], props.disabled && styles.disabledButtonText]}>{label}</Text></Pressable>;
+export function SectionHeading({
+  title,
+  supporting,
+  action,
+}: {
+  title: string;
+  supporting?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <View style={styles.sectionHeading}>
+      {
+        <View style={styles.headerRow}>
+          <View style={styles.headerCopy}>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>
+              {title}
+            </Text>
+            {supporting && <Text style={styles.supporting}>{supporting}</Text>}
+          </View>
+          {action}
+        </View>
+      }
+    </View>
+  );
 }
 
-export function PrimaryButton(props: ButtonProps) { return <ActionButton {...props} kind="primary" />; }
-export function SecondaryButton(props: ButtonProps) { return <ActionButton {...props} kind="secondary" />; }
-export function QuietButton(props: ButtonProps) { return <ActionButton {...props} kind="quiet" />; }
-export function DestructiveButton(props: ButtonProps) { return <ActionButton {...props} kind="destructive" />; }
-
-export function PastelNavigationCard({ title, description, icon, tint = theme.colors.surfaceSage, onPress, disabled }: { title: string; description?: string; icon?: string; tint?: string; onPress?: () => void; disabled?: boolean }) {
-  return <Pressable accessibilityHint={description} accessibilityLabel={title} accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.navigationCard, { backgroundColor: tint }, disabled && styles.navigationDisabled, pressed && !disabled && styles.pressed]}>{icon && <Text accessibilityElementsHidden style={styles.cardIcon}>{icon}</Text>}<View style={styles.cardCopy}><Text style={styles.cardTitle}>{title}</Text>{description && <Text style={styles.supporting}>{description}</Text>}</View><Text accessibilityElementsHidden style={styles.chevron}>›</Text></Pressable>;
+function ActionButton({
+  label,
+  kind,
+  accessibilityLabel,
+  style,
+  ...props
+}: ButtonProps & { kind: "primary" | "secondary" | "quiet" | "destructive" }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(props.disabled) }}
+      {...props}
+      onBlur={(event) => {
+        setFocused(false);
+        props.onBlur?.(event);
+      }}
+      onFocus={(event) => {
+        setFocused(true);
+        props.onFocus?.(event);
+      }}
+      style={({ pressed }) => [
+        styles.button,
+        styles[`${kind}Button`],
+        props.disabled && styles[`${kind}Disabled`],
+        focused && !props.disabled && styles.focused,
+        pressed && !props.disabled && styles[`${kind}Pressed`],
+        style,
+      ]}
+    >
+      <Text
+        style={[
+          styles.buttonText,
+          styles[`${kind}Text`],
+          props.disabled && styles.disabledButtonText,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
-export function StatCard({ value, label }: { value: string | number; label: string }) { return <View style={styles.statCard}><Text style={styles.statValue}>{value}</Text><Text style={styles.caption}>{label}</Text></View>; }
-
-export function RoundedTextInput({ label, error, ...props }: TextInputProps & { label?: string; error?: string | null }) {
-  return <View style={styles.field}>{label && <Text style={styles.label}>{label}</Text>}<TextInput {...props} accessibilityLabel={props.accessibilityLabel ?? label} placeholderTextColor={theme.colors.mutedText} style={[styles.input, error && styles.inputError, props.style]} />{error !== undefined && <Text accessibilityLiveRegion="polite" style={styles.errorText}>{error ?? ''}</Text>}</View>;
+export function PrimaryButton(props: ButtonProps) {
+  return <ActionButton {...props} kind="primary" />;
+}
+export function SecondaryButton(props: ButtonProps) {
+  return <ActionButton {...props} kind="secondary" />;
+}
+export function QuietButton(props: ButtonProps) {
+  return <ActionButton {...props} kind="quiet" />;
+}
+export function DestructiveButton(props: ButtonProps) {
+  return <ActionButton {...props} kind="destructive" />;
 }
 
-export function ReadOnlyValue({ label, value }: { label: string; value: string }) {
-  return <View accessibilityLabel={`${label}: ${value}`} style={styles.readOnlyValue}><Text style={styles.readOnlyLabel}>{label}</Text><Text style={styles.readOnlyText}>{value}</Text></View>;
+export function PastelNavigationCard({
+  title,
+  description,
+  icon,
+  tint = theme.colors.surfaceSage,
+  onPress,
+  disabled,
+}: {
+  title: string;
+  description?: string;
+  icon?: string;
+  tint?: string;
+  onPress?: () => void;
+  disabled?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      accessibilityHint={description}
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.navigationCard,
+        { backgroundColor: tint },
+        disabled && styles.navigationDisabled,
+        focused && !disabled && styles.focused,
+        pressed && !disabled && styles.pressed,
+      ]}
+    >
+      {icon && (
+        <Text accessibilityElementsHidden style={styles.cardIcon}>
+          {icon}
+        </Text>
+      )}
+      <View style={styles.cardCopy}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        {description && <Text style={styles.supporting}>{description}</Text>}
+      </View>
+      <Text accessibilityElementsHidden style={styles.chevron}>
+        ›
+      </Text>
+    </Pressable>
+  );
 }
 
-export function RoundedSelect({ label, value, placeholder = 'Select an option', onPress, accessibilityLabel }: { label?: string; value?: string; placeholder?: string; onPress(): void; accessibilityLabel?: string }) {
-  return <Pressable accessibilityLabel={accessibilityLabel ?? label} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.select, pressed && styles.pressed]}>{label && <Text style={styles.label}>{label}</Text>}<View style={styles.selectRow}><Text style={[styles.selectValue, !value && styles.placeholder]}>{value ?? placeholder}</Text><Text style={styles.selectChevron}>⌄</Text></View></Pressable>;
+export function StatCard({
+  value,
+  label,
+}: {
+  value: string | number;
+  label: string;
+}) {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.caption}>{label}</Text>
+    </View>
+  );
 }
 
-export function FilterChip({ label, selected, onPress }: { label: string; selected?: boolean; onPress(): void }) { return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.chip, selected && styles.selectedChip, pressed && styles.pressed]}><Text style={[styles.chipText, selected && styles.selectedChipText]}>{selected ? '✓ ' : ''}{label}</Text></Pressable>; }
-export function CategoryChip(props: { label: string; selected?: boolean; onPress(): void }) { return <FilterChip {...props} />; }
-
-export function ToggleRow({ label, description, value, disabled = false, onValueChange }: { label: string; description?: string; value: boolean; disabled?: boolean; onValueChange(value: boolean): void }) {
-  return <Pressable accessibilityHint={description} accessibilityLabel={label} accessibilityRole="switch" accessibilityState={{ checked: value, disabled }} disabled={disabled} onPress={() => onValueChange(!value)} style={({ pressed }) => [styles.toggleRow, disabled && styles.toggleRowDisabled, pressed && !disabled && styles.toggleRowPressed]}><View style={styles.cardCopy}><Text style={[styles.label, disabled && styles.disabledControlText]}>{label}</Text>{description && <Text style={[styles.supporting, disabled && styles.disabledControlText]}>{description}</Text>}</View><View accessibilityElementsHidden style={[styles.toggle, value && styles.toggleOn, disabled && styles.toggleDisabled]}><View style={[styles.toggleKnob, value && styles.toggleKnobOn]} /></View></Pressable>;
+export function RoundedTextInput({
+  label,
+  error,
+  ...props
+}: TextInputProps & { label?: string; error?: string | null }) {
+  return (
+    <View style={styles.field}>
+      {label && <Text style={styles.label}>{label}</Text>}
+      <TextInput
+        {...props}
+        accessibilityLabel={props.accessibilityLabel ?? label}
+        placeholderTextColor={theme.colors.mutedText}
+        style={[styles.input, error && styles.inputError, props.style]}
+      />
+      {error !== undefined && (
+        <Text accessibilityLiveRegion="polite" style={styles.errorText}>
+          {error ?? ""}
+        </Text>
+      )}
+    </View>
+  );
 }
 
-export function SegmentedControl<T extends string | number | boolean>({ options, value, onChange, accessibilityLabel = 'Options', getOptionLabel = String }: { options: readonly T[]; value: T; onChange(value: T): void; accessibilityLabel?: string; getOptionLabel?(option: T): string }) {
-  return <View accessibilityLabel={accessibilityLabel} accessibilityRole="radiogroup" style={styles.segmented}>{options.map((option) => { const selected = option === value; const label = getOptionLabel(option); return <Pressable key={String(option)} accessibilityLabel={label} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => onChange(option)} style={[styles.segment, selected && styles.segmentSelected]}><Text style={[styles.segmentText, selected && styles.segmentSelectedText]}>{label}</Text></Pressable>; })}</View>;
+export function ReadOnlyValue({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <View
+      accessibilityLabel={`${label}: ${value}`}
+      style={styles.readOnlyValue}
+    >
+      <Text style={styles.readOnlyLabel}>{label}</Text>
+      <Text style={styles.readOnlyText}>{value}</Text>
+    </View>
+  );
 }
 
-export function EmptyStateCard({ title, message, action }: { title: string; message: string; action?: ReactNode }) { return <View style={styles.stateCard}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.body}>{message}</Text>{action}</View>; }
-export function ErrorStateCard({ message, action }: { message: string; action?: ReactNode }) { return <View accessibilityLiveRegion="polite" style={[styles.stateCard, styles.errorCard]}><Text style={styles.errorTitle}>Something went wrong</Text><Text style={styles.body}>{message}</Text>{action}</View>; }
-export function LoadingState({ label = 'Loading…' }: { label?: string }) { return <View accessibilityLiveRegion="polite" style={styles.loading}><ActivityIndicator color={theme.colors.sageAction} /><Text style={styles.supporting}>{label}</Text></View>; }
+export function RoundedSelect({
+  label,
+  value,
+  placeholder = "Select an option",
+  onPress,
+  accessibilityLabel,
+}: {
+  label?: string;
+  value?: string;
+  placeholder?: string;
+  onPress(): void;
+  accessibilityLabel?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.select, pressed && styles.pressed]}
+    >
+      {label && <Text style={styles.label}>{label}</Text>}
+      <View style={styles.selectRow}>
+        <Text style={[styles.selectValue, !value && styles.placeholder]}>
+          {value ?? placeholder}
+        </Text>
+        <Text style={styles.selectChevron}>⌄</Text>
+      </View>
+    </Pressable>
+  );
+}
 
-export function ToyImage({ uri, source, accessibilityLabel = 'Toy photo' }: { uri?: string | null; source?: ImageSourcePropType; accessibilityLabel?: string }) {
+export function FilterChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected?: boolean;
+  onPress(): void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        selected && styles.selectedChip,
+        focused && styles.focused,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.chipText, selected && styles.selectedChipText]}>
+        {selected ? "✓ " : ""}
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+export function CategoryChip(props: {
+  label: string;
+  selected?: boolean;
+  onPress(): void;
+}) {
+  return <FilterChip {...props} />;
+}
+
+export function ToggleRow({
+  label,
+  description,
+  value,
+  disabled = false,
+  onValueChange,
+}: {
+  label: string;
+  description?: string;
+  value: boolean;
+  disabled?: boolean;
+  onValueChange(value: boolean): void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      accessibilityHint={description}
+      accessibilityLabel={label}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
+      disabled={disabled}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
+      onPress={() => onValueChange(!value)}
+      style={({ pressed }) => [
+        styles.toggleRow,
+        disabled && styles.toggleRowDisabled,
+        focused && !disabled && styles.focused,
+        pressed && !disabled && styles.toggleRowPressed,
+      ]}
+    >
+      <View style={styles.cardCopy}>
+        <Text style={[styles.label, disabled && styles.disabledControlText]}>
+          {label}
+        </Text>
+        {description && (
+          <Text
+            style={[styles.supporting, disabled && styles.disabledControlText]}
+          >
+            {description}
+          </Text>
+        )}
+      </View>
+      <View
+        accessibilityElementsHidden
+        style={[
+          styles.toggle,
+          value && styles.toggleOn,
+          disabled && styles.toggleDisabled,
+        ]}
+      >
+        <View style={[styles.toggleKnob, value && styles.toggleKnobOn]} />
+      </View>
+    </Pressable>
+  );
+}
+
+export function SegmentedControl<T extends string | number | boolean>({
+  options,
+  value,
+  onChange,
+  accessibilityLabel = "Options",
+  getOptionLabel = String,
+}: {
+  options: readonly T[];
+  value: T;
+  onChange(value: T): void;
+  accessibilityLabel?: string;
+  getOptionLabel?(option: T): string;
+}) {
+  return (
+    <View
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="radiogroup"
+      style={styles.segmented}
+    >
+      {options.map((option) => {
+        const selected = option === value;
+        const label = getOptionLabel(option);
+        return (
+          <Pressable
+            key={String(option)}
+            accessibilityLabel={label}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(option)}
+            style={[styles.segment, selected && styles.segmentSelected]}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                selected && styles.segmentSelectedText,
+              ]}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export function EmptyStateCard({
+  title,
+  message,
+  action,
+}: {
+  title: string;
+  message: string;
+  action?: ReactNode;
+}) {
+  return (
+    <View style={styles.stateCard}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={styles.body}>{message}</Text>
+      {action}
+    </View>
+  );
+}
+export function ErrorStateCard({
+  message,
+  action,
+}: {
+  message: string;
+  action?: ReactNode;
+}) {
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={[styles.stateCard, styles.errorCard]}
+    >
+      <Text style={styles.errorTitle}>Something went wrong</Text>
+      <Text style={styles.body}>{message}</Text>
+      {action}
+    </View>
+  );
+}
+export function LoadingState({ label = "Loading…" }: { label?: string }) {
+  return (
+    <View
+      accessibilityLabel={label}
+      accessibilityLiveRegion="polite"
+      accessibilityRole="progressbar"
+      style={styles.loading}
+    >
+      <ActivityIndicator color={theme.colors.brandInk} />
+      <Text style={styles.supporting}>{label}</Text>
+    </View>
+  );
+}
+
+export function ToyImage({
+  uri,
+  source,
+  accessibilityLabel = "Toy photo",
+}: {
+  uri?: string | null;
+  source?: ImageSourcePropType;
+  accessibilityLabel?: string;
+}) {
   const [failed, setFailed] = useState(false);
-  return (uri || source) && !failed ? <Image accessibilityIgnoresInvertColors accessibilityLabel={accessibilityLabel} onError={() => setFailed(true)} source={source ?? { uri: uri ?? undefined }} style={styles.toyImage} /> : <View accessibilityLabel="No photo yet" style={[styles.toyImage, styles.imageFallback]}><View style={styles.imageTileShape} /><Text style={styles.supporting}>No photo yet</Text></View>;
+  return (uri || source) && !failed ? (
+    <Image
+      accessibilityIgnoresInvertColors
+      accessibilityLabel={accessibilityLabel}
+      onError={() => setFailed(true)}
+      source={source ?? { uri: uri ?? undefined }}
+      style={styles.toyImage}
+    />
+  ) : (
+    <View
+      accessibilityLabel="No photo yet"
+      style={[styles.toyImage, styles.imageFallback]}
+    >
+      <View style={styles.imageTileShape} />
+      <Text style={styles.supporting}>No photo yet</Text>
+    </View>
+  );
 }
-export function ImageTile({ uri, label = 'Toy photo', size = 88 }: { uri?: string | null; label?: string; size?: number }) { const [failed, setFailed] = useState(false); return <View style={[styles.imageTile, { height: size, width: size }]}>{uri && !failed ? <Image accessibilityLabel={label} onError={() => setFailed(true)} source={{ uri }} style={styles.imageTileImage} /> : <View accessibilityLabel="No photo yet" style={styles.imageTileFallback}><View style={styles.imageTileShape} /><Text style={styles.imageTileText}>No photo yet</Text></View>}</View>; }
-
-export function Card({ children, tone = 'plain', style }: { children: ReactNode; tone?: 'plain' | 'sage' | 'peach' | 'yellow' | 'lavender'; style?: StyleProp<ViewStyle> }) { const tones = { plain: styles.cardPlain, sage: styles.cardSage, peach: styles.cardPeach, yellow: styles.cardYellow, lavender: styles.cardLavender }; return <View style={[styles.card, tones[tone], style]}>{children}</View>; }
-export function FormCard({ children, tone = 'plain', style }: { children: ReactNode; tone?: 'plain' | 'sage' | 'peach' | 'yellow' | 'lavender'; style?: StyleProp<ViewStyle> }) { return <Card tone={tone} style={[styles.formCard, style]}>{children}</Card>; }
-export function ConfirmationDialog({ visible, title, message, confirmLabel = 'Continue', onCancel, onConfirm, destructive = false }: { visible: boolean; title: string; message: string; confirmLabel?: string; onCancel(): void; onConfirm(): void; destructive?: boolean }) { return <Modal animationType="fade" onRequestClose={onCancel} transparent visible={visible}><View accessibilityViewIsModal onAccessibilityEscape={onCancel} style={styles.modalBackdrop}><Card style={styles.modalCard}><Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text><Text style={styles.body}>{message}</Text><View style={styles.modalActions}>{destructive ? <DestructiveButton label={confirmLabel} onPress={onConfirm} /> : <PrimaryButton label={confirmLabel} onPress={onConfirm} />}<QuietButton label="Cancel" onPress={onCancel} /></View></Card></View></Modal>; }
-
-export function ToyCard({ title, location, uri, action, onPress }: { title: string; location?: string; uri?: string | null; action?: string; onPress?: () => void }) {
-  const content = <><ToyImage uri={uri} /><View style={styles.toyCardBody}><Text style={styles.cardTitle}>{title}</Text>{location && <Text style={styles.supporting}>{location}</Text>}{action && <Text style={styles.cardAction}>{action}</Text>}</View></>;
-  return onPress ? <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={({ pressed }) => [styles.toyCard, pressed && styles.pressed]}>{content}</Pressable> : <View style={styles.toyCard}>{content}</View>;
+export function ImageTile({
+  uri,
+  label = "Toy photo",
+  size = 88,
+}: {
+  uri?: string | null;
+  label?: string;
+  size?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <View style={[styles.imageTile, { height: size, width: size }]}>
+      {uri && !failed ? (
+        <Image
+          accessibilityLabel={label}
+          onError={() => setFailed(true)}
+          source={{ uri }}
+          style={styles.imageTileImage}
+        />
+      ) : (
+        <View
+          accessibilityLabel="No photo yet"
+          style={styles.imageTileFallback}
+        >
+          <View style={styles.imageTileShape} />
+          <Text style={styles.imageTileText}>No photo yet</Text>
+        </View>
+      )}
+    </View>
+  );
 }
 
-export function LocationChip({ label }: { label: string }) { return <View style={styles.locationChip}><Text style={styles.locationText}>⌖ {label}</Text></View>; }
-export function ChildActionCard(props: { title: string; description: string; icon?: string; tint?: string; onPress(): void; disabled?: boolean }) { return <PastelNavigationCard {...props} description={props.description} />; }
-export function StepIndicator({ steps, current }: { steps: readonly string[]; current: number }) { return <View accessibilityLabel={`Step ${current + 1} of ${steps.length}`} style={styles.steps}>{steps.map((step, index) => <View key={step} style={styles.step}><View style={[styles.stepDot, index <= current && styles.stepDotActive]}><Text style={styles.stepNumber}>{index + 1}</Text></View><Text style={[styles.caption, index === current && styles.stepLabelActive]}>{step}</Text></View>)}</View>; }
-export function BottomNavigation({ items, selected, onSelect }: { items: readonly string[]; selected: string; onSelect(item: string): void }) { return <View style={styles.bottomNav}>{items.map((item) => <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: selected === item }} onPress={() => onSelect(item)} style={styles.navItem}><Text style={[styles.navText, selected === item && styles.navTextSelected]}>{item}</Text></Pressable>)}</View>; }
+export function Card({
+  children,
+  tone = "plain",
+  style,
+}: {
+  children: ReactNode;
+  tone?: "plain" | "sage" | "peach" | "yellow" | "lavender";
+  style?: StyleProp<ViewStyle>;
+}) {
+  const tones = {
+    plain: styles.cardPlain,
+    sage: styles.cardSage,
+    peach: styles.cardPeach,
+    yellow: styles.cardYellow,
+    lavender: styles.cardLavender,
+  };
+  return <View style={[styles.card, tones[tone], style]}>{children}</View>;
+}
+export function FormCard({
+  children,
+  tone = "plain",
+  style,
+}: {
+  children: ReactNode;
+  tone?: "plain" | "sage" | "peach" | "yellow" | "lavender";
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Card tone={tone} style={[styles.formCard, style]}>
+      {children}
+    </Card>
+  );
+}
+export function ConfirmationDialog({
+  visible,
+  title,
+  message,
+  confirmLabel = "Continue",
+  onCancel,
+  onConfirm,
+  destructive = false,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  onCancel(): void;
+  onConfirm(): void;
+  destructive?: boolean;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onCancel}
+      transparent
+      visible={visible}
+    >
+      <View
+        accessibilityViewIsModal
+        onAccessibilityEscape={onCancel}
+        style={styles.modalBackdrop}
+      >
+        <Card style={styles.modalCard}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>
+            {title}
+          </Text>
+          <Text style={styles.body}>{message}</Text>
+          <View style={styles.modalActions}>
+            {destructive ? (
+              <DestructiveButton label={confirmLabel} onPress={onConfirm} />
+            ) : (
+              <PrimaryButton label={confirmLabel} onPress={onConfirm} />
+            )}
+            <QuietButton label="Cancel" onPress={onCancel} />
+          </View>
+        </Card>
+      </View>
+    </Modal>
+  );
+}
+
+export function ToyCard({
+  title,
+  location,
+  uri,
+  action,
+  onPress,
+}: {
+  title: string;
+  location?: string;
+  uri?: string | null;
+  action?: string;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
+      <ToyImage uri={uri} />
+      <View style={styles.toyCardBody}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        {location && <Text style={styles.supporting}>{location}</Text>}
+        {action && <Text style={styles.cardAction}>{action}</Text>}
+      </View>
+    </>
+  );
+  return onPress ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={onPress}
+      style={({ pressed }) => [styles.toyCard, pressed && styles.pressed]}
+    >
+      {content}
+    </Pressable>
+  ) : (
+    <View style={styles.toyCard}>{content}</View>
+  );
+}
+
+export function LocationChip({ label }: { label: string }) {
+  return (
+    <View style={styles.locationChip}>
+      <Text style={styles.locationText}>⌖ {label}</Text>
+    </View>
+  );
+}
+export function ChildActionCard(props: {
+  title: string;
+  description: string;
+  icon?: string;
+  tint?: string;
+  onPress(): void;
+  disabled?: boolean;
+}) {
+  return <PastelNavigationCard {...props} description={props.description} />;
+}
+export function StepIndicator({
+  steps,
+  current,
+}: {
+  steps: readonly string[];
+  current: number;
+}) {
+  return (
+    <View
+      accessibilityLabel={`Step ${current + 1} of ${steps.length}`}
+      style={styles.steps}
+    >
+      {steps.map((step, index) => (
+        <View key={step} style={styles.step}>
+          <View
+            style={[styles.stepDot, index <= current && styles.stepDotActive]}
+          >
+            <Text style={[styles.stepNumber, index <= current && styles.stepNumberActive]}>{index + 1}</Text>
+          </View>
+          <Text
+            style={[
+              styles.caption,
+              index === current && styles.stepLabelActive,
+            ]}
+          >
+            {step}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+export function BottomNavigation({
+  items,
+  selected,
+  onSelect,
+}: {
+  items: readonly string[];
+  selected: string;
+  onSelect(item: string): void;
+}) {
+  return (
+    <View style={styles.bottomNav}>
+      {items.map((item) => (
+        <Pressable
+          key={item}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: selected === item }}
+          onPress={() => onSelect(item)}
+          style={styles.navItem}
+        >
+          <Text
+            style={[
+              styles.navText,
+              selected === item && styles.navTextSelected,
+            ]}
+          >
+            {item}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.colors.backgroundCream }, safePage: { backgroundColor: theme.colors.backgroundCream, flex: 1 }, childScreen: { backgroundColor: theme.colors.childBackground }, pageScroll: { flexGrow: 1 }, pageContent: { alignSelf: 'center', gap: theme.spacing[20], maxWidth: theme.measurements.pageMaxWidth, paddingBottom: 56, paddingHorizontal: theme.measurements.screenHorizontalPadding, paddingTop: theme.spacing[24], width: '100%' }, backButton: { alignItems: 'center', alignSelf: 'flex-start', borderRadius: theme.radii.medium, flexDirection: 'row', gap: 4, minHeight: theme.measurements.minimumTouchTarget, paddingHorizontal: theme.spacing[8] }, backText: { color: theme.colors.focus, fontSize: 30, lineHeight: 30 }, backLabel: { color: theme.colors.focus, fontSize: 16, fontWeight: '700' },
-  pageHeader: { gap: 8 }, headerRow: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: 16 }, headerCopy: { flex: 1, gap: 5, minWidth: 220 }, eyebrow: { color: theme.colors.coralDark, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 }, pageTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', ...theme.typography.pageTitle }, sectionHeading: { marginBottom: theme.spacing[12] }, sectionTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', ...theme.typography.sectionTitle }, body: { color: theme.colors.secondaryText, ...theme.typography.body }, supporting: { color: theme.colors.secondaryText, ...theme.typography.supporting }, label: { color: theme.colors.primaryText, ...theme.typography.label }, caption: { color: theme.colors.mutedText, ...theme.typography.caption },
-  button: { alignItems: 'center', borderRadius: theme.radii.large, justifyContent: 'center', minHeight: theme.measurements.minimumTouchTarget, paddingHorizontal: theme.spacing[20] }, primaryButton: { ...theme.shadows.card, backgroundColor: theme.colors.coralAction, minHeight: theme.measurements.primaryButtonHeight }, secondaryButton: { backgroundColor: theme.colors.surfaceMint, borderColor: theme.colors.focus, borderWidth: 1 }, quietButton: { backgroundColor: 'transparent' }, destructiveButton: { backgroundColor: theme.colors.surface, borderColor: theme.colors.error, borderWidth: 1 }, primaryDisabled: { backgroundColor: theme.colors.disabled }, secondaryDisabled: { backgroundColor: theme.colors.disabled, borderColor: theme.colors.disabledText }, quietDisabled: { opacity: 0.6 }, destructiveDisabled: { backgroundColor: theme.colors.disabled, borderColor: theme.colors.disabledText }, buttonText: { textAlign: 'center', ...theme.typography.button }, primaryText: { color: theme.colors.white }, secondaryText: { color: theme.colors.primaryText }, quietText: { color: theme.colors.secondaryText }, destructiveText: { color: theme.colors.error }, disabledButtonText: { color: theme.colors.disabledText }, pressed: { opacity: 0.86 },
-  navigationCard: { ...theme.shadows.card, alignItems: 'center', borderColor: 'rgba(100,90,75,0.08)', borderRadius: theme.radii.card, borderWidth: 1, flexDirection: 'row', gap: 16, minHeight: 96, padding: theme.measurements.cardPadding }, navigationDisabled: { backgroundColor: theme.colors.disabled, borderColor: theme.colors.disabledText }, cardIcon: { fontSize: 30, textAlign: 'center', width: 42 }, cardCopy: { flex: 1, gap: 4 }, cardTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', fontSize: 19, fontWeight: '700', lineHeight: 25 }, chevron: { color: theme.colors.secondaryText, fontSize: 30 }, statCard: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.medium, borderWidth: 1, flex: 1, gap: 2, minHeight: 74, justifyContent: 'center', padding: theme.spacing[8] }, statValue: { color: theme.colors.primaryText, fontSize: 22, fontWeight: '700' },
-  field: { gap: 6 }, input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.medium, borderWidth: 1, color: theme.colors.primaryText, fontSize: 17, minHeight: theme.measurements.inputHeight, paddingHorizontal: theme.spacing[16] }, inputError: { borderColor: theme.colors.error }, errorText: { color: theme.colors.error, minHeight: 17, ...theme.typography.caption }, readOnlyValue: { backgroundColor: theme.colors.surfaceSage, borderRadius: theme.radii.medium, gap: 4, padding: theme.spacing[16] }, readOnlyLabel: { color: theme.colors.secondaryText, fontSize: 13, fontWeight: '700' }, readOnlyText: { color: theme.colors.primaryText, fontSize: 18, fontWeight: '700' }, select: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.medium, borderWidth: 1, minHeight: theme.measurements.inputHeight, padding: theme.spacing[12] }, selectRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between', marginTop: 3 }, selectValue: { color: theme.colors.primaryText, flex: 1, fontSize: 17 }, placeholder: { color: theme.colors.mutedText }, selectChevron: { color: theme.colors.sageAction, fontSize: 21 },
-  chip: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.pill, borderWidth: 1, justifyContent: 'center', minHeight: theme.measurements.minimumTouchTarget, paddingHorizontal: theme.spacing[12] }, selectedChip: { backgroundColor: theme.colors.surfaceMint, borderColor: theme.colors.sageAction, borderWidth: 2 }, chipText: { color: theme.colors.secondaryText, ...theme.typography.caption }, selectedChipText: { color: theme.colors.sageAction }, segmented: { backgroundColor: theme.colors.surfaceSage, borderRadius: theme.radii.pill, flexDirection: 'row', padding: 4 }, segment: { alignItems: 'center', borderRadius: theme.radii.pill, flex: 1, justifyContent: 'center', minHeight: theme.measurements.minimumTouchTarget, paddingHorizontal: 8 }, segmentSelected: { backgroundColor: theme.colors.surface, ...theme.shadows.card }, segmentText: { color: theme.colors.secondaryText, fontSize: 14, fontWeight: '600' }, segmentSelectedText: { color: theme.colors.sageAction, fontWeight: '800' },
-  toggleRow: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.medium, borderWidth: 1, flexDirection: 'row', gap: 16, minHeight: 64, paddingHorizontal: theme.spacing[16], paddingVertical: theme.spacing[12] }, toggleRowPressed: { backgroundColor: theme.colors.surfaceMint, borderColor: theme.colors.focus }, toggleRowDisabled: { backgroundColor: theme.colors.disabled }, toggle: { backgroundColor: theme.colors.surfaceLavender, borderColor: theme.colors.secondaryText, borderRadius: theme.radii.pill, borderWidth: 1, height: 32, justifyContent: 'center', padding: 3, width: 54 }, toggleOn: { backgroundColor: theme.colors.sageAction, borderColor: theme.colors.focus }, toggleDisabled: { opacity: 0.7 }, toggleKnob: { ...theme.shadows.card, backgroundColor: theme.colors.white, borderRadius: theme.radii.pill, height: 24, width: 24 }, toggleKnobOn: { alignSelf: 'flex-end' }, disabledControlText: { color: theme.colors.disabledText }, stateCard: { ...theme.shadows.card, backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.card, borderWidth: 1, gap: 10, padding: theme.measurements.cardPadding }, errorCard: { backgroundColor: theme.colors.errorSoft, borderColor: theme.colors.error }, errorTitle: { color: theme.colors.error, fontSize: 18, fontWeight: '700' }, loading: { alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center', padding: theme.spacing[24] },
-  toyCard: { ...theme.shadows.card, backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.card, borderWidth: 1, flex: 1, minWidth: 150, overflow: 'hidden' }, toyImage: { aspectRatio: 1, backgroundColor: theme.colors.surfacePeach, width: '100%' }, imageFallback: { alignItems: 'center', justifyContent: 'center' }, imageTile: { backgroundColor: theme.colors.surfacePeach, borderRadius: theme.radii.medium, overflow: 'hidden' }, imageTileImage: { height: '100%', width: '100%' }, imageTileFallback: { alignItems: 'center', flex: 1, justifyContent: 'center' }, imageTileShape: { backgroundColor: theme.colors.peach, borderRadius: 16, height: 30, width: 38 }, imageTileText: { color: theme.colors.secondaryText, fontSize: 10, fontWeight: '700', marginTop: 5 }, card: { ...theme.shadows.card, borderColor: theme.colors.border, borderRadius: theme.radii.card, borderWidth: 1, gap: 12, padding: theme.measurements.cardPadding }, formCard: { alignSelf: 'flex-start', maxWidth: theme.measurements.formMaxWidth, width: '100%' }, cardPlain: { backgroundColor: theme.colors.surface }, cardSage: { backgroundColor: theme.colors.surfaceSage }, cardPeach: { backgroundColor: theme.colors.surfacePeach }, cardYellow: { backgroundColor: theme.colors.surfaceYellow }, cardLavender: { backgroundColor: theme.colors.surfaceLavender }, modalBackdrop: { alignItems: 'center', backgroundColor: 'rgba(43, 53, 47, 0.34)', flex: 1, justifyContent: 'flex-end', padding: 16 }, modalCard: { maxWidth: 520, width: '100%' }, modalActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }, toyCardBody: { gap: 7, minHeight: 100, padding: theme.spacing[12] }, cardAction: { color: theme.colors.focus, fontSize: 14, fontWeight: '700' }, locationChip: { alignSelf: 'flex-start', backgroundColor: theme.colors.surfaceSage, borderRadius: theme.radii.pill, paddingHorizontal: theme.spacing[12], paddingVertical: theme.spacing[8] }, locationText: { color: theme.colors.focus, ...theme.typography.caption }, steps: { flexDirection: 'row', justifyContent: 'space-between' }, step: { alignItems: 'center', flex: 1, gap: 6 }, stepDot: { alignItems: 'center', backgroundColor: theme.colors.surfaceSage, borderRadius: theme.radii.pill, height: 32, justifyContent: 'center', width: 32 }, stepDotActive: { backgroundColor: theme.colors.sageAction }, stepNumber: { color: theme.colors.primaryText, fontSize: 14, fontWeight: '800' }, stepLabelActive: { color: theme.colors.focus, fontWeight: '800' }, bottomNav: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderTopWidth: 1, flexDirection: 'row', paddingBottom: 8, paddingTop: 8 }, navItem: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: theme.measurements.minimumTouchTarget }, navText: { color: theme.colors.mutedText, fontSize: 12, fontWeight: '600' }, navTextSelected: { color: theme.colors.focus, fontWeight: '800' },
+  pressed: { opacity: 0.84 },
+  focused: {
+    boxShadow: `0 0 0 3px ${theme.colors.backgroundCream}, 0 0 0 6px ${theme.colors.focus}`,
+  },
+  screen: { flex: 1, backgroundColor: theme.colors.backgroundCream },
+  safePage: { backgroundColor: theme.colors.backgroundCream, flex: 1 },
+  childScreen: { backgroundColor: theme.colors.childBackground },
+  pageScroll: { flexGrow: 1 },
+  pageContent: {
+    alignSelf: "center",
+    gap: theme.spacing[20],
+    maxWidth: theme.measurements.pageMaxWidth,
+    paddingBottom: 56,
+    paddingHorizontal: theme.measurements.screenHorizontalPadding,
+    paddingTop: theme.spacing[24],
+    width: "100%",
+  },
+  backButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: theme.radii.medium,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: theme.measurements.minimumTouchTarget,
+    paddingHorizontal: theme.spacing[8],
+  },
+  backText: { color: theme.colors.focus, fontSize: 30, lineHeight: 30 },
+  backLabel: { color: theme.colors.focus, fontSize: 16, fontWeight: "700" },
+  pageHeader: { gap: 8 },
+  headerRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+  headerCopy: { flex: 1, gap: 5, minWidth: 220 },
+  eyebrow: {
+    color: theme.colors.coralDark,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+  pageTitle: {
+    color: theme.colors.primaryText,
+    fontFamily: "Georgia",
+    ...theme.typography.pageTitle,
+  },
+  sectionHeading: { marginBottom: theme.spacing[12] },
+  sectionTitle: {
+    color: theme.colors.primaryText,
+    fontFamily: "Georgia",
+    ...theme.typography.sectionTitle,
+  },
+  body: { color: theme.colors.secondaryText, ...theme.typography.body },
+  supporting: {
+    color: theme.colors.secondaryText,
+    ...theme.typography.supporting,
+  },
+  label: { color: theme.colors.primaryText, ...theme.typography.label },
+  caption: { color: theme.colors.mutedText, ...theme.typography.caption },
+  button: {
+    alignItems: "center",
+    borderRadius: theme.radii.large,
+    justifyContent: "center",
+    minHeight: theme.measurements.minimumTouchTarget,
+    paddingHorizontal: theme.spacing[20],
+  },
+  primaryButton: {
+    ...theme.shadows.card,
+    backgroundColor: theme.colors.brandPrimary,
+    minHeight: theme.measurements.primaryButtonHeight,
+  },
+  secondaryButton: {
+    backgroundColor: theme.colors.brandPrimarySoft,
+    borderColor: theme.colors.brandInk,
+    borderWidth: 1,
+  },
+  quietButton: { backgroundColor: "transparent" },
+  destructiveButton: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.error,
+    borderWidth: 1,
+  },
+  primaryDisabled: { backgroundColor: theme.colors.disabled },
+  secondaryDisabled: {
+    backgroundColor: theme.colors.disabled,
+    borderColor: theme.colors.disabledText,
+  },
+  quietDisabled: { opacity: 0.6 },
+  destructiveDisabled: {
+    backgroundColor: theme.colors.disabled,
+    borderColor: theme.colors.disabledText,
+  },
+  buttonText: { textAlign: "center", ...theme.typography.button },
+  primaryText: { color: theme.colors.primaryText },
+  secondaryText: { color: theme.colors.brandInk },
+  quietText: { color: theme.colors.brandInk },
+  destructiveText: { color: theme.colors.error },
+  disabledButtonText: { color: theme.colors.disabledText },
+  primaryPressed: { backgroundColor: theme.colors.brandPrimaryPressed },
+  secondaryPressed: { backgroundColor: theme.colors.surfaceSky },
+  quietPressed: { backgroundColor: theme.colors.brandPrimarySoft },
+  destructivePressed: { backgroundColor: theme.colors.errorSoft },
+  navigationCard: {
+    ...theme.shadows.card,
+    alignItems: "center",
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 16,
+    minHeight: 96,
+    padding: theme.measurements.cardPadding,
+  },
+  navigationDisabled: {
+    backgroundColor: theme.colors.disabled,
+    borderColor: theme.colors.disabledText,
+  },
+  cardIcon: {
+    color: theme.colors.brandInk,
+    fontSize: 30,
+    textAlign: "center",
+    width: 42,
+  },
+  cardCopy: { flex: 1, gap: 4 },
+  cardTitle: {
+    color: theme.colors.primaryText,
+    fontFamily: "Georgia",
+    fontSize: 19,
+    fontWeight: "700",
+    lineHeight: 25,
+  },
+  chevron: { color: theme.colors.brandInk, fontSize: 30 },
+  statCard: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.medium,
+    borderWidth: 1,
+    flex: 1,
+    gap: 2,
+    minHeight: 74,
+    justifyContent: "center",
+    padding: theme.spacing[8],
+  },
+  statValue: {
+    color: theme.colors.primaryText,
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  field: { gap: 6 },
+  input: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.medium,
+    borderWidth: 1,
+    color: theme.colors.primaryText,
+    fontSize: 17,
+    minHeight: theme.measurements.inputHeight,
+    paddingHorizontal: theme.spacing[16],
+  },
+  inputError: { borderColor: theme.colors.error },
+  errorText: {
+    color: theme.colors.error,
+    minHeight: 17,
+    ...theme.typography.caption,
+  },
+  readOnlyValue: {
+    backgroundColor: theme.colors.surfaceSage,
+    borderRadius: theme.radii.medium,
+    gap: 4,
+    padding: theme.spacing[16],
+  },
+  readOnlyLabel: {
+    color: theme.colors.secondaryText,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  readOnlyText: {
+    color: theme.colors.primaryText,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  select: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.medium,
+    borderWidth: 1,
+    minHeight: theme.measurements.inputHeight,
+    padding: theme.spacing[12],
+  },
+  selectRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    marginTop: 3,
+  },
+  selectValue: { color: theme.colors.primaryText, flex: 1, fontSize: 17 },
+  placeholder: { color: theme.colors.mutedText },
+  selectChevron: { color: theme.colors.sageAction, fontSize: 21 },
+  chip: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: theme.measurements.minimumTouchTarget,
+    paddingHorizontal: theme.spacing[12],
+  },
+  selectedChip: {
+    backgroundColor: theme.colors.surfaceMint,
+    borderColor: theme.colors.sageAction,
+    borderWidth: 2,
+  },
+  chipText: { color: theme.colors.secondaryText, ...theme.typography.caption },
+  selectedChipText: { color: theme.colors.sageAction },
+  segmented: {
+    backgroundColor: theme.colors.surfaceSage,
+    borderRadius: theme.radii.pill,
+    flexDirection: "row",
+    padding: 4,
+  },
+  segment: {
+    alignItems: "center",
+    borderRadius: theme.radii.pill,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: theme.measurements.minimumTouchTarget,
+    paddingHorizontal: 8,
+  },
+  segmentSelected: {
+    backgroundColor: theme.colors.surface,
+    ...theme.shadows.card,
+  },
+  segmentText: {
+    color: theme.colors.secondaryText,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  segmentSelectedText: { color: theme.colors.sageAction, fontWeight: "800" },
+  toggleRow: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.medium,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 16,
+    minHeight: 64,
+    paddingHorizontal: theme.spacing[16],
+    paddingVertical: theme.spacing[12],
+  },
+  toggleRowPressed: {
+    backgroundColor: theme.colors.surfaceMint,
+    borderColor: theme.colors.focus,
+  },
+  toggleRowDisabled: { backgroundColor: theme.colors.disabled },
+  toggle: {
+    backgroundColor: theme.colors.surfaceLavender,
+    borderColor: theme.colors.secondaryText,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    padding: 3,
+    width: 54,
+  },
+  toggleOn: {
+    backgroundColor: theme.colors.sageAction,
+    borderColor: theme.colors.focus,
+  },
+  toggleDisabled: { opacity: 0.7 },
+  toggleKnob: {
+    ...theme.shadows.card,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radii.pill,
+    height: 24,
+    width: 24,
+  },
+  toggleKnobOn: { alignSelf: "flex-end" },
+  disabledControlText: { color: theme.colors.disabledText },
+  stateCard: {
+    ...theme.shadows.card,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: theme.measurements.cardPadding,
+  },
+  errorCard: {
+    backgroundColor: theme.colors.errorSoft,
+    borderColor: theme.colors.error,
+  },
+  errorTitle: { color: theme.colors.error, fontSize: 18, fontWeight: "700" },
+  loading: {
+    alignItems: "center",
+    flex: 1,
+    gap: 12,
+    justifyContent: "center",
+    padding: theme.spacing[24],
+  },
+  toyCard: {
+    ...theme.shadows.card,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    flex: 1,
+    minWidth: 150,
+    overflow: "hidden",
+  },
+  toyImage: {
+    aspectRatio: 1,
+    backgroundColor: theme.colors.surfacePeach,
+    width: "100%",
+  },
+  imageFallback: { alignItems: "center", justifyContent: "center" },
+  imageTile: {
+    backgroundColor: theme.colors.surfacePeach,
+    borderRadius: theme.radii.medium,
+    overflow: "hidden",
+  },
+  imageTileImage: { height: "100%", width: "100%" },
+  imageTileFallback: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  imageTileShape: {
+    backgroundColor: theme.colors.peach,
+    borderRadius: 16,
+    height: 30,
+    width: 38,
+  },
+  imageTileText: {
+    color: theme.colors.secondaryText,
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 5,
+  },
+  card: {
+    ...theme.shadows.card,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    gap: 12,
+    padding: theme.measurements.cardPadding,
+  },
+  formCard: {
+    alignSelf: "flex-start",
+    maxWidth: theme.measurements.formMaxWidth,
+    width: "100%",
+  },
+  cardPlain: { backgroundColor: theme.colors.surface },
+  cardSage: { backgroundColor: theme.colors.surfaceSage },
+  cardPeach: { backgroundColor: theme.colors.surfacePeach },
+  cardYellow: { backgroundColor: theme.colors.surfaceYellow },
+  cardLavender: { backgroundColor: theme.colors.surfaceLavender },
+  modalBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(43, 53, 47, 0.34)",
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 16,
+  },
+  modalCard: { maxWidth: 520, width: "100%" },
+  modalActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "flex-end",
+  },
+  toyCardBody: { gap: 7, minHeight: 100, padding: theme.spacing[12] },
+  cardAction: { color: theme.colors.focus, fontSize: 14, fontWeight: "700" },
+  locationChip: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.colors.surfaceSage,
+    borderRadius: theme.radii.pill,
+    paddingHorizontal: theme.spacing[12],
+    paddingVertical: theme.spacing[8],
+  },
+  locationText: { color: theme.colors.focus, ...theme.typography.caption },
+  steps: { flexDirection: "row", justifyContent: "space-between" },
+  step: { alignItems: "center", flex: 1, gap: 6 },
+  stepDot: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSage,
+    borderRadius: theme.radii.pill,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  stepDotActive: { backgroundColor: theme.colors.sageAction },
+  stepNumber: {
+    color: theme.colors.primaryText,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  stepNumberActive: { color: theme.colors.white },
+  stepLabelActive: { color: theme.colors.focus, fontWeight: "800" },
+  bottomNav: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    paddingBottom: 8,
+    paddingTop: 8,
+  },
+  navItem: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    minHeight: theme.measurements.minimumTouchTarget,
+  },
+  navText: { color: theme.colors.mutedText, fontSize: 12, fontWeight: "600" },
+  navTextSelected: { color: theme.colors.focus, fontWeight: "800" },
 });

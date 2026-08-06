@@ -8,7 +8,7 @@ on at least one current iOS simulator/device and one Android emulator/device bef
 
 - [ ] Install a fresh SDK 57 development or release build (not only the web preview).
 - [ ] Complete onboarding and create one room with at least two storage spots.
-- [ ] Confirm the app configuration displays PlayMap-specific camera and photo permission copy.
+- [ ] Confirm the app configuration displays Pip-specific camera and photo permission copy.
 
 ## Single toy
 
@@ -41,4 +41,3 @@ on at least one current iOS simulator/device and one Android emulator/device bef
 - [ ] Confirm hidden toys appear in Parent Mode but not Child Mode.
 - [ ] Confirm photo upload and toy creation work offline and without AI.
 - [ ] If optional AI suggestions are enabled later, confirm no suggestion is saved without explicit parent review.
-

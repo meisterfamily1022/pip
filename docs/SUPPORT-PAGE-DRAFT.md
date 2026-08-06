@@ -1,8 +1,8 @@
-# PlayMap Support Page Draft
+# Pip Support Page Draft
 
 Support contact: [SUPPORT EMAIL OR FORM URL]
 
-PlayMap helps families keep a local photo library of toys, locations, and play sessions on one device.
+Pip helps families keep a local photo library of toys, locations, and play sessions on one device.
 
 Before contacting support, try:
 

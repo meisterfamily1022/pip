@@ -2,7 +2,7 @@
 
 ## Goal
 
-AI toy analysis is a limited assist, not a metered prerequisite for PlayMap. Manual entry stays free and unlimited. The service must target average AI cost below $0.50 per active paid household per month, warn at $1.00, and stop at $2.00 per household per month unless an owner explicitly approves more. A configurable global monthly cap is authoritative and fails closed to manual entry.
+AI toy analysis is a limited assist, not a metered prerequisite for Pip. Manual entry stays free and unlimited. The service must target average AI cost below $0.50 per active paid household per month, warn at $1.00, and stop at $2.00 per household per month unless an owner explicitly approves more. A configurable global monthly cap is authoritative and fails closed to manual entry.
 
 All figures below are product limits, not a promise of exact model cost. Set actual counts only after beta measurement against the selected provider, model, image preparation, platform commission, hosting, support, and refund cost.
 
@@ -12,7 +12,7 @@ All figures below are product limits, not a promise of exact model cost. Set act
 | --- | ---: | ---: | --- |
 | Free trial | 3 successful analyses, once per installation/account | 0 | One retry for a timed-out or safely retryable server failure, tied to the original idempotency key. |
 | Closed beta | 10 successful analyses | 10 per calendar month | Same as trial; owner may change remotely while honoring disclosed beta terms. |
-| PlayMap Plus (proposed) | 15 successful analyses at paid activation | 15 per calendar month | Same retry rule; no paid overage in V1.1. |
+| Pip Plus (proposed) | 15 successful analyses at paid activation | 15 per calendar month | Same retry rule; no paid overage in V1.1. |
 | Heavy-user exception | None automatic | None automatic | Show manual-entry fallback and an owner-approved waitlist/upgrade contact, not an open-ended overage. |
 
 The paid starting allowance is intentionally conservative: at the $2 household hard ceiling, it requires a fully loaded cost of no more than about $0.13 per successful analysis. If observed costs exceed that, lower the allowance, use stronger image processing, or defer paid launch. Do not silently turn “monthly” into unlimited.
@@ -57,7 +57,7 @@ Maintain separate counters for `allowance_used`, `provider_attempts`, `pre_provi
 
 Anonymous tokens cannot provide reliable restore behavior or durable cost control: reinstalls and device resets can obtain a fresh allowance. During beta, bind a random installation credential to keychain/secure storage, rate-limit on multiple signals, and accept that abuse control is imperfect. Do not collect child or household content to make the token durable.
 
-For public launch, accounts are required for paid AI usage and allowance restoration. Use authenticated account IDs for quotas; retain an installation token as a device-abuse signal only. Detect unusual account creation or token churn server-side and apply low trial limits, cooldowns, and owner review rather than blocking ordinary manual PlayMap use.
+For public launch, accounts are required for paid AI usage and allowance restoration. Use authenticated account IDs for quotas; retain an installation token as a device-abuse signal only. Detect unusual account creation or token churn server-side and apply low trial limits, cooldowns, and owner review rather than blocking ordinary manual Pip use.
 
 ## Pricing stress test
 

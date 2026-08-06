@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { ChildModeHeader } from './child-ui';
-import { ConfirmationDialog, PageHeader, PastelNavigationCard, PrimaryButton, ReadOnlyValue, RoundedTextInput, ToggleRow } from './playmap-ui';
+import { ConfirmationDialog, PageHeader, PastelNavigationCard, PrimaryButton, ReadOnlyValue, RoundedTextInput, StepIndicator, ToggleRow } from './playmap-ui';
 
 function render(element: ReturnType<typeof createElement>): ReactTestRenderer {
   let renderer: ReactTestRenderer | undefined;
@@ -26,6 +26,19 @@ describe('shared visual components', () => {
 
     const disabled = render(createElement(PrimaryButton, { disabled: true, label: 'Save', onPress }));
     expect(pressableWithLabel(disabled, 'Save').props.accessibilityState).toEqual({ disabled: true });
+  });
+
+  it('shows a high-contrast keyboard focus ring on shared actions', () => {
+    const renderer = render(createElement(PrimaryButton, { label: 'Save', onPress: jest.fn() }));
+    const button = pressableWithLabel(renderer, 'Save');
+    act(() => button.props.onFocus({}));
+    expect(JSON.stringify(renderer.toJSON())).toContain('boxShadow');
+  });
+
+  it('uses light text on active dark progress steps', () => {
+    const renderer = render(createElement(StepIndicator, { current: 0, steps: ['Photos', 'Review'] }));
+    const activeNumber = renderer.root.findAll((node) => node.props.children === 1)[0];
+    expect(JSON.stringify(activeNumber.props.style)).toContain('#FFFFFF');
   });
 
   it('exposes toggle state and responds to repeated activation', () => {
@@ -98,7 +111,7 @@ describe('shared visual components', () => {
     ['Delete Toy', 'Delete Toy'],
     ['Hide Toy', 'Hide Toy'],
     ['Archive Toy', 'Archive Toy'],
-    ['Reset PlayMap', 'Reset PlayMap'],
+    ['Reset Pip', 'Reset Pip'],
   ])('requires confirmation for the %s path and leaves data unchanged on cancel', (_path, confirmLabel) => {
     const onCancel = jest.fn();
     const onConfirm = jest.fn();

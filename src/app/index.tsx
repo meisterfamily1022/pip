@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Text, View } from 'react-native';
+import { Button, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { initializeApp } from '@/startup/initialize-app';
+import { PipLaunchState } from '@/components/pip-brand-mark';
 
 type StartupState = 'loading' | 'error';
 
@@ -28,8 +29,8 @@ export default function StartupScreen() {
     });
   }, [start]);
 
-  if (state === 'loading') return <View style={styles.container}><ActivityIndicator /><Text>Starting PlayMap…</Text></View>;
-  return <View style={styles.container}><Text style={styles.errorTitle}>PlayMap could not start.</Text><Text>{error?.message}</Text><Button title="Try again" onPress={start} /></View>;
+  if (state === 'loading') return <View style={styles.container}><PipLaunchState /></View>;
+  return <View style={styles.container}><Text style={styles.errorTitle}>Pip could not start.</Text><Text>{error?.message}</Text><Button title="Try again" onPress={start} /></View>;
 }
 
 const styles = StyleSheet.create({ container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }, errorTitle: { fontSize: 20, fontWeight: '700' } });

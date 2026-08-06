@@ -3,26 +3,26 @@
 ## Recommended architecture
 
 ```text
-PlayMap mobile app
+Pip mobile app
   -> HTTPS, installation/account credential, idempotency key, one processed image
-PlayMap API / edge
+Pip API / edge
   -> authentication, rate limits, type/size validation, metadata removal, resize/compress,
      fingerprint/cache, allowance + global budget checks
 Provider adapter (server-only)
   -> provider API key, constrained prompt/schema, timeout and safe error mapping
-PlayMap API
+Pip API
   -> strict schema validation and allowlist projection
-PlayMap mobile app
+Pip mobile app
   -> editable suggestions only; existing Save Toy is the only persistence action
 ```
 
-No provider API key, provider endpoint secret, or privileged allowance logic may be embedded in the mobile application, Expo public configuration, source maps, or CI logs. The app only calls a PlayMap-controlled endpoint. Provider credentials reside in a managed server-side secret store with least privilege and rotation procedures.
+No provider API key, provider endpoint secret, or privileged allowance logic may be embedded in the mobile application, Expo public configuration, source maps, or CI logs. The app only calls a Pip-controlled endpoint. Provider credentials reside in a managed server-side secret store with least privilege and rotation procedures.
 
 ## Trust boundaries and data minimization
 
 | Boundary | Data allowed | Explicitly excluded |
 | --- | --- | --- |
-| App to PlayMap backend | One toy image, schema version, idempotency key, installation/account credential | Child nickname, parent PIN, room/storage names, toy form values, household information, free-text prompt, EXIF/location metadata |
+| App to Pip backend | One toy image, schema version, idempotency key, installation/account credential | Child nickname, parent PIN, room/storage names, toy form values, household information, free-text prompt, EXIF/location metadata |
 | Backend to provider | Normalized single toy image and fixed server-authored task/schema instruction | User identifiers, device identifiers, raw installation token, names, location data, submitted form data |
 | Backend to app | Strict V1.1 allowed suggestion object, safe error code, request ID, allowance state | Raw provider output, provider error text, hidden confidence score, image content |
 | Backend logs/metrics | Request ID, timestamps, safe outcome code, byte bucket, model/schema version, aggregate cost and quota events | Raw images, image bytes, image hashes if linkable outside the account scope, EXIF, prompts, tokens, names, credentials, full payloads |
@@ -54,9 +54,9 @@ If the provider returns unknown fields, unsupported categories, unsupported clea
 | B. Require account before AI use | Moderate: account abuse remains but is measurable/rate-limited | Medium to high | Requires account/privacy operations | Strong across devices | Adds a setup step only to AI | Strong |
 | C. Delay AI until cloud accounts exist | Lowest immediate AI risk because no AI ships | Lowest now, defers all AI work | Keeps V1 local-only promise intact | Not applicable until accounts | No AI benefit in beta | Strong once designed with accounts |
 
-Recommendation for closed beta: **Option A**, with a small 10-scan beta allowance, server-held opaque installation token, quota/rate limits, global cap, and clear notice that beta AI allowance does not restore after reinstall. It enables product learning without making accounts a prerequisite for manual PlayMap.
+Recommendation for closed beta: **Option A**, with a small 10-scan beta allowance, server-held opaque installation token, quota/rate limits, global cap, and clear notice that beta AI allowance does not restore after reinstall. It enables product learning without making accounts a prerequisite for manual Pip.
 
-Recommendation for public launch: **Option B**, requiring a PlayMap account for AI-assisted entry and paid allowance. Manual PlayMap remains account-free. Do not choose Option C as the default launch plan if beta learning is needed; choose it only if the owner decides the privacy/cost burden is not justified.
+Recommendation for public launch: **Option B**, requiring a Pip account for AI-assisted entry and paid allowance. Manual Pip remains account-free. Do not choose Option C as the default launch plan if beta learning is needed; choose it only if the owner decides the privacy/cost burden is not justified.
 
 ## Retention, deletion, and incidents
 
@@ -73,7 +73,7 @@ Support a deletion request by deleting retained cache/operational records associ
 
 The current local-only statement in `docs/PRIVACY-POLICY-DRAFT.md` will no longer be fully accurate when AI analysis ships. Before any beta distribution, update and owner-review:
 
-- Privacy policy: photo is sent to PlayMap and a named third-party AI processor only after the parent taps Suggest Details; state purpose, fields returned, retention, deletion, security limitations, optional nature, no provider key in app, and contact/rights process.
+- Privacy policy: photo is sent to Pip and a named third-party AI processor only after the parent taps Suggest Details; state purpose, fields returned, retention, deletion, security limitations, optional nature, no provider key in app, and contact/rights process.
 - App Store privacy disclosure: report data collection/sharing accurately based on actual backend/provider configuration, including user content (photos) and identifiers if used for account/installation quota. Confirm Apple's current categories with counsel/owner at submission time.
 - In-app disclosure: plain-language just-in-time explanation by Suggest Details, link to policy, cancellation behavior, and statement that the photo remains the child's image and suggestions require review before saving.
 - Support documentation: availability, supported image types, manual fallback, allowance/reset rules, deletion/support contact, and no medical or safety advice.

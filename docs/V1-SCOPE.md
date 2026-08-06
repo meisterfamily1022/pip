@@ -1,8 +1,8 @@
-# PlayMap V1 Scope
+# Pip V1 Scope
 
 ## Product Goal
 
-PlayMap helps a parent photograph and organize toys, then gives a child a simple visual way to choose what to play with, find where the toy belongs, and complete a cleanup routine before choosing again.
+Pip helps a parent photograph and organize toys, then gives a child a simple visual way to choose what to play with, find where the toy belongs, and complete a cleanup routine before choosing again.
 
 Version 1 should prove the core loop:
 

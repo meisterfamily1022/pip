@@ -1,4 +1,4 @@
-# PlayMap TestFlight Checklist
+# Pip TestFlight Checklist
 
 - Confirm Apple Developer enrollment.
 - Decide legal ownership and seller name.

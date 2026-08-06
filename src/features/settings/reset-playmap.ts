@@ -46,7 +46,7 @@ export async function resetPlayMapData(
       try {
         await pins.savePin(existingPin);
       } catch {
-        throw new Error('PlayMap data was preserved, but the parent PIN could not be restored. Restart the app before trying again.');
+        throw new Error('Pip data was preserved, but the parent PIN could not be restored. Restart the app before trying again.');
       }
     }
     throw error;

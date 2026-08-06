@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+// Rebrand compatibility: changing this legacy key would orphan existing parent PINs.
 const PIN_STORAGE_KEY = 'playmap.parent-pin';
 
 export type PinStorage = {

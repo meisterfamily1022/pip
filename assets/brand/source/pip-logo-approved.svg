@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <title>Pip logo — Canva editable</title>
+  <desc>Editable Pip logo lockup with pastel sage p forms, aqua center stroke, yellow-orange dot, and separate accent marks.</desc>
+
+  <defs>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#8F9C97" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- Editable white background -->
+  <rect id="background" x="0" y="0" width="1600" height="1000" fill="#FFFFFF"/>
+
+  <!-- Main wordmark: each p and the center stroke are separate editable shapes -->
+  <g id="main-wordmark" aria-label="Pip wordmark">
+    <!-- left p bowl -->
+    <circle id="left-p-outer" cx="355" cy="505" r="120" fill="#91A489"/>
+    <circle id="left-p-counter" cx="355" cy="505" r="78" fill="#FFFFFF"/>
+    <rect id="left-p-stem" x="235" y="505" width="42" height="245" rx="21" fill="#91A489"/>
+
+    <!-- center i stroke -->
+    <rect id="center-stroke" x="580" y="415" width="42" height="335" rx="21" fill="#72B8C5"/>
+
+    <!-- right p bowl -->
+    <circle id="right-p-outer" cx="805" cy="505" r="120" fill="#91A489"/>
+    <circle id="right-p-counter" cx="805" cy="505" r="78" fill="#FFFFFF"/>
+    <rect id="right-p-stem" x="685" y="505" width="42" height="245" rx="21" fill="#91A489"/>
+
+    <!-- separate dot -->
+    <circle id="center-dot" cx="601" cy="350" r="36" fill="#F9BD4B"/>
+
+    <!-- three separate accent marks -->
+    <rect id="accent-sage" x="475" y="265" width="42" height="92" rx="21" transform="rotate(-43 496 311)" fill="#91A489"/>
+    <rect id="accent-aqua" x="580" y="215" width="42" height="92" rx="21" fill="#72B8C5"/>
+    <rect id="accent-lavender" x="710" y="265" width="42" height="92" rx="21" transform="rotate(43 731 311)" fill="#9B83D2"/>
+  </g>
+
+  <!-- Editable tagline text. Canva can replace the font if Quicksand is unavailable. -->
+  <text id="tagline" x="235" y="825" fill="#83BDD0" font-family="Quicksand, Nunito Sans, Arial, sans-serif" font-size="28" font-weight="600" letter-spacing="5">LESS DECIDING. MORE PLAYING.</text>
+
+  <!-- Separate app icon lockup, matching the finalized concept -->
+  <g id="app-icon" aria-label="Pip app icon" filter="url(#softShadow)">
+    <rect id="app-icon-background" x="1010" y="365" width="300" height="300" rx="72" fill="#FFFFFF"/>
+
+    <circle id="icon-left-p-outer" cx="1160" cy="540" r="66" fill="#91A489"/>
+    <circle id="icon-left-p-counter" cx="1160" cy="540" r="43" fill="#FFFFFF"/>
+    <rect id="icon-left-p-stem" x="1094" y="540" width="23" height="120" rx="11.5" fill="#91A489"/>
+    <rect id="icon-center-stroke" x="1148.5" y="490" width="23" height="170" rx="11.5" fill="#72B8C5"/>
+    <circle id="icon-center-dot" cx="1160" cy="455" r="20" fill="#F9BD4B"/>
+    <rect id="icon-accent-sage" x="1094" y="405" width="23" height="52" rx="11.5" transform="rotate(-43 1105.5 431)" fill="#91A489"/>
+    <rect id="icon-accent-aqua" x="1148.5" y="375" width="23" height="52" rx="11.5" fill="#72B8C5"/>
+    <rect id="icon-accent-lavender" x="1203" y="405" width="23" height="52" rx="11.5" transform="rotate(43 1214.5 431)" fill="#9B83D2"/>
+  </g>
+</svg>

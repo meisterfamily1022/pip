@@ -1,6 +1,8 @@
-# PlayMap App Store Listing Draft
+# Pip App Store Listing Draft
 
-App name: PlayMap
+App name: Pip
+
+Subtitle: Less deciding. More playing.
 
 Subtitle options:
 
@@ -10,13 +12,13 @@ Subtitle options:
 
 Promotional description:
 
-PlayMap helps parents photograph toys, organize where they belong, and give children a simple visual way to choose and clean up.
+Pip helps parents photograph toys, organize where they belong, and give children a simple visual way to choose and clean up.
 
 Full description:
 
-PlayMap is a local-first toy organization app for families. Parents create rooms, storage spots, and a photo library of toys. Child Mode then offers a small number of visual play choices, shows exactly where the selected toy belongs, and guides cleanup before the next choice.
+Pip is a local-first toy organization app for families. Parents create rooms, storage spots, and a photo library of toys. Child Mode then offers a small number of visual play choices, shows exactly where the selected toy belongs, and guides cleanup before the next choice.
 
-PlayMap V1 works without an account and stores toy data and photos on the device. It is designed to feel calm, visual, and low demand.
+Pip V1 works without an account and stores toy data and photos on the device. It is designed to feel calm, visual, and low demand.
 
 Keyword suggestions:
 

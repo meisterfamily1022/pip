@@ -4,6 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ToyButton, ToyError, ToyLoading } from '@/components/toy-ui';
 import { ParentModeHeader } from '@/components/parent-ui';
 import { ConfirmationDialog, DestructiveButton, FormCard, PageShell, PrimaryButton, RoundedTextInput, ToggleRow } from '@/components/playmap-ui';
+import { PipBrandMark } from '@/components/pip-brand-mark';
+import { pipBrand } from '@/brand/pip-brand';
 import { initializeDatabase } from '@/database/client';
 import { addChildProfile, changeParentPin, listChildProfiles, loadParentSettings, saveParentSettings, type ChangePinInput } from '@/features/settings/settings-service';
 import { pinStorage } from '@/services/pin-storage';
@@ -110,7 +112,7 @@ export default function ParentSettingsRoute() {
       await resetRouteAccess();
       router.replace('/onboarding');
     } catch (caught: unknown) {
-      setPageError(caught instanceof Error ? caught.message : 'Could not reset PlayMap.');
+      setPageError(caught instanceof Error ? caught.message : 'Could not reset Pip.');
       setResetConfirming(false);
       resettingRef.current = false; setResetting(false);
     }
@@ -124,7 +126,14 @@ export default function ParentSettingsRoute() {
       <ParentModeHeader backTo={parentBackTargets.settings} subtitle="Manage Child Mode choices, parent access, and local data." title="Settings" />
       {pageError && <Text accessibilityLiveRegion="polite" style={styles.error}>{pageError}</Text>}
 
-      <FormCard tone="peach">
+      <FormCard tone="sage">
+        <PipBrandMark style={styles.aboutLogo} />
+        <Text accessibilityRole="header" style={styles.sectionTitle}>About Pip</Text>
+        <Text style={styles.supporting}>{pipBrand.primaryTagline}</Text>
+        <Text style={styles.supporting}>A calm, local-first toy library for simpler choices and easier cleanup.</Text>
+      </FormCard>
+
+      <FormCard>
         <Text style={styles.sectionTitle}>Child Profiles</Text>
         {settingsError && <Text accessibilityLiveRegion="polite" style={styles.inlineError}>{settingsError}</Text>}
         {settingsSuccess && <Text accessibilityLiveRegion="polite" style={styles.success}>{settingsSuccess}</Text>}
@@ -143,7 +152,7 @@ export default function ParentSettingsRoute() {
         <PrimaryButton disabled={savingSettings} label={savingSettings ? 'Saving…' : 'Save Settings'} onPress={() => { void saveSettings(); }} />
       </FormCard>
 
-      <FormCard tone="lavender">
+      <FormCard>
         <Text style={styles.sectionTitle}>Parent Access</Text>
         {pinError && <Text accessibilityLiveRegion="polite" style={styles.inlineError}>{pinError}</Text>}
         {pinSuccess && <Text accessibilityLiveRegion="polite" style={styles.success}>{pinSuccess}</Text>}
@@ -153,15 +162,16 @@ export default function ParentSettingsRoute() {
         <PrimaryButton disabled={savingPin} label={savingPin ? 'Changing…' : 'Change Parent PIN'} onPress={() => { void changePin(); }} />
       </FormCard>
 
-      <FormCard tone="yellow">
+      <FormCard>
         <Text style={styles.sectionTitle}>Data & Privacy</Text>
         <Text style={styles.supporting}>Toy records, play history, and original photos are stored locally on this device.</Text>
-        <Text style={styles.supporting}>PlayMap has no account, cloud backup, Face ID unlock, or remote parent dashboard. Child profiles and their checkout state stay on this device.</Text>
-        <Text style={styles.supporting}>Resetting removes every PlayMap room, storage spot, toy, photo, play record, setting, and the parent PIN from this device.</Text>
-        <DestructiveButton disabled={resetting} label={resetting ? 'Resetting…' : 'Reset PlayMap'} onPress={() => setResetConfirming(true)} />
+        <Text style={styles.supporting}>Pip has no account, cloud backup, Face ID unlock, or remote parent dashboard. Child profiles and their checkout state stay on this device.</Text>
+        <Text style={styles.supporting}>Resetting removes every Pip room, storage spot, toy, photo, play record, setting, and the parent PIN from this device.</Text>
+        <Text style={styles.supporting}>Less mess. More play.</Text>
+        <DestructiveButton disabled={resetting} label={resetting ? 'Resetting…' : 'Reset Pip'} onPress={() => setResetConfirming(true)} />
       </FormCard>
 
-      <ConfirmationDialog confirmLabel="Reset PlayMap" destructive message="This permanently removes all toys, photos, rooms, settings, play history, and the parent PIN from this device." onCancel={() => setResetConfirming(false)} onConfirm={() => { void resetData(); }} title="Reset all PlayMap data?" visible={resetConfirming} />
+      <ConfirmationDialog confirmLabel="Reset Pip" destructive message="This permanently removes all toys, photos, rooms, settings, play history, and the parent PIN from this device." onCancel={() => setResetConfirming(false)} onConfirm={() => { void resetData(); }} title="Reset all Pip data?" visible={resetConfirming} />
     </PageShell>
   );
 }
@@ -170,6 +180,7 @@ const styles = StyleSheet.create({
   error: { color: theme.colors.danger },
   inlineError: { backgroundColor: theme.colors.errorSoft, borderRadius: theme.radii.md, color: theme.colors.danger, fontSize: 14, fontWeight: '600', padding: 10 },
   label: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
+  aboutLogo: { alignSelf: 'flex-start', maxWidth: 150 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sectionTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
   supporting: { color: theme.colors.secondaryText, fontSize: 15, lineHeight: 22 },

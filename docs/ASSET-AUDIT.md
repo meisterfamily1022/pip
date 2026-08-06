@@ -1,33 +1,29 @@
-# PlayMap Asset Audit
+# Pip Asset Audit
 
 Current app configuration:
 
-- Display name: PlayMap
+- Display name: Pip
 - Slug: `playmap-mobile`
 - Version: `1.0.0`
 - iOS build number: `1`
-- Orientation: portrait
+- Orientation: default (phone and tablet rotation supported)
 - iPhone support: yes
 - iPad support: enabled
 - Bundle identifier: `com.meister23.playmapmobile`
 
-Current placeholder or inherited assets:
+Canonical Pip assets:
 
-- `assets/images/icon.png`
+- Approved immutable source: `assets/brand/source/pip-logo-approved.svg`
+- Deterministic generator: `npm run assets:pip`
+- Generated lockup, wordmark, symbol, opaque iOS icon, transparent Android foreground, splash, favicon, and social preview: `assets/brand/generated/`
+- Expo configuration points directly to the generated Pip assets.
+- `public/pip-preview.png` and `public/pip-icon.png` support web previews and touch icons.
+
+Legacy assets retained but no longer referenced by app configuration:
+
 - `assets/expo.icon`
-- `assets/images/splash-icon.png`
-- `assets/images/android-icon-foreground.png`
-- `assets/images/android-icon-background.png`
-- `assets/images/android-icon-monochrome.png`
-- `assets/images/favicon.png`
-- Expo/react tutorial and logo assets under `assets/images/`
-
-Assets requiring replacement before release:
-
-- Final PlayMap app icon.
-- Final adaptive Android icon set, if Android is ever pursued.
-- Final splash mark.
-- Final favicon for web previews, if web output is shared.
+- Expo/React tutorial graphics under `assets/images/`
+- Android background and monochrome placeholders. Pip uses a cream adaptive-icon background color and the approved full-color symbol foreground; no recolored monochrome variant is generated.
 
 Owner decisions still required:
 
