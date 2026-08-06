@@ -15,6 +15,9 @@ function mapDraft(row: ToySetupDraftRow): ToySetupDraft {
     categoriesJson: row.categories_json,
     cleanupDifficultyDraft: row.cleanup_difficulty_draft,
     adultHelpRequiredDraft: row.adult_help_required_draft === null ? null : row.adult_help_required_draft === 1,
+    isAvailableDraft: row.is_available_draft !== 0,
+    savedToyId: row.saved_toy_id,
+    saveError: row.save_error,
     analysisStatus: row.analysis_status,
     enhancementStatus: row.enhancement_status,
     aiConsentAt: row.ai_consent_at,
@@ -25,7 +28,7 @@ function mapDraft(row: ToySetupDraftRow): ToySetupDraft {
   };
 }
 
-const select = 'SELECT id, original_image_uri, enhanced_image_uri, draft_name, room_id, storage_spot_id, categories_json, cleanup_difficulty_draft, adult_help_required_draft, analysis_status, enhancement_status, ai_consent_at, parent_reviewed_at, created_at, updated_at, expires_at FROM toy_setup_drafts';
+const select = 'SELECT id, original_image_uri, enhanced_image_uri, draft_name, room_id, storage_spot_id, categories_json, cleanup_difficulty_draft, adult_help_required_draft, is_available_draft, saved_toy_id, save_error, analysis_status, enhancement_status, ai_consent_at, parent_reviewed_at, created_at, updated_at, expires_at FROM toy_setup_drafts';
 
 export type ToySetupDraftInput = Pick<ToySetupDraft, 'originalImageUri'> & { id?: string } & Partial<Omit<ToySetupDraft, 'id' | 'originalImageUri' | 'createdAt' | 'updatedAt'>>;
 
@@ -33,8 +36,8 @@ export async function createToySetupDraft(database: DatabaseConnection, input: T
   const timestamp = now();
   const id = input.id ?? `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   await database.runAsync(
-    'INSERT INTO toy_setup_drafts (id, original_image_uri, enhanced_image_uri, draft_name, room_id, storage_spot_id, categories_json, cleanup_difficulty_draft, adult_help_required_draft, analysis_status, enhancement_status, ai_consent_at, parent_reviewed_at, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
-    id, input.originalImageUri, input.enhancedImageUri ?? null, input.draftName ?? null, input.roomId ?? null, input.storageSpotId ?? null, input.categoriesJson ?? '[]', input.cleanupDifficultyDraft ?? null, input.adultHelpRequiredDraft === null || input.adultHelpRequiredDraft === undefined ? null : input.adultHelpRequiredDraft ? 1 : 0, input.analysisStatus ?? 'not_requested', input.enhancementStatus ?? 'not_requested', input.aiConsentAt ?? null, input.parentReviewedAt ?? null, timestamp, timestamp, input.expiresAt ?? null,
+    'INSERT INTO toy_setup_drafts (id, original_image_uri, enhanced_image_uri, draft_name, room_id, storage_spot_id, categories_json, cleanup_difficulty_draft, adult_help_required_draft, is_available_draft, saved_toy_id, save_error, analysis_status, enhancement_status, ai_consent_at, parent_reviewed_at, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+    id, input.originalImageUri, input.enhancedImageUri ?? null, input.draftName ?? null, input.roomId ?? null, input.storageSpotId ?? null, input.categoriesJson ?? '[]', input.cleanupDifficultyDraft ?? null, input.adultHelpRequiredDraft === null || input.adultHelpRequiredDraft === undefined ? null : input.adultHelpRequiredDraft ? 1 : 0, input.isAvailableDraft === false ? 0 : 1, input.savedToyId ?? null, input.saveError ?? null, input.analysisStatus ?? 'not_requested', input.enhancementStatus ?? 'not_requested', input.aiConsentAt ?? null, input.parentReviewedAt ?? null, timestamp, timestamp, input.expiresAt ?? null,
   );
   const draft = await getToySetupDraft(database, id);
   if (!draft) throw new Error('Created toy setup draft could not be loaded.');
@@ -58,8 +61,8 @@ export async function updateToySetupDraft(database: DatabaseConnection, id: stri
   if (!existing) throw new Error('Toy setup draft not found.');
   const next = { ...existing, ...update, updatedAt: now() };
   await database.runAsync(
-    'UPDATE toy_setup_drafts SET original_image_uri = ?, enhanced_image_uri = ?, draft_name = ?, room_id = ?, storage_spot_id = ?, categories_json = ?, cleanup_difficulty_draft = ?, adult_help_required_draft = ?, analysis_status = ?, enhancement_status = ?, ai_consent_at = ?, parent_reviewed_at = ?, updated_at = ?, expires_at = ? WHERE id = ?;',
-    next.originalImageUri, next.enhancedImageUri, next.draftName, next.roomId, next.storageSpotId, next.categoriesJson, next.cleanupDifficultyDraft, next.adultHelpRequiredDraft === null ? null : next.adultHelpRequiredDraft ? 1 : 0, next.analysisStatus, next.enhancementStatus, next.aiConsentAt, next.parentReviewedAt, next.updatedAt, next.expiresAt, id,
+    'UPDATE toy_setup_drafts SET original_image_uri = ?, enhanced_image_uri = ?, draft_name = ?, room_id = ?, storage_spot_id = ?, categories_json = ?, cleanup_difficulty_draft = ?, adult_help_required_draft = ?, is_available_draft = ?, saved_toy_id = ?, save_error = ?, analysis_status = ?, enhancement_status = ?, ai_consent_at = ?, parent_reviewed_at = ?, updated_at = ?, expires_at = ? WHERE id = ?;',
+    next.originalImageUri, next.enhancedImageUri, next.draftName, next.roomId, next.storageSpotId, next.categoriesJson, next.cleanupDifficultyDraft, next.adultHelpRequiredDraft === null ? null : next.adultHelpRequiredDraft ? 1 : 0, next.isAvailableDraft ? 1 : 0, next.savedToyId, next.saveError, next.analysisStatus, next.enhancementStatus, next.aiConsentAt, next.parentReviewedAt, next.updatedAt, next.expiresAt, id,
   );
   const draft = await getToySetupDraft(database, id);
   if (!draft) throw new Error('Updated toy setup draft could not be loaded.');

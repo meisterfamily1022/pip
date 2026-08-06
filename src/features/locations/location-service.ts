@@ -22,6 +22,12 @@ export class LocationConflictError extends Error {}
 export class LocationDeletionBlockedError extends Error {}
 
 export type LocationTreeItem = Room & { storageSpots: StorageSpot[] };
+export type LocationDeletionImpact = {
+  canDelete: boolean;
+  message: string;
+  storageSpotCount: number;
+  toyCount: number;
+};
 
 export async function getParentRoom(database: DatabaseConnection, id: number): Promise<Room> {
   const room = await getRoom(database, id);
@@ -100,16 +106,47 @@ export async function renameParentStorageSpot(database: DatabaseConnection, id: 
 }
 
 export async function removeParentStorageSpot(database: DatabaseConnection, id: number): Promise<void> {
-  const existing = await getStorageSpot(database, id);
-  if (!existing) throw new Error('Storage spot not found.');
-  if (await countToysAssignedToStorageSpot(database, id) > 0) throw new LocationDeletionBlockedError('This storage spot cannot be deleted because toys are assigned to it.');
+  const impact = await getParentStorageSpotDeletionImpact(database, id);
+  if (!impact.canDelete) throw new LocationDeletionBlockedError(impact.message);
   await deleteStorageSpot(database, id);
 }
 
 export async function removeParentRoom(database: DatabaseConnection, id: number): Promise<void> {
+  const impact = await getParentRoomDeletionImpact(database, id);
+  if (!impact.canDelete) throw new LocationDeletionBlockedError(impact.message);
+  await deleteRoom(database, id);
+}
+
+export async function getParentStorageSpotDeletionImpact(database: DatabaseConnection, id: number): Promise<LocationDeletionImpact> {
+  const existing = await getStorageSpot(database, id);
+  if (!existing) throw new Error('Storage spot not found.');
+  const toyCount = await countToysAssignedToStorageSpot(database, id);
+  return {
+    canDelete: toyCount === 0,
+    storageSpotCount: 0,
+    toyCount,
+    message: toyCount > 0
+      ? `${toyCount} ${toyCount === 1 ? 'toy is' : 'toys are'} assigned to this storage spot. Move or delete ${toyCount === 1 ? 'it' : 'them'} before deleting the storage spot.`
+      : 'This storage spot is empty. Deleting it removes the storage record permanently.',
+  };
+}
+
+export async function getParentRoomDeletionImpact(database: DatabaseConnection, id: number): Promise<LocationDeletionImpact> {
   const existing = await getRoom(database, id);
   if (!existing) throw new Error('Room not found.');
-  if (await countStorageSpots(database, id) > 0) throw new LocationDeletionBlockedError('Remove this room’s storage spots before deleting the room.');
-  if (await countToysAssignedToRoom(database, id) > 0) throw new LocationDeletionBlockedError('This room cannot be deleted because toys are assigned to it.');
-  await deleteRoom(database, id);
+  const [storageSpotCount, toyCount] = await Promise.all([
+    countStorageSpots(database, id),
+    countToysAssignedToRoom(database, id),
+  ]);
+  const dependencies: string[] = [];
+  if (storageSpotCount > 0) dependencies.push(`${storageSpotCount} storage ${storageSpotCount === 1 ? 'spot' : 'spots'}`);
+  if (toyCount > 0) dependencies.push(`${toyCount} assigned ${toyCount === 1 ? 'toy' : 'toys'}`);
+  return {
+    canDelete: dependencies.length === 0,
+    storageSpotCount,
+    toyCount,
+    message: dependencies.length > 0
+      ? `This room still contains ${dependencies.join(' and ')}. Move or delete those records before deleting the room.`
+      : 'This room has no storage spots or toys. Deleting it removes the room permanently.',
+  };
 }

@@ -14,38 +14,38 @@ export type CleanupState = {
   cleanupRequired: boolean;
 };
 
-export async function loadCleanupState(database: DatabaseConnection): Promise<CleanupState> {
-  const [activeSession, settings] = await Promise.all([getActivePlaySession(database), getSettings(database)]);
+export async function loadCleanupState(database: DatabaseConnection, childId: number): Promise<CleanupState> {
+  const [activeSession, settings] = await Promise.all([getActivePlaySession(database, childId), getSettings(database)]);
   return { activeSession, cleanupRequired: settings.cleanupRequired };
 }
 
-export async function beginCleanup(database: DatabaseConnection): Promise<ActivePlaySession> {
-  const active = await getActivePlaySession(database);
+export async function beginCleanup(database: DatabaseConnection, childId: number): Promise<ActivePlaySession> {
+  const active = await getActivePlaySession(database, childId);
   if (!active) throw new Error('There is no active toy to clean up.');
   if (active.status === 'completed') throw new Error('This play session is already complete.');
-  await markCleanupStarted(database, active.id);
-  const next = await getActivePlaySession(database);
+  await markCleanupStarted(database, active.id, childId);
+  const next = await getActivePlaySession(database, childId);
   if (!next) throw new Error('Cleanup session could not be recovered.');
   return next;
 }
 
-export async function requestCleanupHelp(database: DatabaseConnection): Promise<ActivePlaySession> {
-  const active = await getActivePlaySession(database);
+export async function requestCleanupHelp(database: DatabaseConnection, childId: number): Promise<ActivePlaySession> {
+  const active = await getActivePlaySession(database, childId);
   if (!active) throw new Error('There is no active cleanup session.');
-  await markCleanupHelpRequested(database, active.id);
-  const next = await getActivePlaySession(database);
+  await markCleanupHelpRequested(database, active.id, childId);
+  const next = await getActivePlaySession(database, childId);
   if (!next) throw new Error('Cleanup session could not be recovered.');
   return next;
 }
 
-export async function completeCleanup(database: DatabaseConnection): Promise<void> {
-  const active = await getActivePlaySession(database);
+export async function completeCleanup(database: DatabaseConnection, childId: number): Promise<void> {
+  const active = await getActivePlaySession(database, childId);
   if (!active) throw new Error('There is no active cleanup session.');
-  await completePlaySession(database, active.id);
+  await completePlaySession(database, active.id, childId);
 }
 
-export async function completeCleanupWithParentOverride(database: DatabaseConnection): Promise<void> {
-  const active = await getActivePlaySession(database);
+export async function completeCleanupWithParentOverride(database: DatabaseConnection, childId: number): Promise<void> {
+  const active = await getActivePlaySession(database, childId);
   if (!active) throw new Error('There is no active cleanup session.');
-  await completePlaySessionWithParentOverride(database, active.id);
+  await completePlaySessionWithParentOverride(database, active.id, childId);
 }

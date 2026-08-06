@@ -4,18 +4,21 @@ import { changeParentPin, saveParentSettings, SettingsValidationError } from './
 import { getSettings } from '@/repositories/settings-repository';
 
 class SettingsTestDatabase implements DatabaseConnection {
-  public settings = { onboarding_completed: 1, child_nickname: 'Ari', choice_limit: 3, cleanup_required: 1, created_at: '', updated_at: '' };
+  public settings = { onboarding_completed: 1, child_nickname: 'Ari', active_child_id: 1, choice_limit: 3, cleanup_required: 1, created_at: '', updated_at: '' };
+  public child = { id: 1, name: 'Ari', created_at: '', updated_at: '' };
   async execAsync(): Promise<void> {}
   async withTransactionAsync(task: () => Promise<void>): Promise<void> { await task(); }
   async runAsync(source: string, ...params: SqlParameters): Promise<SqlRunResult> {
     if (source.startsWith('UPDATE settings')) {
-      this.settings = { onboarding_completed: params[0] as number, child_nickname: params[1] as string, choice_limit: params[2] as number, cleanup_required: params[3] as number, created_at: '', updated_at: params[4] as string };
+      this.settings = { onboarding_completed: params[0] as number, child_nickname: params[1] as string, active_child_id: params[2] as number, choice_limit: params[3] as number, cleanup_required: params[4] as number, created_at: '', updated_at: params[5] as string };
       return { lastInsertRowId: 1, changes: 1 };
     }
+    if (source.startsWith('UPDATE child_profiles')) { this.child.name = params[0] as string; this.child.updated_at = params[1] as string; return { lastInsertRowId: 0, changes: 1 }; }
     throw new Error(`Unhandled SQL: ${source}`);
   }
   async getFirstAsync<T>(source: string): Promise<T | null> {
     if (source.includes('FROM settings')) return this.settings as T;
+    if (source.includes('FROM child_profiles')) return this.child as T;
     throw new Error(`Unhandled SQL: ${source}`);
   }
   async getAllAsync<T>(): Promise<T[]> { return []; }
@@ -46,6 +49,7 @@ describe('parent settings service', () => {
   it('rejects empty nickname and invalid choice limits', async () => {
     const database = new SettingsTestDatabase();
     await expect(saveParentSettings(database, { childNickname: ' ', choiceLimit: 3, cleanupRequired: true })).rejects.toBeInstanceOf(SettingsValidationError);
+    await expect(saveParentSettings(database, { childNickname: 'b', choiceLimit: 3, cleanupRequired: true })).rejects.toThrow('at least 2 characters');
     await expect(saveParentSettings(database, { childNickname: 'Jo', choiceLimit: 2, cleanupRequired: true })).rejects.toThrow('Choice limit must be 1, 3, or 5.');
   });
 });
@@ -53,9 +57,14 @@ describe('parent settings service', () => {
 describe('parent PIN change', () => {
   it('validates current PIN, new PIN, and confirmation', async () => {
     const storage = new TestPinStorage();
-    await expect(changeParentPin(storage, { currentPin: '0000', newPin: '5678', confirmation: '5678' })).rejects.toThrow('Current PIN is not correct.');
+    const wrongCurrent = { currentPin: '0000', newPin: '5678', confirmation: '5678' };
+    const mismatch = { currentPin: '1234', newPin: '5678', confirmation: '8765' };
+    await expect(changeParentPin(storage, wrongCurrent)).rejects.toThrow('Current PIN is not correct.');
     await expect(changeParentPin(storage, { currentPin: '1234', newPin: '567', confirmation: '567' })).rejects.toThrow('Enter a four-digit numeric PIN.');
-    await expect(changeParentPin(storage, { currentPin: '1234', newPin: '5678', confirmation: '8765' })).rejects.toThrow('The PINs do not match.');
+    await expect(changeParentPin(storage, mismatch)).rejects.toThrow('The PINs do not match.');
+    expect(wrongCurrent).toEqual({ currentPin: '0000', newPin: '5678', confirmation: '5678' });
+    expect(mismatch).toEqual({ currentPin: '1234', newPin: '5678', confirmation: '8765' });
+    await expect(storage.getPin()).resolves.toBe('1234');
   });
 
   it('changes the PIN and invalidates the old PIN', async () => {

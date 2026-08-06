@@ -1,15 +1,8 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
-import { BackButton, Field } from '@/components/onboarding-controls';
-import { ChildButton, ChildPage } from '@/components/child-ui';
+import { ChildModeHeader } from '@/components/child-ui';
+import { Card, PageHeader, PageShell, PrimaryButton, RoundedTextInput } from '@/components/playmap-ui';
 import { pinStorage } from '@/services/pin-storage';
 import { verifyParentPin } from '@/features/child/parent-access';
-import { playmapTheme as theme } from '@/theme/playmap-theme';
-
-export default function ParentReturnRoute() {
-  const [pin, setPin] = useState(''); const [error, setError] = useState<string | null>(null); const [submitting, setSubmitting] = useState(false);
-  const submit = async (): Promise<void> => { if (submitting) return; setSubmitting(true); setError(null); try { if (!await verifyParentPin(pinStorage, pin)) { setError('That PIN is not correct.'); setSubmitting(false); return; } router.replace('/parent/home'); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not verify the PIN.'); setSubmitting(false); } };
-  return <ChildPage><BackButton onPress={() => router.back()} /><Text style={styles.eyebrow}>GROWN-UP AREA</Text><Text accessibilityRole="header" style={styles.title}>Parent Mode</Text><Text style={styles.helper}>Enter the four-digit PIN to return.</Text><Field label="Parent PIN" value={pin} onChangeText={(value) => { setPin(value.replace(/\D/g, '')); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={4} error={error} /><ChildButton label={submitting ? 'Checking…' : 'Return to Parent Mode'} disabled={submitting} onPress={() => void submit()} /><ChildButton label="Cancel" secondary onPress={() => router.back()} /></ChildPage>;
-}
-const styles = StyleSheet.create({ eyebrow: { color: theme.colors.coralDark, fontSize: 12, fontWeight: '800', letterSpacing: 1.4 }, title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: 36, fontWeight: '700', lineHeight: 44 }, helper: { color: theme.colors.secondaryText, fontSize: 17, lineHeight: 25 } });
+import { leaveChildMode } from '@/startup/route-access';
+export default function ParentReturnRoute() { const [pin, setPin] = useState(''); const [error, setError] = useState<string | null>(null); const [submitting, setSubmitting] = useState(false); const cancel = (): void => router.replace('/child/home'); const submit = async (): Promise<void> => { if (submitting) return; setSubmitting(true); setError(null); try { if (!await verifyParentPin(pinStorage, pin)) { setError('That PIN is not correct.'); return; } await leaveChildMode(); router.replace('/parent/home'); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not verify the PIN.'); } finally { setSubmitting(false); } }; return <PageShell child><ChildModeHeader backLabel="Child home" onBack={cancel} /><PageHeader eyebrow="GROWN-UP AREA" title="Parent Mode" subtitle="Enter your four-digit PIN to continue." /><Card tone="lavender"><RoundedTextInput error={error} keyboardType="number-pad" label="Parent PIN" maxLength={4} onChangeText={(value) => { setPin(value.replace(/\D/g, '')); setError(null); }} secureTextEntry value={pin} /><PrimaryButton disabled={submitting} label={submitting ? 'Checking…' : 'Continue'} onPress={() => void submit()} /></Card></PageShell>; }

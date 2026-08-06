@@ -1,0 +1,26 @@
+import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+import { ParentModeHeader } from '@/components/parent-ui';
+import { ErrorStateCard, LoadingState, PageShell, PastelNavigationCard } from '@/components/playmap-ui';
+import { initializeDatabase } from '@/database/client';
+import type { ChildProfile } from '@/domain/models';
+import { listChildProfiles } from '@/repositories/child-profiles-repository';
+import { setActiveChild } from '@/repositories/settings-repository';
+import { enterChildMode } from '@/startup/route-access';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
+
+export default function SelectChildRoute() {
+  const [children, setChildren] = useState<ChildProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { initializeDatabase().then(listChildProfiles).then(setChildren).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Could not load child profiles.')).finally(() => setLoading(false)); }, []);
+  const choose = async (childId: number): Promise<void> => {
+    setError(null);
+    try { const database = await initializeDatabase(); await setActiveChild(database, childId); router.replace('/child/home'); await enterChildMode(); }
+    catch (caught: unknown) { router.replace('/parent/select-child'); setError(caught instanceof Error ? caught.message : 'Could not open Child Mode.'); }
+  };
+  if (loading) return <PageShell scroll={false}><LoadingState label="Loading child profiles…" /></PageShell>;
+  return <PageShell><ParentModeHeader backTo="/parent/home" title="Who is playing?" subtitle="Choose a child. Each profile keeps its own current toy and cleanup progress." />{error && <ErrorStateCard message={error} />}{children.length === 0 ? <ErrorStateCard message="Add a child profile in Settings before opening Child Mode." /> : <View style={styles.list}>{children.map((child, index) => <PastelNavigationCard key={child.id} title={child.name} description="Open their own Child Mode" tint={index % 2 === 0 ? theme.colors.surfaceSage : theme.colors.surfacePeach} onPress={() => { void choose(child.id); }} />)}</View>}<Text style={styles.help}>You can add more child profiles in Settings.</Text></PageShell>;
+}
+const styles = StyleSheet.create({ list: { gap: 10 }, help: { color: theme.colors.secondaryText, fontSize: 15, lineHeight: 22 } });

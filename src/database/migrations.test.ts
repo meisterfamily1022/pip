@@ -16,22 +16,33 @@ const v1SessionColumns = [
 
 class SchemaDatabase implements DatabaseConnection {
   public version: number;
+  public childNickname: string | null = null;
+  public onboardingCompleted = 0;
   public readonly tables = new Map<string, string[]>();
+  public readonly executedSources: string[] = [];
   public readonly toyRecords = [{ id: 7, name: 'Wooden Train', image_uri: 'file:///train.jpg', original_image_uri: null as string | null, cleanup_difficulty: 'medium' }];
 
   constructor(version = 0, toyColumns: string[] = [], sessionColumns: string[] = []) {
     this.version = version;
     if (toyColumns.length > 0) this.tables.set('toys', [...toyColumns]);
     if (sessionColumns.length > 0) this.tables.set('play_sessions', [...sessionColumns]);
+    if (version > 0) this.tables.set('settings', ['id', 'onboarding_completed', 'child_nickname', 'choice_limit', 'cleanup_required', 'created_at', 'updated_at']);
   }
 
   async execAsync(source: string): Promise<void> {
+    this.executedSources.push(source);
+    if (source.includes('length(trim(child_nickname)) < 2') && this.childNickname !== null && this.childNickname.trim().length < 2) {
+      this.childNickname = null;
+      this.onboardingCompleted = 0;
+    }
     if (source.includes('CREATE TABLE IF NOT EXISTS toys') && !this.tables.has('toys')) {
       this.tables.set('toys', [...v1ToyColumns]);
     }
     if (source.includes('CREATE TABLE IF NOT EXISTS play_sessions') && !this.tables.has('play_sessions')) {
       this.tables.set('play_sessions', [...v1SessionColumns]);
     }
+    if (source.includes('CREATE TABLE IF NOT EXISTS settings') && !this.tables.has('settings')) this.tables.set('settings', ['id', 'onboarding_completed', 'child_nickname', 'choice_limit', 'cleanup_required', 'created_at', 'updated_at']);
+    if (source.includes('CREATE TABLE IF NOT EXISTS child_profiles') && !this.tables.has('child_profiles')) this.tables.set('child_profiles', ['id', 'name', 'created_at', 'updated_at']);
     if (source.includes('CREATE TABLE IF NOT EXISTS toy_setup_drafts')) this.tables.set('toy_setup_drafts', ['id']);
 
     const alter = source.match(/ALTER TABLE "([^"]+)" ADD COLUMN "([^"]+)"/);
@@ -99,6 +110,15 @@ describe('SQLite migration compatibility', () => {
     expect(cleanupDifficultyCount(database)).toBe(1);
   });
 
+  it('returns a leaked one-character review nickname to clean onboarding', async () => {
+    const database = new SchemaDatabase(6, v1ToyColumns, v1SessionColumns);
+    database.childNickname = 'b';
+    database.onboardingCompleted = 1;
+    await runMigrations(database);
+    expect(database.childNickname).toBeNull();
+    expect(database.onboardingCompleted).toBe(0);
+  });
+
   it('preserves an existing cleanup_difficulty column and toy records', async () => {
     const database = new SchemaDatabase(2, v1ToyColumns, v1SessionColumns);
     await runMigrations(database);
@@ -113,11 +133,30 @@ describe('SQLite migration compatibility', () => {
     expect(database.tables.get('toys')).toEqual(expect.arrayContaining(['original_image_uri', 'enhanced_image_uri', 'preferred_image_variant', 'ai_metadata_status', 'ai_analysis_id', 'ai_schema_version', 'ai_consent_at', 'ai_confirmed_at']));
   });
 
+  it('adds persistent intake and duplicate-protection columns', async () => {
+    const database = new SchemaDatabase();
+    await runMigrations(database);
+    expect(database.tables.get('toys')).toContain('intake_key');
+    expect(database.tables.get('toy_setup_drafts')).toEqual(expect.arrayContaining(['is_available_draft', 'saved_toy_id', 'save_error']));
+  });
+
   it('repairs a versioned database where cleanup_difficulty is missing', async () => {
     const database = new SchemaDatabase(2, legacyToyColumns, v1SessionColumns);
     database.toyRecords[0]!.cleanup_difficulty = undefined as unknown as string;
     await runMigrations(database);
     expect(cleanupDifficultyCount(database)).toBe(1);
     expect(database.toyRecords[0]).toMatchObject({ id: 7, name: 'Wooden Train', cleanup_difficulty: 'easy', original_image_uri: 'file:///train.jpg' });
+  });
+
+  it('adds child ownership and replaces the global active-session constraint without resetting legacy data', async () => {
+    const database = new SchemaDatabase(7, v1ToyColumns, v1SessionColumns);
+    await runMigrations(database);
+    expect(database.tables.get('settings')).toContain('active_child_id');
+    expect(database.tables.get('play_sessions')).toContain('child_id');
+    const migrationSql = database.executedSources.join('\n');
+    expect(migrationSql).toContain('UPDATE play_sessions');
+    expect(migrationSql).toContain('DROP INDEX IF EXISTS active_play_session');
+    expect(migrationSql).toContain('active_play_session_per_child');
+    expect(migrationSql).toContain('active_play_session_per_toy');
   });
 });

@@ -69,6 +69,54 @@ async function ensureToySetupDraftsTable(database: DatabaseConnection): Promise<
   `);
 }
 
+async function ensureProductionPhotoIntakeColumns(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'toys', 'intake_key', 'TEXT');
+  await database.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS toys_intake_key_unique ON toys(intake_key) WHERE intake_key IS NOT NULL;');
+  await addColumnIfMissing(database, 'toy_setup_drafts', 'is_available_draft', 'INTEGER NOT NULL DEFAULT 1 CHECK (is_available_draft IN (0, 1))');
+  await addColumnIfMissing(database, 'toy_setup_drafts', 'saved_toy_id', 'INTEGER REFERENCES toys(id) ON DELETE SET NULL');
+  await addColumnIfMissing(database, 'toy_setup_drafts', 'save_error', 'TEXT');
+}
+
+async function ensureMultiChildSessions(database: DatabaseConnection): Promise<void> {
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS child_profiles (
+      id INTEGER PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL COLLATE NOCASE CHECK (length(trim(name)) >= 2),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  await addColumnIfMissing(database, 'settings', 'active_child_id', 'INTEGER REFERENCES child_profiles(id) ON DELETE SET NULL');
+  await addColumnIfMissing(database, 'play_sessions', 'child_id', 'INTEGER REFERENCES child_profiles(id) ON DELETE RESTRICT');
+  await database.execAsync(`
+    INSERT INTO child_profiles (name, created_at, updated_at)
+    SELECT trim(child_nickname), created_at, updated_at
+      FROM settings
+     WHERE child_nickname IS NOT NULL
+       AND length(trim(child_nickname)) >= 2
+       AND NOT EXISTS (SELECT 1 FROM child_profiles);
+
+    INSERT INTO child_profiles (name, created_at, updated_at)
+    SELECT 'Child', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+     WHERE EXISTS (SELECT 1 FROM play_sessions)
+       AND NOT EXISTS (SELECT 1 FROM child_profiles);
+
+    UPDATE settings
+       SET active_child_id = COALESCE(active_child_id, (SELECT id FROM child_profiles ORDER BY id LIMIT 1))
+     WHERE id = 1;
+
+    UPDATE play_sessions
+       SET child_id = COALESCE(child_id, (SELECT id FROM child_profiles ORDER BY id LIMIT 1));
+
+    DROP INDEX IF EXISTS active_play_session;
+    CREATE UNIQUE INDEX IF NOT EXISTS active_play_session_per_child
+      ON play_sessions(child_id) WHERE status = 'active';
+    CREATE UNIQUE INDEX IF NOT EXISTS active_play_session_per_toy
+      ON play_sessions(toy_id) WHERE status = 'active';
+    CREATE INDEX IF NOT EXISTS play_sessions_child_id_index ON play_sessions(child_id);
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -166,6 +214,33 @@ const migrations: readonly Migration[] = [
       await ensureAiToySetupColumns(database);
       await ensureToySetupDraftsTable(database);
     },
+  },
+  {
+    version: 6,
+    apply: async (database) => {
+      await ensureAiToySetupColumns(database);
+      await ensureToySetupDraftsTable(database);
+      await ensureProductionPhotoIntakeColumns(database);
+    },
+  },
+  {
+    version: 7,
+    apply: async (database) => {
+      // One-character values came from pre-launch review sessions. Returning the
+      // profile to onboarding is safer than showing test data or inventing a name.
+      await database.execAsync(`
+        UPDATE settings
+           SET onboarding_completed = 0,
+               child_nickname = NULL,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE child_nickname IS NOT NULL
+           AND length(trim(child_nickname)) < 2;
+      `);
+    },
+  },
+  {
+    version: 8,
+    apply: ensureMultiChildSessions,
   },
 ];
 

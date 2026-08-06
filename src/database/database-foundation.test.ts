@@ -8,11 +8,13 @@ import { ensureSettings, getSettings, updateSettings } from '@/repositories/sett
 import { getStartupDestination } from '@/startup/startup-routing';
 import { completeOnboarding } from '@/features/onboarding/complete-onboarding';
 import { savePinThenCompleteOnboarding } from '@/features/onboarding/complete-onboarding-flow';
-import { DEFAULT_CHOICE_LIMIT, DEFAULT_CLEANUP_REQUIRED, validatePin, validatePinConfirmation, validateRequiredName } from '@/features/onboarding/validation';
+import { DEFAULT_CHOICE_LIMIT, DEFAULT_CLEANUP_REQUIRED, validateChildNickname, validatePin, validatePinConfirmation, validateRequiredName } from '@/features/onboarding/validation';
 import type { PinStorage } from '@/services/pin-storage';
 import {
   createParentRoom,
   createParentStorageSpot,
+  getParentRoomDeletionImpact,
+  getParentStorageSpotDeletionImpact,
   loadLocationTree,
   removeParentRoom,
   removeParentStorageSpot,
@@ -34,6 +36,7 @@ class TestDatabase implements DatabaseConnection {
   private readonly toys = new Map<number, RecordRow>();
   private readonly categories = new Map<number, string[]>();
   private readonly sessions = new Map<number, RecordRow>();
+  private readonly children = new Map<number, RecordRow>([[1, { id: 1, name: 'Ari', created_at: '', updated_at: '' }]]);
   private settings: RecordRow | null = null;
 
   async execAsync(source: string): Promise<void> {
@@ -47,8 +50,9 @@ class TestDatabase implements DatabaseConnection {
   async runAsync(source: string, ...params: SqlParameters): Promise<SqlRunResult> {
     const id = (): number => { this.identifier += 1; return this.identifier; };
     if (source.startsWith('UPDATE toys SET original_image_uri') || source.startsWith('UPDATE toys SET preferred_image_variant') || source.startsWith('UPDATE toys SET ai_metadata_status')) return { lastInsertRowId: 0, changes: 0 };
-    if (source.startsWith('INSERT OR IGNORE INTO settings')) { if (!this.settings) this.settings = { id: 1, onboarding_completed: 0, parent_pin: null, child_nickname: null, choice_limit: 3, cleanup_required: 1, created_at: params[1]!, updated_at: params[2]! }; return { lastInsertRowId: 1, changes: 1 }; }
-    if (source.startsWith('UPDATE settings')) { if (!this.settings) throw new Error('Missing settings'); [this.settings.onboarding_completed, this.settings.child_nickname, this.settings.choice_limit, this.settings.cleanup_required, this.settings.updated_at] = params; return { lastInsertRowId: 1, changes: 1 }; }
+    if (source.startsWith('INSERT OR IGNORE INTO settings')) { if (!this.settings) this.settings = { id: 1, onboarding_completed: 0, parent_pin: null, child_nickname: null, active_child_id: null, choice_limit: 3, cleanup_required: 1, created_at: params[1]!, updated_at: params[2]! }; return { lastInsertRowId: 1, changes: 1 }; }
+    if (source.startsWith('UPDATE settings')) { if (!this.settings) throw new Error('Missing settings'); [this.settings.onboarding_completed, this.settings.child_nickname, this.settings.active_child_id, this.settings.choice_limit, this.settings.cleanup_required, this.settings.updated_at] = params; return { lastInsertRowId: 1, changes: 1 }; }
+    if (source.startsWith('INSERT INTO child_profiles')) { const rowId = id(); this.children.set(rowId, { id: rowId, name: params[0]!, created_at: params[1]!, updated_at: params[2]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO rooms')) { const rowId = id(); this.rooms.set(rowId, { id: rowId, name: params[0]!, created_at: params[1]!, updated_at: params[2]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO storage_spots')) { if (this.failStorageSpotCreation) throw new Error('Storage spot creation failed.'); const rowId = id(); this.spots.set(rowId, { id: rowId, room_id: params[0]!, name: params[1]!, created_at: params[2]!, updated_at: params[3]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('UPDATE rooms')) { const row = this.rooms.get(params[2] as number); if (!row) return { lastInsertRowId: 0, changes: 0 }; row.name = params[0]!; row.updated_at = params[1]!; return { lastInsertRowId: 0, changes: 1 }; }
@@ -57,7 +61,7 @@ class TestDatabase implements DatabaseConnection {
     if (source.startsWith('DELETE FROM storage_spots')) { const idToDelete = params[0] as number; const changes = this.spots.delete(idToDelete) ? 1 : 0; return { lastInsertRowId: 0, changes }; }
     if (source.startsWith('INSERT INTO toys')) { const rowId = id(); this.toys.set(rowId, { id: rowId, name: params[0]!, image_uri: params[1]!, original_image_uri: params[2]!, enhanced_image_uri: params[3]!, preferred_image_variant: params[4]!, ai_metadata_status: params[5]!, room_id: params[10]!, storage_spot_id: params[11]!, cleanup_difficulty: params[12]!, adult_help_required: params[13]!, is_available: params[14]!, is_archived: params[15]!, created_at: params[16]!, updated_at: params[17]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO toy_categories')) { const toyId = params[0] as number; this.categories.set(toyId, [...(this.categories.get(toyId) ?? []), params[1] as string]); return { lastInsertRowId: 0, changes: 1 }; }
-    if (source.startsWith('INSERT INTO play_sessions')) { const rowId = id(); this.sessions.set(rowId, { id: rowId, toy_id: params[0]!, status: params[1]!, started_at: params[2]!, completed_at: params[3]!, cleanup_started_at: params[4]!, help_requested: params[5]!, parent_override_used: params[6]!, created_at: params[7]!, updated_at: params[8]! }); return { lastInsertRowId: rowId, changes: 1 }; }
+    if (source.startsWith('INSERT INTO play_sessions')) { const rowId = id(); this.sessions.set(rowId, { id: rowId, child_id: params[0]!, toy_id: params[1]!, status: params[2]!, started_at: params[3]!, completed_at: params[4]!, cleanup_started_at: params[5]!, help_requested: params[6]!, parent_override_used: params[7]!, created_at: params[8]!, updated_at: params[9]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('UPDATE play_sessions')) { const session = this.sessions.get(params[3] as number); if (!session || session.status !== 'active') return { lastInsertRowId: 0, changes: 0 }; session.status = params[0]!; session.completed_at = params[1]!; session.updated_at = params[2]!; return { lastInsertRowId: 0, changes: 1 }; }
     throw new Error(`Unhandled SQL: ${source}`);
   }
@@ -79,6 +83,7 @@ class TestDatabase implements DatabaseConnection {
     if (source.includes('COUNT(*) AS count FROM toys WHERE storage_spot_id')) return { count: [...this.toys.values()].filter((row) => row.storage_spot_id === params[0]).length } as T;
     if (source.includes('COUNT(*) AS count FROM storage_spots')) return { count: [...this.spots.values()].filter((row) => row.room_id === params[0]).length } as T;
     if (source.includes('FROM settings')) return this.settings as T | null;
+    if (source.includes('FROM child_profiles')) return (this.children.get(params[0] as number) ?? null) as T | null;
     if (source.includes('FROM rooms')) return (this.rooms.get(params[0] as number) ?? null) as T | null;
     if (source.includes('FROM storage_spots')) return (this.spots.get(params[0] as number) ?? null) as T | null;
     if (source.includes('FROM toys')) return (this.toys.get(params[0] as number) ?? null) as T | null;
@@ -90,6 +95,8 @@ class TestDatabase implements DatabaseConnection {
   async getAllAsync<T>(source: string, ...params: SqlParameters): Promise<T[]> {
     if (source.includes('PRAGMA table_info("toys")')) return ['cleanup_difficulty', 'adult_help_required'].map((name) => ({ name }) as T);
     if (source.includes('PRAGMA table_info("play_sessions")')) return ['cleanup_started_at', 'help_requested', 'parent_override_used'].map((name) => ({ name }) as T);
+    if (source.includes('PRAGMA table_info("settings")')) return ['active_child_id'].map((name) => ({ name }) as T);
+    if (source.includes('PRAGMA table_info("toy_setup_drafts")')) return ['is_available_draft', 'saved_toy_id', 'save_error'].map((name) => ({ name }) as T);
     if (source.includes('FROM rooms')) return [...this.rooms.values()].sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM storage_spots')) return [...this.spots.values()].filter((row) => row.room_id === params[0]).sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM toy_categories')) return (this.categories.get(params[0] as number) ?? []).map((category) => ({ category }) as T);
@@ -129,7 +136,7 @@ describe('database foundation', () => {
   it('initializes a database on first launch', async () => {
     await initializeDatabase();
     expect(mockDatabase.version).toBe(LATEST_DATABASE_VERSION);
-    await expect(getSettings(mockDatabase)).resolves.toMatchObject({ choiceLimit: 3, onboardingCompleted: false });
+    await expect(getSettings(mockDatabase)).resolves.toMatchObject({ childNickname: null, choiceLimit: 3, onboardingCompleted: false });
   });
 
   it('runs migrations idempotently', async () => {
@@ -154,14 +161,14 @@ describe('database foundation', () => {
   });
 
   it('creates and completes a play session', async () => {
-    const session = await createPlaySession(mockDatabase, 1);
+    const session = await createPlaySession(mockDatabase, 1, 1);
     await expect(completePlaySession(mockDatabase, session.id)).resolves.toMatchObject({ status: 'completed', completedAt: expect.any(String) });
   });
 
   it('does not create a second active play session', async () => {
     const fresh = new TestDatabase();
-    const first = await startPlaySessionIfNoneActive(fresh, 1);
-    const second = await startPlaySessionIfNoneActive(fresh, 2);
+    const first = await createPlaySession(fresh, 1, 1);
+    const second = await startPlaySessionIfNoneActive(fresh, 1, 2);
     expect(second.id).toBe(first.id);
   });
 
@@ -186,7 +193,7 @@ describe('database foundation', () => {
   });
 
   it('chooses startup destinations from onboarding state', () => {
-    const settings = { onboardingCompleted: false, childNickname: null, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+    const settings = { onboardingCompleted: false, childNickname: null, activeChildId: null, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
     expect(getStartupDestination(settings, false)).toBe('/onboarding');
     expect(getStartupDestination({ ...settings, onboardingCompleted: true }, true)).toBe('/parent/home');
     expect(getStartupDestination({ ...settings, onboardingCompleted: true }, false)).toBe('/onboarding');
@@ -205,7 +212,9 @@ describe('onboarding validation', () => {
   });
 
   it('validates child and location names', () => {
-    expect(validateRequiredName('  ', 'Child nickname')).toBe('Child nickname is required.');
+    expect(validateChildNickname('  ')).toBe('Child nickname is required.');
+    expect(validateChildNickname('b')).toBe('Child nickname must be at least 2 characters.');
+    expect(validateChildNickname('Bea')).toBeNull();
     expect(validateRequiredName('Room', 'Room name')).toBeNull();
     expect(validateRequiredName('   ', 'Storage spot name')).toBe('Storage spot name is required.');
   });
@@ -263,7 +272,7 @@ describe('PIN and onboarding completion consistency', () => {
   });
 
   it('never treats completed SQLite data without a PIN as a parent-ready state', () => {
-    const settings = { onboardingCompleted: true, childNickname: 'Ari', choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+    const settings = { onboardingCompleted: true, childNickname: 'Ari', activeChildId: 1, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
     expect(getStartupDestination(settings, false)).toBe('/onboarding');
   });
 });
@@ -295,8 +304,20 @@ describe('parent location management', () => {
     await removeParentRoom(database, emptyRoom.id);
     const room = await createParentRoom(database, 'Playroom');
     const spot = await createParentStorageSpot(database, room.id, 'Bin');
+    await expect(getParentRoomDeletionImpact(database, room.id)).resolves.toMatchObject({
+      canDelete: false,
+      storageSpotCount: 1,
+      toyCount: 0,
+      message: expect.stringContaining('1 storage spot'),
+    });
     await expect(removeParentRoom(database, room.id)).rejects.toBeInstanceOf(LocationDeletionBlockedError);
+    await expect(getParentStorageSpotDeletionImpact(database, spot.id)).resolves.toMatchObject({
+      canDelete: true,
+      toyCount: 0,
+      message: expect.stringContaining('storage spot is empty'),
+    });
     await removeParentStorageSpot(database, spot.id);
+    await expect(getParentRoomDeletionImpact(database, room.id)).resolves.toMatchObject({ canDelete: true, storageSpotCount: 0, toyCount: 0 });
     await removeParentRoom(database, room.id);
   });
 
@@ -306,7 +327,18 @@ describe('parent location management', () => {
     const spot = await createParentStorageSpot(database, room.id, 'Bin');
     await createToy(database, { name: 'Blocks', imageUri: null, roomId: room.id, storageSpotId: spot.id, cleanupDifficulty: 'easy', adultHelpRequired: false, isAvailable: true, isArchived: false, categories: ['building'] });
     await expect(countToysAssignedToRoom(database, room.id)).resolves.toBe(1);
-    await expect(removeParentStorageSpot(database, spot.id)).rejects.toThrow('toys are assigned');
+    await expect(getParentStorageSpotDeletionImpact(database, spot.id)).resolves.toMatchObject({
+      canDelete: false,
+      toyCount: 1,
+      message: expect.stringContaining('1 toy is assigned'),
+    });
+    await expect(getParentRoomDeletionImpact(database, room.id)).resolves.toMatchObject({
+      canDelete: false,
+      storageSpotCount: 1,
+      toyCount: 1,
+      message: expect.stringContaining('1 assigned toy'),
+    });
+    await expect(removeParentStorageSpot(database, spot.id)).rejects.toThrow('1 toy is assigned');
     await expect(removeParentRoom(database, room.id)).rejects.toBeInstanceOf(LocationDeletionBlockedError);
   });
 });

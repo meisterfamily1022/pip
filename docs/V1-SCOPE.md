@@ -20,7 +20,9 @@ Version 1 should prove the core loop:
 
 - First-launch onboarding
 - Four-digit parent PIN
-- One child nickname
+- One or more local child profiles, with one selected for Child Mode at a time
+- Working settings only: child profile selection/add/rename, choice limit, cleanup requirement, and parent PIN
+- Local data reset with explicit confirmation
 - Choice limit of 1, 3, or 5 toys
 - Cleanup requirement setting
 - Parent Mode and Child Mode
@@ -277,3 +279,7 @@ Version 1 is complete when:
 Do not add features outside this document during the Version 1 build.
 
 Any new idea should be recorded for a future release rather than added to Version 1.
+The Settings screen intentionally does not show controls for play prompts, visual
+themes, Face ID, dashboards, multiple children, backups, accounts, or account
+deletion. Those features have no v1 persistence or behavior, so presenting them
+as interactive settings would be misleading.

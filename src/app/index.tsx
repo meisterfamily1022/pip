@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Button, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
@@ -10,7 +10,7 @@ export default function StartupScreen() {
   const [state, setState] = useState<StartupState>('loading');
   const [error, setError] = useState<Error | null>(null);
 
-  const start = (): void => {
+  const start = useCallback((): void => {
     setState('loading');
     setError(null);
     initializeApp().then((destination) => router.replace(destination)).catch((caught: unknown) => {
@@ -18,7 +18,7 @@ export default function StartupScreen() {
       setError(startupError);
       setState('error');
     });
-  };
+  }, []);
 
   useEffect(() => {
     initializeApp().then((destination) => router.replace(destination)).catch((caught: unknown) => {
@@ -26,7 +26,7 @@ export default function StartupScreen() {
       setError(startupError);
       setState('error');
     });
-  }, []);
+  }, [start]);
 
   if (state === 'loading') return <View style={styles.container}><ActivityIndicator /><Text>Starting PlayMap…</Text></View>;
   return <View style={styles.container}><Text style={styles.errorTitle}>PlayMap could not start.</Text><Text>{error?.message}</Text><Button title="Try again" onPress={start} /></View>;

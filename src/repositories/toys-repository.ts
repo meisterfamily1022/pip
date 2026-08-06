@@ -30,6 +30,7 @@ export type SaveToyInput = {
   isAvailable: boolean;
   isArchived: boolean;
   categories: readonly PlayCategory[];
+  intakeKey?: string | null;
 };
 
 export type ChildToy = Toy & { roomName: string; storageSpotName: string };
@@ -46,8 +47,8 @@ export async function createToy(database: DatabaseConnection, input: SaveToyInpu
   let toyId: number | null = null;
   await database.withTransactionAsync(async () => {
     const result = await database.runAsync(
-      'INSERT INTO toys (name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
-      input.name.trim(), input.imageUri, input.imageUri, null, 'original', 'manual', null, null, null, null, input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, timestamp,
+      'INSERT INTO toys (name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at, intake_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      input.name.trim(), input.imageUri, input.imageUri, null, 'original', 'manual', null, null, null, null, input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, timestamp, input.intakeKey ?? null,
     );
     toyId = result.lastInsertRowId;
     for (const category of [...new Set(input.categories)]) {
@@ -73,6 +74,7 @@ export async function listChildToys(database: DatabaseConnection): Promise<Child
        JOIN rooms r ON r.id = t.room_id
        JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
       WHERE t.is_available = 1 AND t.is_archived = 0
+        AND NOT EXISTS (SELECT 1 FROM play_sessions p WHERE p.toy_id = t.id AND p.status = 'active')
       ORDER BY t.name COLLATE NOCASE ASC, t.id ASC;`,
   );
   return Promise.all(rows.map(async (row) => mapChildToy(row, await getCategories(database, row.id))));
@@ -83,7 +85,10 @@ export type ParentToy = ChildToy;
 export type ToyFilters = {
   search?: string;
   roomId?: number | null;
+  storageSpotId?: number | null;
   category?: PlayCategory | null;
+  cleanupDifficulty?: Toy['cleanupDifficulty'] | null;
+  adultHelpRequired?: boolean | null;
   availability?: 'all' | 'available' | 'hidden';
   archived?: 'active' | 'archived' | 'all';
 };
@@ -101,6 +106,9 @@ export async function listParentToys(database: DatabaseConnection, filters: ToyF
   if (filters.availability === 'available') appendFilter(clauses, parameters, 't.is_available = ?', 1);
   if (filters.availability === 'hidden') appendFilter(clauses, parameters, 't.is_available = ?', 0);
   if (filters.roomId) appendFilter(clauses, parameters, 't.room_id = ?', filters.roomId);
+  if (filters.storageSpotId) appendFilter(clauses, parameters, 't.storage_spot_id = ?', filters.storageSpotId);
+  if (filters.cleanupDifficulty) appendFilter(clauses, parameters, 't.cleanup_difficulty = ?', filters.cleanupDifficulty);
+  if (filters.adultHelpRequired !== undefined && filters.adultHelpRequired !== null) appendFilter(clauses, parameters, 't.adult_help_required = ?', filters.adultHelpRequired ? 1 : 0);
   const search = filters.search?.trim();
   if (search) appendFilter(clauses, parameters, 't.name LIKE ? COLLATE NOCASE', `%${search}%`);
   if (filters.category) appendFilter(clauses, parameters, 'EXISTS (SELECT 1 FROM toy_categories tc WHERE tc.toy_id = t.id AND tc.category = ?)', filters.category);
@@ -127,6 +135,19 @@ export async function getParentToy(database: DatabaseConnection, id: number): Pr
        JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
       WHERE t.id = ?;`,
     id,
+  );
+  return row ? mapChildToy(row, await getCategories(database, row.id)) : null;
+}
+
+export async function getParentToyByIntakeKey(database: DatabaseConnection, intakeKey: string): Promise<ParentToy | null> {
+  const row = await database.getFirstAsync<ChildToyRow>(
+    `SELECT t.id, t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.ai_metadata_status, t.ai_analysis_id, t.ai_schema_version, t.ai_consent_at, t.ai_confirmed_at, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
+            t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
+       FROM toys t
+       JOIN rooms r ON r.id = t.room_id
+       JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
+      WHERE t.intake_key = ?;`,
+    intakeKey,
   );
   return row ? mapChildToy(row, await getCategories(database, row.id)) : null;
 }
@@ -162,8 +183,19 @@ export async function setToyAvailable(database: DatabaseConnection, id: number, 
 
 export async function deleteToy(database: DatabaseConnection, id: number): Promise<void> {
   await database.withTransactionAsync(async () => {
+    await database.runAsync('DELETE FROM play_sessions WHERE toy_id = ?;', id);
     await database.runAsync('DELETE FROM toy_categories WHERE toy_id = ?;', id);
     const result = await database.runAsync('DELETE FROM toys WHERE id = ?;', id);
     if (result.changes !== 1) throw new Error('Toy not found.');
   });
+}
+
+export async function countPlaySessionsForToy(database: DatabaseConnection, id: number): Promise<number> {
+  const row = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM play_sessions WHERE toy_id = ?;', id);
+  return row?.count ?? 0;
+}
+
+export async function countActivePlaySessionsForToy(database: DatabaseConnection, id: number): Promise<number> {
+  const row = await database.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM play_sessions WHERE toy_id = ? AND status = 'active';", id);
+  return row?.count ?? 0;
 }

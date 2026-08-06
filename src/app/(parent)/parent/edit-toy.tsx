@@ -1,13 +1,14 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView, StyleSheet, Text } from 'react-native';
 import { ToyForm } from '@/components/toy-form';
-import { ToyError, ToyLoading } from '@/components/toy-ui';
+import { ToyLoading } from '@/components/toy-ui';
+import { ParentModeHeader } from '@/components/parent-ui';
+import { ErrorStateCard, PageShell, PrimaryButton } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import { loadLocationTree, type LocationTreeItem } from '@/features/locations/location-service';
 import { updateParentToy, type ToyFormInput } from '@/features/toys/toy-service';
 import { getParentToy, type ParentToy } from '@/repositories/toys-repository';
-import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { parentBackTargets } from '@/features/navigation/parent-navigation';
 
 export default function EditToyRoute() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -17,6 +18,7 @@ export default function EditToyRoute() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
@@ -32,14 +34,15 @@ export default function EditToyRoute() {
   }, [toyId]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   const submit = async (input: ToyFormInput): Promise<void> => {
-    if (saving) return;
+    if (submitting.current) return;
+    submitting.current = true;
     setSaving(true); setError(null);
-    try { const database = await initializeDatabase(); await updateParentToy(database, toyId, input); router.replace('/parent/toy-library'); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not save toy.'); setSaving(false); }
+    try { const database = await initializeDatabase(); await updateParentToy(database, toyId, input); router.replace('/parent/toy-library'); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not save toy.'); } finally { submitting.current = false; setSaving(false); }
   };
+  const errorScreen = (message: string, retry = false) => <PageShell><ParentModeHeader backLabel="Toy Library" backTo={parentBackTargets.editToy} subtitle="Update a toy’s details and Child Mode availability." title="Edit Toy" /><ErrorStateCard action={<PrimaryButton label={retry ? 'Retry' : 'Return to Toy Library'} onPress={() => { if (retry) void load(); else router.replace('/parent/toy-library'); }} />} message={message} /></PageShell>;
+  if (!Number.isInteger(toyId) || toyId < 1) return errorScreen('This toy link is invalid.');
   if (loading) return <ToyLoading />;
-  if (error && !toy) return <ToyError message={error} onRetry={() => { void load(); }} />;
-  if (!toy) return <ToyError message="Toy not found." onRetry={() => router.replace('/parent/toy-library')} />;
-  return <SafeAreaView style={styles.container}><Text accessibilityRole="header" style={styles.title}>Edit Toy</Text><ToyForm error={error} locations={locations} onSubmit={submit} saving={saving} submitLabel="Save Changes" toy={toy} /></SafeAreaView>;
+  if (error && !toy) return errorScreen(error, error !== 'Toy not found.');
+  if (!toy) return errorScreen('Toy not found.');
+  return <PageShell><ParentModeHeader backLabel="Toy Library" backTo={parentBackTargets.editToy} subtitle={`Update ${toy.name} without changing its play history.`} title="Edit Toy" /><ToyForm error={error} locations={locations} onSubmit={submit} saving={saving} submitLabel="Save Changes" toy={toy} /></PageShell>;
 }
-
-const styles = StyleSheet.create({ container: { backgroundColor: theme.colors.background, flex: 1 }, title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: theme.type.title, fontWeight: '700', paddingHorizontal: 24, paddingTop: 32 } });

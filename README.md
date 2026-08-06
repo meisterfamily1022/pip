@@ -1,56 +1,32 @@
-# Welcome to your Expo app 👋
+# PlayMap
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+PlayMap is a local-first family toy library. Parents photograph and organize toys by room and storage spot; Child Mode offers a deliberately simple, picture-led way to choose and return a toy.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Commands
 
 ```bash
-npm run reset-project
+npm install
+npm run dev
+npm run typecheck
+npm run lint
+npm test
+npm run ios
+npm run android
+npm run web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Local data and media
 
-### Other setup steps
+PlayMap stores its SQLite database and toy photos on the device. Photos selected or captured in the native app are copied into PlayMap-managed storage before a toy is saved. On web, selected blob URLs are converted to durable data URLs before persistence, so they survive an app reload while browser storage remains intact.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Image intake
 
-## Learn more
+The Add Toys screen supports one-photo entry and multi-select intake. Bulk photos share the selected location, categories, and cleanup details; each becomes a separate editable toy. An embedded camera is available in Expo Go and iOS/Android devices, plus compatible secure-context browsers. Device simulators and browsers without an available camera show the permission/unavailable path; selecting a photo remains available.
 
-To learn more about developing your project with Expo, look at the following resources:
+See [the product-quality audit](docs/PRODUCT-QUALITY-AUDIT-2026-07-29.md) for current technical and platform considerations.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Review and reset data
 
-## Join the community
+Settings includes a confirmed **Reset PlayMap** action that removes family data, managed photos, play history, settings, and the parent PIN without touching project source files. The old Expo starter `reset-project` source-deletion command is intentionally not available.
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+`seedReviewFixture` in `src/features/testing/review-fixture.ts` provides deterministic, idempotent rooms, storage spots, and toy states for automated review environments. It is not connected to production UI.

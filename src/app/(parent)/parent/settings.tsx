@@ -1,34 +1,52 @@
-import { useCallback, useState } from 'react';
-import Constants from 'expo-constants';
-import { useFocusEffect } from 'expo-router';
-import { SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
 import { ToyButton, ToyError, ToyLoading } from '@/components/toy-ui';
+import { ParentModeHeader } from '@/components/parent-ui';
+import { ConfirmationDialog, DestructiveButton, FormCard, PageShell, PrimaryButton, RoundedTextInput, ToggleRow } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
-import { changeParentPin, loadParentSettings, saveParentSettings, type ChangePinInput } from '@/features/settings/settings-service';
+import { addChildProfile, changeParentPin, listChildProfiles, loadParentSettings, saveParentSettings, type ChangePinInput } from '@/features/settings/settings-service';
 import { pinStorage } from '@/services/pin-storage';
-import { playmapTheme as theme, screenContentStyle } from '@/theme/playmap-theme';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { resetPlayMapData } from '@/features/settings/reset-playmap';
+import { resetRouteAccess } from '@/startup/route-access';
+import { parentBackTargets } from '@/features/navigation/parent-navigation';
+import type { ChildProfile } from '@/domain/models';
+import { setActiveChild } from '@/repositories/settings-repository';
 
 export default function ParentSettingsRoute() {
   const [nickname, setNickname] = useState('');
+  const [newChildName, setNewChildName] = useState('');
+  const [children, setChildren] = useState<ChildProfile[]>([]);
+  const [activeChildId, setActiveChildId] = useState<number | null>(null);
   const [choiceLimit, setChoiceLimit] = useState<1 | 3 | 5>(3);
   const [cleanupRequired, setCleanupRequired] = useState(true);
   const [pinInput, setPinInput] = useState<ChangePinInput>({ currentPin: '', newPin: '', confirmation: '' });
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingPin, setSavingPin] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinSuccess, setPinSuccess] = useState<string | null>(null);
+  const [resetConfirming, setResetConfirming] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const savingSettingsRef = useRef(false);
+  const savingPinRef = useRef(false);
+  const resettingRef = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setPageError(null);
     try {
       const database = await initializeDatabase();
-      const settings = await loadParentSettings(database);
-      setNickname(settings.childNickname ?? '');
+      const [settings, profiles] = await Promise.all([loadParentSettings(database), listChildProfiles(database)]);
+      setChildren(profiles); setActiveChildId(settings.activeChildId);
+      setNickname(profiles.find((child) => child.id === settings.activeChildId)?.name ?? settings.childNickname ?? '');
       setChoiceLimit(settings.choiceLimit);
       setCleanupRequired(settings.cleanupRequired);
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Could not load settings.');
+      setPageError(caught instanceof Error ? caught.message : 'Could not load settings.');
     } finally {
       setLoading(false);
     }
@@ -37,93 +55,123 @@ export default function ParentSettingsRoute() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const saveSettings = async (): Promise<void> => {
-    if (savingSettings) return;
-    setSavingSettings(true); setError(null); setSuccess(null);
+    if (savingSettingsRef.current) return;
+    savingSettingsRef.current = true;
+    setSavingSettings(true); setSettingsError(null); setSettingsSuccess(null);
     try {
       const database = await initializeDatabase();
       const settings = await saveParentSettings(database, { childNickname: nickname, choiceLimit, cleanupRequired });
       setNickname(settings.childNickname ?? '');
       setChoiceLimit(settings.choiceLimit);
       setCleanupRequired(settings.cleanupRequired);
-      setSuccess('Settings saved.');
+      setSettingsSuccess('Settings saved.');
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Could not save settings.');
+      setSettingsError(caught instanceof Error ? caught.message : 'Could not save settings.');
     } finally {
-      setSavingSettings(false);
+      savingSettingsRef.current = false; setSavingSettings(false);
     }
   };
 
+  const chooseChild = async (child: ChildProfile): Promise<void> => {
+    try { const database = await initializeDatabase(); await setActiveChild(database, child.id); setActiveChildId(child.id); setNickname(child.name); setSettingsError(null); }
+    catch (caught: unknown) { setSettingsError(caught instanceof Error ? caught.message : 'Could not select this child.'); }
+  };
+
+  const addChild = async (): Promise<void> => {
+    if (savingSettingsRef.current) return;
+    savingSettingsRef.current = true; setSavingSettings(true); setSettingsError(null); setSettingsSuccess(null);
+    try { const database = await initializeDatabase(); const child = await addChildProfile(database, newChildName); await setActiveChild(database, child.id); setChildren(await listChildProfiles(database)); setActiveChildId(child.id); setNickname(child.name); setNewChildName(''); setSettingsSuccess(`${child.name} was added and selected.`); }
+    catch (caught: unknown) { setSettingsError(caught instanceof Error ? caught.message : 'Could not add this child.'); }
+    finally { savingSettingsRef.current = false; setSavingSettings(false); }
+  };
+
   const changePin = async (): Promise<void> => {
-    if (savingPin) return;
-    setSavingPin(true); setError(null); setSuccess(null);
+    if (savingPinRef.current) return;
+    savingPinRef.current = true;
+    setSavingPin(true); setPinError(null); setPinSuccess(null);
     try {
       await changeParentPin(pinStorage, pinInput);
       setPinInput({ currentPin: '', newPin: '', confirmation: '' });
-      setSuccess('Parent PIN changed.');
+      setPinSuccess('Parent PIN changed.');
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Could not change PIN.');
+      setPinError(caught instanceof Error ? caught.message : 'Could not change PIN.');
     } finally {
-      setSavingPin(false);
+      savingPinRef.current = false; setSavingPin(false);
+    }
+  };
+
+  const resetData = async (): Promise<void> => {
+    if (resettingRef.current) return;
+    resettingRef.current = true;
+    setResetting(true); setPageError(null);
+    try {
+      const database = await initializeDatabase();
+      await resetPlayMapData(database);
+      await resetRouteAccess();
+      router.replace('/onboarding');
+    } catch (caught: unknown) {
+      setPageError(caught instanceof Error ? caught.message : 'Could not reset PlayMap.');
+      setResetConfirming(false);
+      resettingRef.current = false; setResetting(false);
     }
   };
 
   if (loading) return <ToyLoading />;
-  if (error && !nickname) return <ToyError message={error} onRetry={() => { void load(); }} />;
+  if (pageError && !nickname) return <ToyError message={pageError} onRetry={() => { void load(); }} />;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
-        <Text accessibilityRole="header" style={styles.title}>Settings</Text>
-        {error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
-        {success && <Text accessibilityLiveRegion="polite" style={styles.success}>{success}</Text>}
+    <PageShell>
+      <ParentModeHeader backTo={parentBackTargets.settings} subtitle="Manage Child Mode choices, parent access, and local data." title="Settings" />
+      {pageError && <Text accessibilityLiveRegion="polite" style={styles.error}>{pageError}</Text>}
 
-        <View style={[styles.section, styles.childSection]}>
-          <Text style={styles.sectionTitle}>Child Experience</Text>
-          <Text style={styles.label}>Child nickname</Text>
-          <TextInput accessibilityLabel="Child nickname" onChangeText={setNickname} placeholder="Ari" style={styles.input} value={nickname} />
-          <Text style={styles.label}>Choice limit</Text>
-          <View style={styles.row}>{([1, 3, 5] as const).map((limit) => <ToyButton key={limit} label={`${limit} toy${limit === 1 ? '' : 's'}`} selected={choiceLimit === limit} onPress={() => setChoiceLimit(limit)} />)}</View>
-          <View style={styles.switchRow}><Text style={styles.switchText}>Cleanup required</Text><Switch value={cleanupRequired} onValueChange={setCleanupRequired} /></View>
-          <ToyButton disabled={savingSettings} label={savingSettings ? 'Saving…' : 'Save Settings'} onPress={() => { void saveSettings(); }} />
-        </View>
+      <FormCard tone="peach">
+        <Text style={styles.sectionTitle}>Child Profiles</Text>
+        {settingsError && <Text accessibilityLiveRegion="polite" style={styles.inlineError}>{settingsError}</Text>}
+        {settingsSuccess && <Text accessibilityLiveRegion="polite" style={styles.success}>{settingsSuccess}</Text>}
+        <Text style={styles.supporting}>Select a child to rename them or to open their Child Mode next.</Text>
+        <View style={styles.row}>{children.map((child) => <ToyButton key={child.id} label={child.name} selected={activeChildId === child.id} onPress={() => { void chooseChild(child); }} />)}</View>
+        <RoundedTextInput accessibilityLabel="Selected child name" label="Selected child name" onChangeText={setNickname} placeholder="Ari" value={nickname} />
+        <RoundedTextInput accessibilityLabel="New child name" label="Add another child" onChangeText={setNewChildName} placeholder="Sam" value={newChildName} />
+        <PrimaryButton disabled={savingSettings || newChildName.trim().length < 2} label={savingSettings ? 'Adding…' : 'Add Child'} onPress={() => { void addChild(); }} />
+      </FormCard>
 
-        <View style={[styles.section, styles.accessSection]}>
-          <Text style={styles.sectionTitle}>Parent Access</Text>
-          <TextInput accessibilityLabel="Current PIN" keyboardType="number-pad" maxLength={4} onChangeText={(value) => setPinInput((current) => ({ ...current, currentPin: value.replace(/\D/g, '') }))} placeholder="Current PIN" secureTextEntry style={styles.input} value={pinInput.currentPin} />
-          <TextInput accessibilityLabel="New PIN" keyboardType="number-pad" maxLength={4} onChangeText={(value) => setPinInput((current) => ({ ...current, newPin: value.replace(/\D/g, '') }))} placeholder="New PIN" secureTextEntry style={styles.input} value={pinInput.newPin} />
-          <TextInput accessibilityLabel="Confirm new PIN" keyboardType="number-pad" maxLength={4} onChangeText={(value) => setPinInput((current) => ({ ...current, confirmation: value.replace(/\D/g, '') }))} placeholder="Confirm new PIN" secureTextEntry style={styles.input} value={pinInput.confirmation} />
-          <ToyButton disabled={savingPin} label={savingPin ? 'Changing…' : 'Change Parent PIN'} onPress={() => { void changePin(); }} />
-        </View>
+      <FormCard tone="sage">
+        <Text style={styles.sectionTitle}>Child Mode Settings</Text>
+        <Text style={styles.label}>Choice limit</Text>
+        <View style={styles.row}>{([1, 3, 5] as const).map((limit) => <ToyButton key={limit} label={`${limit} toy${limit === 1 ? '' : 's'}`} selected={choiceLimit === limit} onPress={() => setChoiceLimit(limit)} />)}</View>
+        <ToggleRow description="Ask for cleanup before another toy choice." label="Cleanup required" value={cleanupRequired} onValueChange={setCleanupRequired} />
+        <PrimaryButton disabled={savingSettings} label={savingSettings ? 'Saving…' : 'Save Settings'} onPress={() => { void saveSettings(); }} />
+      </FormCard>
 
-        <View style={[styles.section, styles.dataSection]}>
-          <Text style={styles.sectionTitle}>Data and Privacy</Text>
-          <Text>PlayMap stores your toy library and photos on this device.</Text>
-          <Text>Deleting PlayMap may delete your saved toy library.</Text>
-          <Text>PlayMap V1 does not upload toy photos or require an account.</Text>
-        </View>
+      <FormCard tone="lavender">
+        <Text style={styles.sectionTitle}>Parent Access</Text>
+        {pinError && <Text accessibilityLiveRegion="polite" style={styles.inlineError}>{pinError}</Text>}
+        {pinSuccess && <Text accessibilityLiveRegion="polite" style={styles.success}>{pinSuccess}</Text>}
+        <RoundedTextInput keyboardType="number-pad" label="Current PIN" maxLength={4} onChangeText={(value) => { setPinInput((current) => ({ ...current, currentPin: value.replace(/\D/g, '') })); setPinError(null); }} secureTextEntry value={pinInput.currentPin} />
+        <RoundedTextInput keyboardType="number-pad" label="New PIN" maxLength={4} onChangeText={(value) => { setPinInput((current) => ({ ...current, newPin: value.replace(/\D/g, '') })); setPinError(null); }} secureTextEntry value={pinInput.newPin} />
+        <RoundedTextInput keyboardType="number-pad" label="Confirm new PIN" maxLength={4} onChangeText={(value) => { setPinInput((current) => ({ ...current, confirmation: value.replace(/\D/g, '') })); setPinError(null); }} secureTextEntry value={pinInput.confirmation} />
+        <PrimaryButton disabled={savingPin} label={savingPin ? 'Changing…' : 'Change Parent PIN'} onPress={() => { void changePin(); }} />
+      </FormCard>
 
-        <View style={[styles.section, styles.supportSection]}>
-          <Text style={styles.sectionTitle}>Support</Text>
-          <Text>App version: {Constants.expoConfig?.version ?? '1.0.0'}</Text>
-          <Text>Privacy Policy: Not configured yet.</Text>
-          <Text>Support: Not configured yet.</Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <FormCard tone="yellow">
+        <Text style={styles.sectionTitle}>Data & Privacy</Text>
+        <Text style={styles.supporting}>Toy records, play history, and original photos are stored locally on this device.</Text>
+        <Text style={styles.supporting}>PlayMap has no account, cloud backup, Face ID unlock, or remote parent dashboard. Child profiles and their checkout state stay on this device.</Text>
+        <Text style={styles.supporting}>Resetting removes every PlayMap room, storage spot, toy, photo, play record, setting, and the parent PIN from this device.</Text>
+        <DestructiveButton disabled={resetting} label={resetting ? 'Resetting…' : 'Reset PlayMap'} onPress={() => setResetConfirming(true)} />
+      </FormCard>
+
+      <ConfirmationDialog confirmLabel="Reset PlayMap" destructive message="This permanently removes all toys, photos, rooms, settings, play history, and the parent PIN from this device." onCancel={() => setResetConfirming(false)} onConfirm={() => { void resetData(); }} title="Reset all PlayMap data?" visible={resetConfirming} />
+    </PageShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: theme.colors.background, flex: 1 },
-  content: { ...screenContentStyle, gap: 18 },
   error: { color: theme.colors.danger },
-  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, color: theme.colors.text, fontSize: 17, minHeight: theme.sizes.input, paddingHorizontal: 16 },
+  inlineError: { backgroundColor: theme.colors.errorSoft, borderRadius: theme.radii.md, color: theme.colors.danger, fontSize: 14, fontWeight: '600', padding: 10 },
   label: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  section: { ...theme.shadows.card, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, gap: 12, padding: 18 }, childSection: { backgroundColor: theme.colors.peachSoft }, accessSection: { backgroundColor: theme.colors.lavenderSoft }, dataSection: { backgroundColor: theme.colors.sageSoft }, supportSection: { backgroundColor: theme.colors.yellowSoft },
-  sectionTitle: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
+  sectionTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
+  supporting: { color: theme.colors.secondaryText, fontSize: 15, lineHeight: 22 },
   success: { color: theme.colors.success },
-  switchRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  switchText: { fontSize: 16, fontWeight: '600' },
-  title: { color: theme.colors.primary, fontFamily: 'Georgia', fontSize: 32, fontWeight: '700' },
 });

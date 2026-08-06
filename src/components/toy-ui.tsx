@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ParentToy } from '@/repositories/toys-repository';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
-import { DestructiveButton, ErrorStateCard, FilterChip, LoadingState, SecondaryButton, ToyImage } from './playmap-ui';
+import { DestructiveButton, ErrorStateCard, FilterChip, LoadingState, PageShell, SecondaryButton, ToyImage } from './playmap-ui';
 
 type ToyButtonProps = { label: string; onPress(): void; destructive?: boolean; disabled?: boolean; selected?: boolean };
 
@@ -31,11 +31,11 @@ export function ToyGridCard({ toy, onPress }: { toy: ParentToy; onPress(): void 
 }
 
 export function ToyLoading() {
-  return <LoadingState label="Loading toys…" />;
+  return <PageShell scroll={false}><LoadingState label="Loading toys…" /></PageShell>;
 }
 
-export function ToyError({ message, onRetry }: { message: string; onRetry(): void }) {
-  return <ErrorStateCard action={<ToyButton label="Retry" onPress={onRetry} />} message={message} />;
+export function ToyError({ message, onRetry, actionLabel = 'Retry' }: { message: string; onRetry(): void; actionLabel?: string }) {
+  return <PageShell><ErrorStateCard action={<ToyButton label={actionLabel} onPress={onRetry} />} message={message} /></PageShell>;
 }
 
 const styles = StyleSheet.create({

@@ -4,8 +4,27 @@ import type { ChildToy } from '@/repositories/toys-repository';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { PrimaryButton, SecondaryButton, ToyImage as SharedToyImage } from './playmap-ui';
 
+export function ChildModeHeader({ backLabel = 'Home', onBack }: { backLabel?: string; onBack(): void }) {
+  return (
+    <View style={styles.header}>
+      <Pressable
+        accessibilityHint={`Returns to ${backLabel}`}
+        accessibilityLabel={`Back to ${backLabel}`}
+        accessibilityRole="button"
+        onPress={onBack}
+        style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+      >
+        <Text accessible={false} style={styles.backArrow}>‹</Text>
+        <Text style={styles.backLabel}>{backLabel}</Text>
+      </Pressable>
+      <Text accessibilityRole="text" style={styles.modeLabel}>✦ CHILD MODE</Text>
+    </View>
+  );
+}
+
 export function ChildButton({ label, onPress, secondary = false, disabled = false, tint }: { label: string; onPress(): void; secondary?: boolean; disabled?: boolean; tint?: string }) {
-  return secondary ? <SecondaryButton disabled={disabled} label={label} onPress={onPress} style={tint ? { backgroundColor: tint, borderColor: tint } : undefined} /> : <PrimaryButton disabled={disabled} label={label} onPress={onPress} style={[styles.childButton, tint ? { backgroundColor: tint } : undefined]} />;
+  if (secondary || tint) return <SecondaryButton disabled={disabled} label={label} onPress={onPress} style={tint ? { backgroundColor: tint, borderColor: theme.colors.primaryText } : undefined} />;
+  return <PrimaryButton disabled={disabled} label={label} onPress={onPress} style={styles.childButton} />;
 }
 
 export function ToyImage({ uri }: { uri: string | null }) {
@@ -29,6 +48,12 @@ export function ToyCard({ toy, onPress }: { toy: ChildToy; onPress(): void }) {
 }
 
 const styles = StyleSheet.create({
+  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 48 },
+  backButton: { alignItems: 'center', backgroundColor: theme.colors.surfaceMint, borderColor: theme.colors.border, borderRadius: theme.radii.pill, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 44, paddingHorizontal: 14 },
+  backButtonPressed: { opacity: 0.76 },
+  backArrow: { color: theme.colors.primaryText, fontSize: 29, lineHeight: 30 },
+  backLabel: { color: theme.colors.primaryText, fontSize: 15, fontWeight: '800' },
+  modeLabel: { color: theme.colors.coralDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
   page: { flex: 1, backgroundColor: theme.colors.childBackground, gap: 18, padding: theme.spacing[20], paddingTop: theme.spacing[24] },
   centered: { alignItems: 'center', justifyContent: 'center' },
   childButton: { minHeight: theme.sizes.childButton, width: '100%' },

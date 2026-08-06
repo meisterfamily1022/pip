@@ -7,11 +7,11 @@ const isChoiceLimit = (value: number): value is ChoiceLimit => value === 1 || va
 
 function toSettings(row: SettingsRow): AppSettings {
   if (!isChoiceLimit(row.choice_limit)) throw new Error('Stored choice limit is invalid.');
-  return { onboardingCompleted: row.onboarding_completed === 1, childNickname: row.child_nickname, choiceLimit: row.choice_limit, cleanupRequired: row.cleanup_required === 1, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { onboardingCompleted: row.onboarding_completed === 1, childNickname: row.child_nickname, activeChildId: row.active_child_id ?? null, choiceLimit: row.choice_limit, cleanupRequired: row.cleanup_required === 1, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 export async function getSettings(database: DatabaseConnection): Promise<AppSettings> {
-  const row = await database.getFirstAsync<SettingsRow>('SELECT onboarding_completed, child_nickname, choice_limit, cleanup_required, created_at, updated_at FROM settings WHERE id = ?;', 1);
+  const row = await database.getFirstAsync<SettingsRow>('SELECT onboarding_completed, child_nickname, active_child_id, choice_limit, cleanup_required, created_at, updated_at FROM settings WHERE id = ?;', 1);
   if (!row) throw new Error('App settings have not been initialized.');
   return toSettings(row);
 }
@@ -22,14 +22,20 @@ export async function ensureSettings(database: DatabaseConnection): Promise<AppS
   return getSettings(database);
 }
 
-export type SettingsUpdate = Partial<Pick<AppSettings, 'onboardingCompleted' | 'childNickname' | 'choiceLimit' | 'cleanupRequired'>>;
+export type SettingsUpdate = Partial<Pick<AppSettings, 'onboardingCompleted' | 'childNickname' | 'activeChildId' | 'choiceLimit' | 'cleanupRequired'>>;
 
 export async function updateSettings(database: DatabaseConnection, update: SettingsUpdate): Promise<AppSettings> {
   const existing = await getSettings(database);
   const next = { ...existing, ...update };
   await database.runAsync(
-    'UPDATE settings SET onboarding_completed = ?, child_nickname = ?, choice_limit = ?, cleanup_required = ?, updated_at = ? WHERE id = ?;',
-    next.onboardingCompleted ? 1 : 0, next.childNickname, next.choiceLimit, next.cleanupRequired ? 1 : 0, now(), 1,
+    'UPDATE settings SET onboarding_completed = ?, child_nickname = ?, active_child_id = ?, choice_limit = ?, cleanup_required = ?, updated_at = ? WHERE id = ?;',
+    next.onboardingCompleted ? 1 : 0, next.childNickname, next.activeChildId, next.choiceLimit, next.cleanupRequired ? 1 : 0, now(), 1,
   );
   return getSettings(database);
+}
+
+export async function setActiveChild(database: DatabaseConnection, childId: number): Promise<AppSettings> {
+  const child = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE id = ?;', childId);
+  if (!child) throw new Error('Choose a valid child profile.');
+  return updateSettings(database, { activeChildId: childId });
 }

@@ -15,7 +15,7 @@ export function OnboardingScreen({ step, title, description, children, footer }:
           {description && <Text style={styles.description}>{description}</Text>}
           <View style={styles.body}>{children}</View>
         </ScrollView>
-        {footer && <View style={styles.footer}>{footer}</View>}
+        {footer && <View style={styles.footer}><View style={styles.footerContent}>{footer}</View></View>}
       </KeyboardAvoidingView>
     </View>
   );
@@ -31,4 +31,5 @@ const styles = StyleSheet.create({
   description: { color: theme.colors.mutedText, fontSize: 17, lineHeight: 25, marginTop: 14 },
   body: { flex: 1, gap: 16, marginTop: 32 },
   footer: { backgroundColor: theme.colors.background, borderTopColor: theme.colors.border, borderTopWidth: 1, padding: 16 },
+  footerContent: { alignSelf: 'center', maxWidth: 680, width: '100%' },
 });

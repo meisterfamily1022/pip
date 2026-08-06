@@ -16,3 +16,9 @@ export function validatePinConfirmation(pin: string, confirmation: string): stri
 export function validateRequiredName(value: string, label: string): string | null {
   return value.trim().length > 0 ? null : `${label} is required.`;
 }
+
+export function validateChildNickname(value: string): string | null {
+  const nickname = value.trim();
+  if (!nickname) return 'Child nickname is required.';
+  return nickname.length >= 2 ? null : 'Child nickname must be at least 2 characters.';
+}

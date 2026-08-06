@@ -1,27 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { BackButton, Field, PrimaryButton } from '@/components/onboarding-controls';
-import { OnboardingScreen } from '@/components/onboarding-screen';
+import { ParentModeHeader } from '@/components/parent-ui';
+import { ErrorStateCard, FormCard, LoadingState, PageShell, PrimaryButton, ReadOnlyValue, RoundedTextInput } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import { getParentRoom, getParentStorageSpot, renameParentRoom, renameParentStorageSpot } from '@/features/locations/location-service';
-
-function returnToLocations(): void {
-  if (router.canGoBack()) router.back();
-  else router.replace('/parent/locations');
-}
+import { parentBackTargets } from '@/features/navigation/parent-navigation';
+import { validateRequiredName } from '@/features/onboarding/validation';
 
 export default function EditLocationRoute() {
   const { type, id: idParam } = useLocalSearchParams<{ type?: string; id?: string }>();
   const isStorage = type === 'storage';
   const id = idParam ? Number(idParam) : NaN;
-  const invalidRoute = !Number.isInteger(id) || (type !== 'room' && type !== 'storage');
+  const invalidRoute = !Number.isInteger(id) || id < 1 || (type !== 'room' && type !== 'storage');
   const [currentName, setCurrentName] = useState('');
   const [roomLabel, setRoomLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(invalidRoute ? 'This location link is invalid.' : null);
   const [loading, setLoading] = useState(!invalidRoute);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+
   useEffect(() => {
     if (invalidRoute) return;
     initializeDatabase().then(async (database) => {
@@ -34,11 +33,31 @@ export default function EditLocationRoute() {
       }
     }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Could not load location.')).finally(() => setLoading(false));
   }, [id, invalidRoute, isStorage]);
-  const save = (): void => {
-    setSaving(true); setError(null);
-    const operation = isStorage ? initializeDatabase().then((database) => renameParentStorageSpot(database, id, currentName)) : initializeDatabase().then((database) => renameParentRoom(database, id, currentName));
-    operation.then(returnToLocations).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Could not save location.')).finally(() => setSaving(false));
+
+  const save = async (): Promise<void> => {
+    if (savingRef.current) return;
+    const validationError = validateRequiredName(currentName, isStorage ? 'Storage spot name' : 'Room name');
+    if (validationError) { setError(validationError); return; }
+    savingRef.current = true; setSaving(true); setError(null);
+    try {
+      const database = await initializeDatabase();
+      if (isStorage) await renameParentStorageSpot(database, id, currentName);
+      else await renameParentRoom(database, id, currentName);
+      router.replace('/parent/locations');
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Could not save location.');
+    } finally {
+      savingRef.current = false; setSaving(false);
+    }
   };
-  if (loading) return <OnboardingScreen title="Edit location"><Text>Loading…</Text></OnboardingScreen>;
-  return <OnboardingScreen title={isStorage ? 'Edit storage spot' : 'Edit room'} description={isStorage ? `This storage spot belongs to ${roomLabel ?? 'the selected room'}.` : 'Rename this room without changing its storage spots.'} footer={<PrimaryButton label={saving ? 'Saving…' : 'Save'} disabled={saving || Boolean(error && !currentName)} onPress={save} />}><BackButton onPress={returnToLocations} /><Field label={isStorage ? 'Storage spot name' : 'Room name'} value={currentName} onChangeText={(value) => { setCurrentName(value); setError(null); }} error={error} />{isStorage && roomLabel && <Field label="Room" value={roomLabel} onChangeText={() => {}} />}</OnboardingScreen>;
+
+  const title = isStorage ? 'Edit Storage Spot' : 'Edit Room';
+  const header = <ParentModeHeader backLabel="Rooms & Storage" backTo={parentBackTargets.editLocation} subtitle={isStorage ? `Rename this storage spot in ${roomLabel ?? 'its room'}.` : 'Rename this room without changing its storage spots.'} title={title} />;
+  if (loading) return <PageShell scroll={false}>{header}<LoadingState label="Loading location…" /></PageShell>;
+  if (invalidRoute || (error && !currentName)) return <PageShell>{header}<ErrorStateCard message={error ?? 'Location not found.'} /></PageShell>;
+  return <PageShell>{header}<FormCard tone={isStorage ? 'sage' : 'peach'}><RoundedTextInput error={error} label={isStorage ? 'Storage spot name' : 'Room name'} onChangeText={(value) => { setCurrentName(value); setError(null); }} value={currentName} />{isStorage && roomLabel && <ReadOnlyValue label="Room" value={roomLabel} />}<View style={styles.actions}><PrimaryButton disabled={saving || !currentName.trim()} label={saving ? 'Saving…' : 'Save Changes'} onPress={() => { void save(); }} /></View></FormCard></PageShell>;
 }
+
+const styles = StyleSheet.create({
+  actions: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap' },
+});

@@ -1,0 +1,6 @@
+import { applyBatchMetadata, createToyBatchDrafts, MAX_TOY_IMAGE_BYTES, removeBatchDraft, updateBatchDraft, validateIntakeAsset } from './toy-batch-drafts';
+describe('toy batch drafts', () => {
+  it('creates temporary names and rejects invalid assets individually', () => { const result = createToyBatchDrafts([{ uri: 'one.jpg', mimeType: 'image/jpeg' }, { uri: 'bad.pdf', mimeType: 'application/pdf' }, { uri: 'two.jpg', fileSize: MAX_TOY_IMAGE_BYTES + 1 }]); expect(result.drafts.map((d) => d.name)).toEqual(['New toy 1']); expect(result.rejected).toHaveLength(2); });
+  it('validates oversized images', () => expect(validateIntakeAsset({ uri: 'large.jpg', fileSize: MAX_TOY_IMAGE_BYTES + 1 })).toMatch('15 MB'));
+  it('removes, edits, and applies metadata to every draft', () => { const { drafts } = createToyBatchDrafts([{ uri: 'one.jpg' }, { uri: 'two.jpg' }]); const applied = applyBatchMetadata(drafts, { roomId: 4, storageSpotId: 5, categories: ['building'] }); expect(applied.every((d) => d.roomId === 4 && d.categories[0] === 'building')).toBe(true); expect(updateBatchDraft(applied, applied[0]!.id, { name: 'Blocks' })[0]!.name).toBe('Blocks'); expect(removeBatchDraft(applied, applied[1]!.id)).toHaveLength(1); });
+});

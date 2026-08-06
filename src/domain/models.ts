@@ -55,6 +55,9 @@ export type ToySetupDraft = {
   categoriesJson: string;
   cleanupDifficultyDraft: Toy['cleanupDifficulty'] | null;
   adultHelpRequiredDraft: boolean | null;
+  isAvailableDraft: boolean;
+  savedToyId: number | null;
+  saveError: string | null;
   analysisStatus: ToySetupAnalysisStatus;
   enhancementStatus: ToySetupEnhancementStatus;
   aiConsentAt: Timestamp | null;
@@ -68,6 +71,7 @@ export type PlaySessionStatus = 'active' | 'completed';
 
 export type PlaySession = {
   id: number;
+  childId: number;
   toyId: number;
   status: PlaySessionStatus;
   startedAt: Timestamp;
@@ -79,11 +83,19 @@ export type PlaySession = {
   updatedAt: Timestamp;
 };
 
+export type ChildProfile = {
+  id: number;
+  name: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 export type ChoiceLimit = 1 | 3 | 5;
 
 export type AppSettings = {
   onboardingCompleted: boolean;
   childNickname: string | null;
+  activeChildId: number | null;
   choiceLimit: ChoiceLimit;
   cleanupRequired: boolean;
   createdAt: Timestamp;

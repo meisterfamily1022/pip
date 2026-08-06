@@ -11,14 +11,14 @@ export function PrimaryButton({ label, onPress, disabled = false, accessibilityL
 type BackButtonProps = { onPress(): void };
 export function BackButton({ onPress }: BackButtonProps) { return <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={onPress} style={styles.backButton}><Text style={styles.backButtonText}>Back</Text></Pressable>; }
 
-type FieldProps = { label: string; value: string; onChangeText(value: string): void; error?: string | null; placeholder?: string; keyboardType?: 'default' | 'number-pad'; secureTextEntry?: boolean; maxLength?: number };
-export function Field({ label, value, onChangeText, error, placeholder, keyboardType, secureTextEntry, maxLength }: FieldProps) {
-  return <RoundedTextInput accessibilityLabel={label} error={error} keyboardType={keyboardType} label={label} maxLength={maxLength} onChangeText={onChangeText} placeholder={placeholder} secureTextEntry={secureTextEntry} value={value} />;
+type FieldProps = { label: string; value: string; onChangeText(value: string): void; error?: string | null; placeholder?: string; keyboardType?: 'default' | 'number-pad'; secureTextEntry?: boolean; maxLength?: number; editable?: boolean };
+export function Field({ label, value, onChangeText, error, placeholder, keyboardType, secureTextEntry, maxLength, editable = true }: FieldProps) {
+  return <RoundedTextInput accessibilityLabel={label} editable={editable} error={error} keyboardType={keyboardType} label={label} maxLength={maxLength} onChangeText={onChangeText} placeholder={placeholder} secureTextEntry={secureTextEntry} value={value} />;
 }
 
 type ChoiceControlProps = { choiceLimit: ChoiceLimit; onChoiceLimitChange(value: ChoiceLimit): void; cleanupRequired: boolean; onCleanupRequiredChange(value: boolean): void };
 export function ChoiceControls({ choiceLimit, onChoiceLimitChange, cleanupRequired, onCleanupRequiredChange }: ChoiceControlProps) {
-  return <View style={styles.choiceGroup}><Text style={styles.label}>Toy choices</Text><SegmentedControl accessibilityLabel="Toy choices" onChange={onChoiceLimitChange} options={[1, 3, 5]} value={choiceLimit} /><Text style={styles.label}>Require cleanup before another choice?</Text><SegmentedControl accessibilityLabel="Cleanup requirement" onChange={onCleanupRequiredChange} options={[true, false]} value={cleanupRequired} /></View>;
+  return <View style={styles.choiceGroup}><Text style={styles.label}>Toy choices</Text><SegmentedControl accessibilityLabel="Toy choices" getOptionLabel={(limit) => `${limit} toy${limit === 1 ? '' : 's'}`} onChange={onChoiceLimitChange} options={[1, 3, 5]} value={choiceLimit} /><Text style={styles.label}>Require cleanup before another choice?</Text><SegmentedControl accessibilityLabel="Cleanup requirement" getOptionLabel={(required) => required ? 'Yes' : 'Not required'} onChange={onCleanupRequiredChange} options={[true, false]} value={cleanupRequired} /></View>;
 }
 
 const styles = StyleSheet.create({

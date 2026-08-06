@@ -4,6 +4,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 export interface ToyImageStorage {
   copyIntoManagedStorage(sourceUri: string): Promise<string>;
   deleteManagedImage(uri: string | null): Promise<void>;
+  fingerprintImage?(uri: string): Promise<string | null>;
 }
 
 export async function deleteUniqueManagedImages(storage: ToyImageStorage, uris: readonly (string | null)[]): Promise<number> {
@@ -31,9 +32,22 @@ function ensureToyDirectory(): Directory {
   return directory;
 }
 
+async function durableWebImageUri(sourceUri: string): Promise<string> {
+  if (sourceUri.startsWith('data:')) return sourceUri;
+  const response = await fetch(sourceUri);
+  if (!response.ok) throw new Error('The selected photo could not be read.');
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('The selected photo could not be saved.'));
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('The selected photo could not be saved.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export const expoToyImageStorage: ToyImageStorage = {
   async copyIntoManagedStorage(sourceUri: string): Promise<string> {
-    if (Platform.OS === 'web') return sourceUri;
+    if (Platform.OS === 'web') return durableWebImageUri(sourceUri);
     const source = new File(sourceUri);
     const destination = new File(ensureToyDirectory(), uniqueImageName(sourceUri));
     await source.copy(destination);
@@ -46,5 +60,15 @@ export const expoToyImageStorage: ToyImageStorage = {
     if (!uri.startsWith(managedPrefix)) return;
     const file = new File(uri);
     if (file.exists) file.delete();
+  },
+
+  async fingerprintImage(uri: string): Promise<string | null> {
+    if (Platform.OS !== 'web') return new File(uri).md5;
+    let hash = 2166136261;
+    for (let index = 0; index < uri.length; index += 1) {
+      hash ^= uri.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `${uri.length}-${(hash >>> 0).toString(36)}`;
   },
 };

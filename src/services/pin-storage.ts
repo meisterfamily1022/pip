@@ -19,7 +19,6 @@ function getWebStorage(): Storage {
 export const pinStorage: PinStorage = {
   async savePin(pin: string): Promise<void> {
     if (Platform.OS === 'web') {
-      if (!__DEV__) throw new Error('PIN storage is unavailable in this web build.');
       getWebStorage().setItem(PIN_STORAGE_KEY, pin);
       return;
     }
@@ -27,14 +26,12 @@ export const pinStorage: PinStorage = {
   },
   async getPin(): Promise<string | null> {
     if (Platform.OS === 'web') {
-      if (!__DEV__) throw new Error('PIN storage is unavailable in this web build.');
       return getWebStorage().getItem(PIN_STORAGE_KEY);
     }
     return SecureStore.getItemAsync(PIN_STORAGE_KEY);
   },
   async deletePin(): Promise<void> {
     if (Platform.OS === 'web') {
-      if (!__DEV__) throw new Error('PIN storage is unavailable in this web build.');
       getWebStorage().removeItem(PIN_STORAGE_KEY);
       return;
     }
