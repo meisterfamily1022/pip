@@ -274,6 +274,43 @@ Added `renameHousehold` to the auth service and a `/v1/household` route. The
 household id is read from the request but re-checked against the session's
 memberships, so supplying another household's id is rejected — covered by test.
 
+## 8d. Prompt 6 outcomes — child profiles and parent management
+
+`src/features/children/child-profile-service.ts` plus two screens:
+`/parent/children` (list, pause, reorder, delete, add) and `/parent/edit-child`
+(nickname, avatar, accent colour, broad age band, choice count, reading
+support).
+
+**The rule that shapes the service: a profile owns preferences and play
+history, never inventory.** Deleting a profile removes its play sessions and
+nothing else — toys, rooms, storage spots and photos are household property.
+`play_sessions.child_id` is RESTRICT, so history has to go first anyway, and
+that is also the privacy-respecting choice since history is the only part that
+is about the child rather than the household. Tests assert toys, rooms and
+spots all survive a deletion, and that a sibling's history is untouched.
+
+Deleting the active profile clears `settings.active_child_id`, so Child Mode
+asks who is playing rather than opening a profile that no longer exists.
+
+Duplicate prevention compares names case-insensitively with collapsed
+whitespace, so a double tap or a replayed offline queue cannot produce two
+profiles a parent cannot tell apart. Reordering writes in one transaction and
+ignores ids outside the household, and omitted profiles keep their position
+rather than being dropped from the ordering.
+
+Paused profiles are labelled in words ("Paused — not shown in Child Mode"), not
+by colour, per the accessibility requirement.
+
+Nothing collects a birthday, legal name, school, or diagnosis. The optional age
+field is a broad band and is documented on screen as affecting wording only.
+
+Landing claims `profiles` and `per-child` flipped to `available: true`, since
+they are now real; `guest` stays false until Guest reaches Child Mode. The
+landing test was updated to match — that mechanism working as designed.
+
+Onboarding's child step became "Who will use Pip?" with avatar, colour and
+reading support, and a "Skip for now" action, since profiles are optional.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

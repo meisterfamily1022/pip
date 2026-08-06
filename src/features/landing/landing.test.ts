@@ -97,10 +97,12 @@ describe('feature claims', () => {
     const shown = availableFeatures().map((feature) => feature.id);
     expect(shown).toContain('child-mode');
     expect(shown).toContain('library');
-    // These ship in the child-profile prompts and must stay hidden until then.
-    expect(shown).not.toContain('profiles');
+    // Child profiles and per-child settings ship with the profile management
+    // screens, so these claims are now true.
+    expect(shown).toContain('profiles');
+    expect(shown).toContain('per-child');
+    // Guest play reaches Child Mode later; the claim stays hidden until then.
     expect(shown).not.toContain('guest');
-    expect(shown).not.toContain('per-child');
   });
 
   it('keeps every feature id unique', () => {

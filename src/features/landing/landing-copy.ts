@@ -73,10 +73,10 @@ export const landingFeatures: readonly LandingFeature[] = [
   { id: 'cleanup', title: 'Tidy-up guidance', body: 'Where the toy goes, shown before the next choice.', available: true },
   { id: 'pin', title: 'Grown-up PIN', body: 'Parent settings stay behind a four-digit PIN.', available: true },
   { id: 'hidden', title: 'Hidden and archived toys', body: 'Keep some things out of rotation without deleting them.', available: true },
-  // Shipping in the child-profile prompts. Listed here so the claim is tracked
-  // rather than forgotten, but not shown until it is true.
-  { id: 'profiles', title: 'Multiple child profiles', body: 'Each child gets their own choices and play history.', available: false },
-  { id: 'per-child', title: 'Per-child settings', body: 'Choice count and reading support, tuned per child.', available: false },
+  { id: 'profiles', title: 'Multiple child profiles', body: 'Each child gets their own choices and play history.', available: true },
+  { id: 'per-child', title: 'Per-child settings', body: 'Choice count and reading support, tuned per child.', available: true },
+  // Guest play reaches Child Mode in a later prompt; the claim stays hidden
+  // until a visitor can actually use it.
   { id: 'guest', title: 'Guest mode', body: 'A visiting friend can play without creating a profile.', available: false },
 ];
 

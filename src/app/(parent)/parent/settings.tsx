@@ -7,7 +7,7 @@ import { ConfirmationDialog, DestructiveButton, FormCard, PageShell, PrimaryButt
 import { PipBrandMark } from '@/components/pip-brand-mark';
 import { pipBrand } from '@/brand/pip-brand';
 import { initializeDatabase } from '@/database/client';
-import { addChildProfile, changeParentPin, listChildProfiles, loadParentSettings, saveParentSettings, type ChangePinInput } from '@/features/settings/settings-service';
+import { changeParentPin, listChildProfiles, loadParentSettings, saveParentSettings, type ChangePinInput } from '@/features/settings/settings-service';
 import { pinStorage } from '@/services/pin-storage';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { resetPlayMapData } from '@/features/settings/reset-playmap';
@@ -18,7 +18,6 @@ import { setActiveChild } from '@/repositories/settings-repository';
 
 export default function ParentSettingsRoute() {
   const [nickname, setNickname] = useState('');
-  const [newChildName, setNewChildName] = useState('');
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [activeChildId, setActiveChildId] = useState<number | null>(null);
   const [choiceLimit, setChoiceLimit] = useState<1 | 3 | 5>(3);
@@ -79,14 +78,6 @@ export default function ParentSettingsRoute() {
     catch (caught: unknown) { setSettingsError(caught instanceof Error ? caught.message : 'Could not select this child.'); }
   };
 
-  const addChild = async (): Promise<void> => {
-    if (savingSettingsRef.current) return;
-    savingSettingsRef.current = true; setSavingSettings(true); setSettingsError(null); setSettingsSuccess(null);
-    try { const database = await initializeDatabase(); const child = await addChildProfile(database, newChildName); await setActiveChild(database, child.id); setChildren(await listChildProfiles(database)); setActiveChildId(child.id); setNickname(child.name); setNewChildName(''); setSettingsSuccess(`${child.name} was added and selected.`); }
-    catch (caught: unknown) { setSettingsError(caught instanceof Error ? caught.message : 'Could not add this child.'); }
-    finally { savingSettingsRef.current = false; setSavingSettings(false); }
-  };
-
   const changePin = async (): Promise<void> => {
     if (savingPinRef.current) return;
     savingPinRef.current = true;
@@ -140,8 +131,7 @@ export default function ParentSettingsRoute() {
         <Text style={styles.supporting}>Select a child to rename them or to open their Child Mode next.</Text>
         <View style={styles.row}>{children.map((child) => <ToyButton key={child.id} label={child.name} selected={activeChildId === child.id} onPress={() => { void chooseChild(child); }} />)}</View>
         <RoundedTextInput accessibilityLabel="Selected child name" label="Selected child name" onChangeText={setNickname} placeholder="Ari" value={nickname} />
-        <RoundedTextInput accessibilityLabel="New child name" label="Add another child" onChangeText={setNewChildName} placeholder="Sam" value={newChildName} />
-        <PrimaryButton disabled={savingSettings || newChildName.trim().length < 2} label={savingSettings ? 'Adding…' : 'Add Child'} onPress={() => { void addChild(); }} />
+        <PrimaryButton label="Manage children" onPress={() => router.push({ pathname: '/parent/children' })} />
       </FormCard>
 
       <FormCard tone="sage">

@@ -3,11 +3,11 @@ import type { ParentToy } from '@/repositories/toys-repository';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { DestructiveButton, ErrorStateCard, FilterChip, LoadingState, PageShell, SecondaryButton, ToyImage } from './playmap-ui';
 
-type ToyButtonProps = { label: string; onPress(): void; destructive?: boolean; disabled?: boolean; selected?: boolean };
+type ToyButtonProps = { label: string; onPress(): void; destructive?: boolean; disabled?: boolean; selected?: boolean; accessibilityLabel?: string };
 
-export function ToyButton({ label, onPress, destructive = false, disabled = false, selected = false }: ToyButtonProps) {
+export function ToyButton({ label, onPress, destructive = false, disabled = false, selected = false, accessibilityLabel }: ToyButtonProps) {
   if (selected) return <FilterChip label={label} onPress={onPress} selected />;
-  return destructive ? <DestructiveButton disabled={disabled} label={label} onPress={onPress} /> : <SecondaryButton disabled={disabled} label={label} onPress={onPress} />;
+  return destructive ? <DestructiveButton accessibilityLabel={accessibilityLabel} disabled={disabled} label={label} onPress={onPress} /> : <SecondaryButton accessibilityLabel={accessibilityLabel} disabled={disabled} label={label} onPress={onPress} />;
 }
 
 export function ToyImagePreview({ uri }: { uri: string | null }) {

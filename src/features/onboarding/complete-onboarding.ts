@@ -6,6 +6,9 @@ import { createChildProfile } from '@/repositories/child-profiles-repository';
 
 export type CompleteOnboardingInput = {
   childNickname: string;
+  childAvatarId?: string;
+  childAccentColorId?: string;
+  childReadingSupport?: string;
   choiceLimit: ChoiceLimit;
   cleanupRequired: boolean;
   roomName: string;
@@ -16,7 +19,15 @@ export async function completeOnboarding(database: DatabaseConnection, input: Co
   await database.withTransactionAsync(async () => {
     const room = await createRoom(database, input.roomName);
     await createStorageSpot(database, room.id, input.storageSpotName);
-    const child = await createChildProfile(database, input.childNickname);
+    const child = await createChildProfile(database, {
+      name: input.childNickname,
+      avatarId: input.childAvatarId,
+      accentColorId: input.childAccentColorId,
+      readingSupport: input.childReadingSupport,
+      // The onboarding choice count is this first child's own setting, not just
+      // a device-wide default.
+      choiceLimit: input.choiceLimit,
+    });
     await updateSettings(database, {
       childNickname: input.childNickname.trim(),
       activeChildId: child.id,
