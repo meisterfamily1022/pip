@@ -376,6 +376,38 @@ children are never sent to the same object.
 
 Landing flag `guest` flipped to available. Every advertised feature now exists.
 
+## 8g. Prompt 9 outcomes — library connection and conflict recovery
+
+**Sync is not shipped, and the landing page still says so.** There is no
+durable server-side store for household data — `src/server/auth` keeps accounts
+in development memory — so no remote transport exists to sync against. Building
+a UI that claimed otherwise would have made the landing page lie.
+
+What is implemented and tested is everything that must be correct *before* a
+transport exists, so adding one later is wiring rather than redesign:
+
+- **Conflict policy** (`conflict-resolution.ts`), pure and fully tested. The
+  brief forbids blind last-write-wins for destructive conflicts, so a
+  delete-versus-edit, a replaced photo, two simultaneously active sessions, and
+  identical timestamps all return `needs-review` instead of an answer. A photo
+  test pins the important case: remote is strictly newer, and the policy still
+  refuses to discard the local photograph. Non-destructive edits converge on the
+  newer one.
+- **Eligibility** (`checkConnectionEligibility`), which refuses without an
+  account, before email confirmation, when the library is already connected, and
+  when it belongs to a different account — each with a message rather than a
+  button that does nothing. Sample toys do not count as a library worth
+  connecting.
+- **Durable import state** (migration 11, `sync_operations`), keyed on
+  `(entity, entity_id, household_id)`. Re-planning queues nothing already
+  queued or finished, so a retry resumes rather than duplicating. Interrupted
+  `in_flight` rows can be returned to the queue without touching finished ones.
+- **Tombstones**, so a device that never saw a deletion cannot resurrect the
+  record.
+
+Landing claims deliberately unchanged: no present-tense backup or sync claim,
+and the existing tests asserting that still pass.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

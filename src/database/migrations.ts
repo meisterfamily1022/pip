@@ -240,6 +240,34 @@ async function ensureSampleFlags(database: DatabaseConnection): Promise<void> {
   await database.execAsync('CREATE INDEX IF NOT EXISTS toys_is_sample_index ON toys(is_sample);');
 }
 
+/**
+ * Durable, restart-safe state for connecting a local library to a household.
+ *
+ * An import can be interrupted by a lost connection, a backgrounded app, or a
+ * device restart. Recording each record's outcome means a retry resumes rather
+ * than starting again, and cannot import the same row twice.
+ */
+async function ensureSyncOperations(database: DatabaseConnection): Promise<void> {
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS sync_operations (
+      -- Stable across retries: the same local record always maps to the same row.
+      entity TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'in_flight', 'done', 'conflict', 'failed')),
+      -- Set when the record needs a decision rather than an automatic answer.
+      conflict_reason TEXT,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (entity, entity_id, household_id)
+    );
+    CREATE INDEX IF NOT EXISTS sync_operations_status_index ON sync_operations(status);
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -372,6 +400,10 @@ const migrations: readonly Migration[] = [
   {
     version: 10,
     apply: ensureSampleFlags,
+  },
+  {
+    version: 11,
+    apply: ensureSyncOperations,
   },
 ];
 
