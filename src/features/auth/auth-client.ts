@@ -170,6 +170,30 @@ export async function renameHousehold(
   });
 }
 
+/** Confirms the current password before a sensitive action. */
+export async function reauthenticate(
+  password: string,
+  storage: AuthSessionStorage = authSessionStorage,
+): Promise<void> {
+  const token = await storage.read();
+  if (!token) throw new AuthRequestError('SESSION_INVALID', 'Sign in to continue.');
+  await request('/reauthenticate', { method: 'POST', token, body: JSON.stringify({ password }) });
+}
+
+/**
+ * Deletes the parent account.
+ *
+ * Only the server-side account. The local library is deliberately left alone,
+ * so this can never be mistaken for a way to clear the device.
+ */
+export async function deleteAccount(storage: AuthSessionStorage = authSessionStorage): Promise<void> {
+  const token = await storage.read();
+  if (!token) throw new AuthRequestError('SESSION_INVALID', 'Sign in to continue.');
+  await request('/account', { method: 'DELETE', token });
+  await storage.clear();
+  clearSession();
+}
+
 export async function requestPasswordReset(email: string): Promise<void> {
   await request('/password-reset', { method: 'POST', body: JSON.stringify({ email }) });
 }

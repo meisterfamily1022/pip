@@ -59,6 +59,7 @@ export type ResetRecord = {
 
 export interface AccountRepository {
   create(record: AccountRecord): Promise<void>;
+  remove(accountId: string): Promise<void>;
   get(accountId: string): Promise<AccountRecord | undefined>;
   findByEmail(emailKey: string): Promise<AccountRecord | undefined>;
   update(record: AccountRecord): Promise<void>;
@@ -151,6 +152,15 @@ export class LocalDevelopmentAuthStorage implements AuthStorage {
     create: async (record) => {
       this.data.accounts.set(record.accountId, { ...record });
       this.data.emails.set(record.emailKey, record.accountId);
+    },
+    remove: async (accountId) => {
+      const existing = this.data.accounts.get(accountId);
+      if (!existing) return;
+      this.data.accounts.delete(accountId);
+      this.data.emails.delete(existing.emailKey);
+      for (const [key, membership] of this.data.memberships) {
+        if (membership.accountId === accountId) this.data.memberships.delete(key);
+      }
     },
     get: async (accountId) => this.data.accounts.get(accountId),
     findByEmail: async (emailKey) => {

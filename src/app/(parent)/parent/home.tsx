@@ -16,6 +16,7 @@ const destinations = [
   { href: '/parent/locations' as const, title: 'Rooms & storage', description: 'Keep every toy easy to find', tint: theme.colors.surface },
   { href: '/parent/select-child' as const, title: 'Child mode', description: 'Choose who is playing', tint: theme.colors.brandPrimarySoft, locks: true },
   { href: '/parent/settings' as const, title: 'Settings', description: 'Children, choices, cleanup, and access', tint: theme.colors.surface },
+  { href: '/parent/account' as const, title: 'Account', description: 'Sign in, export your data, delete your account', tint: theme.colors.surfaceLavender },
 ] as const;
 
 export default function ParentHomeRoute() {

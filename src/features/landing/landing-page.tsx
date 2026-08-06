@@ -157,6 +157,15 @@ export function LandingPage() {
                 {link.label}
               </Text>
             ))}
+            <Pressable
+              accessibilityLabel={landingNav.signIn.label}
+              accessibilityRole="link"
+              onPress={() => {
+                void Linking.openURL(landingNav.signIn.href);
+              }}
+            >
+              <Text style={styles.navSignIn}>{landingNav.signIn.label}</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -315,7 +324,8 @@ const styles = StyleSheet.create({
   listItem: { color: theme.colors.secondaryText, ...theme.typography.body },
   nav: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[16], justifyContent: 'space-between' },
   navLink: { color: theme.colors.brandInk, ...theme.typography.label },
-  navLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[16] },
+  navLinks: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[16] },
+  navSignIn: { color: theme.colors.brandInk, textDecorationLine: 'underline', ...theme.typography.label },
   navLogo: { width: 96 },
   note: { color: theme.colors.mutedText, ...theme.typography.supporting },
   page: { backgroundColor: theme.colors.backgroundCream, padding: theme.spacing[24], paddingBottom: theme.spacing[40] },

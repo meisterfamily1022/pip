@@ -644,6 +644,7 @@ export function ConfirmationDialog({
   onCancel,
   onConfirm,
   destructive = false,
+  children,
 }: {
   visible: boolean;
   title: string;
@@ -652,6 +653,8 @@ export function ConfirmationDialog({
   onCancel(): void;
   onConfirm(): void;
   destructive?: boolean;
+  /** Extra content between the message and the actions, e.g. a password field. */
+  children?: ReactNode;
 }) {
   return (
     <Modal
@@ -670,6 +673,7 @@ export function ConfirmationDialog({
             {title}
           </Text>
           <Text style={styles.body}>{message}</Text>
+          {children}
           <View style={styles.modalActions}>
             {destructive ? (
               <DestructiveButton label={confirmLabel} onPress={onConfirm} />

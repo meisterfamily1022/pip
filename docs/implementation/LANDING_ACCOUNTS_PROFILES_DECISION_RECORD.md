@@ -408,6 +408,43 @@ transport exists, so adding one later is wiring rather than redesign:
 Landing claims deliberately unchanged: no present-tense backup or sync claim,
 and the existing tests asserting that still pass.
 
+## 8h. Prompt 10 outcomes — sign-in, recovery, account settings, export, deletion
+
+Screens: `(auth)/sign-in`, `(auth)/forgot-password`, `(parent)/parent/account`,
+built on the Prompt 3 service.
+
+**Four ways of removing something, deliberately kept apart**, because confusing
+them is how a family loses a library they meant to keep. Each states what it
+does *not* do:
+
+1. *Sign out* — ends the session, deletes nothing.
+2. *Delete a child profile* — in Children; never touches toys.
+3. *Remove local data* — "Reset Pip" in Settings; this device only.
+4. *Delete account* — in Account; the server-side account only.
+
+Account deletion requires a **recent password confirmation**, not merely a valid
+session, so a borrowed unlocked device cannot erase an account. It revokes every
+session first, so other devices lose access immediately rather than when their
+token expires. It leaves the local library alone, and says so on screen.
+
+**Export is built from the device database**, which is where the library
+actually lives. Plain JSON with names resolved rather than foreign keys, so a
+parent can read it. Photos are referenced by path, not embedded — a library of
+hundreds would otherwise become a base64 wall. Tests assert the payload contains
+no password, hash, token, PIN, or code, and that Guest play exports with a null
+child rather than an invented one.
+
+Recovery copy stays enumeration-resistant: "if that address has an account"
+rather than confirming whether it does.
+
+**Sign In added to the landing nav**, held back since Prompt 4 precisely because
+it had no destination. The test that asserted the nav offered no sign-in was
+replaced with one asserting the link resolves to `/sign-in`; downloads are still
+not offered, since there is no App Store listing.
+
+Email delivery remains unconfigured, so both the sign-in and reset screens say
+plainly that no message will arrive rather than leaving a parent waiting.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

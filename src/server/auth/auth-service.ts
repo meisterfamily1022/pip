@@ -426,6 +426,28 @@ export class AuthService {
     return { householdId: context.householdId, name: trimmed };
   }
 
+  /**
+   * Deletes the account.
+   *
+   * Requires a recent password confirmation, not merely a valid session, so a
+   * borrowed unlocked device cannot erase an account. Every session is revoked
+   * first, so the deletion takes effect on the family's other devices
+   * immediately rather than when their token happens to expire.
+   *
+   * This removes the *account*, which is the server-side record. It never
+   * touches the local library: a parent who deletes their account still has
+   * their toys on the device, and must remove local data separately if that is
+   * what they meant.
+   */
+  async deleteAccount(token: string): Promise<{ deletedAccountId: string }> {
+    const context = await this.requireRecentAuthentication(token);
+    const timestamp = this.nowIso();
+    await this.storage.sessions.revokeAllForAccount(context.accountId, timestamp);
+    await this.storage.verifications.delete(context.accountId);
+    await this.storage.accounts.remove(context.accountId);
+    return { deletedAccountId: context.accountId };
+  }
+
   /** Which third-party sign-in buttons the client should show. */
   availableProviders(): { apple: boolean; google: boolean } {
     return { apple: this.config.appleSignInEnabled, google: this.config.googleSignInEnabled };

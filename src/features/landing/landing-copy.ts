@@ -117,11 +117,14 @@ export const earlyAccessForm = {
 } as const;
 
 export const landingNav = {
-  // Sign In is deliberately absent: web sign-in has no destination yet, and the
-  // page must not offer a link that goes nowhere.
   links: [
     { id: 'how', label: 'How it works' },
     { id: 'families', label: 'For families' },
     { id: 'privacy', label: 'Safety & privacy' },
   ],
+  /**
+   * Sign In was deliberately absent until it had somewhere to go. The sign-in
+   * screen now exists, so the link is real.
+   */
+  signIn: { label: 'Sign in', href: '/sign-in' },
 } as const;

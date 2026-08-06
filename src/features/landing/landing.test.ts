@@ -59,16 +59,20 @@ describe('landing copy', () => {
     expect(landingHero.primaryCta.toLowerCase()).toContain('early access');
     expect(allCopy()).not.toMatch(/download on the app store|get it on google play|testflight/i);
 
-    // Checked against the nav and the calls to action specifically. Prose may
-    // legitimately mention signing in — "Children never sign in" is a privacy
-    // statement, not an offer.
+    // Downloads are still not offered: there is no App Store listing.
     const offers = [
       ...landingNav.links.map((link) => link.label),
       landingHero.primaryCta,
       landingHero.secondaryCta,
       earlyAccessForm.submitLabel,
     ].join('\n');
-    expect(offers).not.toMatch(/sign ?in|log ?in|download/i);
+    expect(offers).not.toMatch(/download/i);
+  });
+
+  it('offers sign in now that the screen exists', () => {
+    // Held back until Prompt 10 built the destination, so the link is real.
+    expect(landingNav.signIn.href).toBe('/sign-in');
+    expect(landingNav.signIn.label).toMatch(/sign in/i);
   });
 
   it('never claims backup or syncing exists today', () => {
