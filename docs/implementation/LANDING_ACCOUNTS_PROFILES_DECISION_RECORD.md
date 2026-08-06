@@ -240,6 +240,40 @@ endpoint cannot be used to test whether an address is on the list.
 Verified by exporting the web build: the root document contains the headline
 and CTA as server-rendered HTML, with zero occurrences of the legacy name.
 
+## 8c. Prompt 5 outcomes — sign-up, verification, family space
+
+Three screens in a new `(auth)` route group: `sign-up`, `verify-email`,
+`family-space`.
+
+**The account is opt-in, not a gate.** The existing onboarding is local-first —
+PIN, child nickname, first location — and none of it now requires an account.
+The welcome screen offers "Create an account" beside copy explaining that Pip
+works on this device without one. This follows the brief's own principle that
+an account must earn itself through backup, recovery, or sharing; forcing it
+into local setup would have contradicted that and broken the "do not block
+evaluation" rule.
+
+Flow: sign up → confirm the address (a session is issued on success, so the
+parent is not asked to sign in again) → name the household. Household naming
+comes after verification because renaming needs a session, and renaming is
+idempotent, so a retry settles on the same value.
+
+Resumability: the address awaiting confirmation is persisted, so closing the
+app mid-sign-up returns to the code screen rather than an empty form. It is
+only an address, never a credential, but it still goes to secure storage on
+device.
+
+**The verification screen states plainly that email delivery is not switched on
+in this build.** A parent would otherwise sit waiting for a code that cannot
+arrive. That notice is removed when a provider is configured.
+
+Nothing in account creation asks about a child, and a test asserts the field
+list contains nothing matching child, birthday, age, school, or diagnosis.
+
+Added `renameHousehold` to the auth service and a `/v1/household` route. The
+household id is read from the request but re-checked against the session's
+memberships, so supplying another household's id is rejected — covered by test.
+
 ## 9. Branch note
 
 `claude/playmap-redesign-subagents-7748b2` holds an independent redesign built from the same base (`78f3910`) in a separate worktree. `feature/ai-assisted-toy-entry` contains its own, further-developed redesign plus the AI toy-entry work and the Pip rebrand. The two lines overlap substantially and are not merged. This work builds on `feature/ai-assisted-toy-entry` as the more advanced line. The other branch is left untouched; reconciling or retiring it is a separate decision.

@@ -412,6 +412,20 @@ export class AuthService {
     return { ...context, householdId };
   }
 
+  /**
+   * Names the household.
+   *
+   * Renaming is idempotent, so a retry after a dropped connection settles on
+   * the same value rather than creating anything.
+   */
+  async renameHousehold(token: string, householdId: string, name: string): Promise<{ householdId: string; name: string }> {
+    const context = await this.authorizeHousehold(token, householdId);
+    const trimmed = name.trim();
+    if (!trimmed || trimmed.length > 60) throw this.fail('INVALID_REQUEST');
+    await this.storage.households.rename(context.householdId, trimmed);
+    return { householdId: context.householdId, name: trimmed };
+  }
+
   /** Which third-party sign-in buttons the client should show. */
   availableProviders(): { apple: boolean; google: boolean } {
     return { apple: this.config.appleSignInEnabled, google: this.config.googleSignInEnabled };

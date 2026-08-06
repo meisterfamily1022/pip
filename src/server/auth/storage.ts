@@ -67,6 +67,7 @@ export interface AccountRepository {
 export interface HouseholdRepository {
   create(household: HouseholdRecord, ownerAccountId: string, createdAt: string): Promise<void>;
   get(householdId: string): Promise<HouseholdRecord | undefined>;
+  rename(householdId: string, name: string): Promise<void>;
   listForAccount(accountId: string): Promise<HouseholdRecord[]>;
   membership(householdId: string, accountId: string): Promise<MembershipRecord | undefined>;
 }
@@ -175,6 +176,10 @@ export class LocalDevelopmentAuthStorage implements AuthStorage {
       });
     },
     get: async (householdId) => this.data.households.get(householdId),
+    rename: async (householdId, name) => {
+      const existing = this.data.households.get(householdId);
+      if (existing) this.data.households.set(householdId, { ...existing, name });
+    },
     listForAccount: async (accountId) =>
       [...this.data.memberships.values()]
         .filter((membership) => membership.accountId === accountId)

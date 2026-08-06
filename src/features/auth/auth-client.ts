@@ -33,7 +33,8 @@ async function request<T>(
   init: RequestInit & { token?: string } = {},
 ): Promise<T | null> {
   const { token, ...rest } = init;
-  const response = await fetch(`${AUTH_BASE}${path}`, {
+  const url = path.startsWith('/household') ? `/v1${path}` : `${AUTH_BASE}${path}`;
+  const response = await fetch(url, {
     ...rest,
     headers: {
       'content-type': 'application/json',
@@ -147,6 +148,26 @@ export async function signOut(storage: AuthSessionStorage = authSessionStorage):
   }
   await storage.clear();
   clearSession();
+}
+
+/**
+ * Names the household after verification.
+ *
+ * Renaming is idempotent, so a retry after a dropped connection settles on the
+ * same value rather than creating a second household.
+ */
+export async function renameHousehold(
+  householdId: string,
+  name: string,
+  storage: AuthSessionStorage = authSessionStorage,
+): Promise<void> {
+  const token = await storage.read();
+  if (!token) throw new AuthRequestError('SESSION_INVALID', 'Sign in to continue.');
+  await request('/household', {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify({ householdId, name }),
+  });
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
