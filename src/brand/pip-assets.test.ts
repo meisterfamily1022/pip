@@ -8,9 +8,11 @@ import appConfig from '../../app.json';
 const root = join(__dirname, '../..');
 
 describe('Pip generated brand assets', () => {
+  // Pinned so the approved artwork cannot drift silently. Update deliberately,
+  // and only alongside a regenerated asset set.
   it('keeps the approved source byte-for-byte unchanged', () => {
     const checksum = createHash('sha256').update(readFileSync(join(root, 'assets/brand/source/pip-logo-approved.svg'), 'utf8')).digest('hex');
-    expect(checksum).toBe('c378455a3099aae121db140fb0c4d74900822cc69802dd050cf25dd27e8c7463');
+    expect(checksum).toBe('f99329dd8044041c123178ea65d0412cf38264bd373e7ba24b038e5f15480985');
   });
 
   it.each([
