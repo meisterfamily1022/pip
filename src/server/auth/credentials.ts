@@ -12,7 +12,7 @@ import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 const SCRYPT = { N: 16_384, r: 8, p: 1, keyLength: 64 } as const;
 const HASH_PREFIX = 'scrypt$1';
 
-export const MINIMUM_PASSWORD_LENGTH = 10;
+export const MINIMUM_PASSWORD_LENGTH = 8;
 
 function constantTimeEquals(left: string, right: string): boolean {
   const a = Buffer.from(left);
