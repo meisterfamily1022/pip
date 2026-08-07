@@ -1,3 +1,5 @@
+import { MINIMUM_PASSWORD_LENGTH } from './credentials';
+
 export const AUTH_ERROR_CODES = [
   'INVALID_REQUEST',
   'WEAK_PASSWORD',
@@ -32,7 +34,7 @@ export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
  */
 const defaults: Record<AuthErrorCode, { message: string; retryable: boolean; status: number }> = {
   INVALID_REQUEST: { message: 'Check the details and try again.', retryable: false, status: 400 },
-  WEAK_PASSWORD: { message: 'Choose a password with at least 10 characters.', retryable: false, status: 400 },
+  WEAK_PASSWORD: { message: `Choose a password with at least ${MINIMUM_PASSWORD_LENGTH} characters.`, retryable: false, status: 400 },
   INVALID_CREDENTIALS: { message: 'That email or password is not correct.', retryable: false, status: 401 },
   EMAIL_UNVERIFIED: { message: 'Confirm your email address to continue.', retryable: false, status: 403 },
   VERIFICATION_INVALID: { message: 'That confirmation code has expired or is not valid.', retryable: false, status: 400 },

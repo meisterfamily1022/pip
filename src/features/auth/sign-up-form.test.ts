@@ -36,7 +36,7 @@ describe('sign-up validation', () => {
 
   it('states the password rule rather than failing silently', () => {
     const errors = validateSignUp({ ...valid, password: 'short' });
-    expect(errors.password).toMatch(/at least 10 characters/i);
+    expect(errors.password).toMatch(/at least 8 characters/i);
   });
 
   it('treats unchecked consent as a validation failure, never a default', () => {
