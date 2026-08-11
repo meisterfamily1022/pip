@@ -1,20 +1,200 @@
-import { useEffect, useState } from 'react';
-import { router } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Card, ErrorStateCard, LoadingState, PageShell } from '@/components/playmap-ui';
+
+import { ChildPage } from '@/components/child-ui';
+import { PipIcon, type PipIconName } from '@/components/pip-icon';
+import { ProfileAvatar } from '@/components/profile-ui';
+import { Banner, SkeletonRows } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
-import { getActivePlaySession } from '@/repositories/play-sessions-repository';
-import { getSettings } from '@/repositories/settings-repository';
+import type { ChildProfile } from '@/domain/models';
 import { getActiveChildProfile } from '@/repositories/child-profiles-repository';
+import { getActivePlaySession, type ActivePlaySession } from '@/repositories/play-sessions-repository';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
+/**
+ * Child Home.
+ *
+ * Three things a child can do, in the order they are most likely to want them.
+ * The only way to Parent Mode is the PIN, and it sits at the bottom as a small,
+ * plain link rather than a button competing with the choices.
+ */
 export default function ChildHomeRoute() {
-  const [nickname, setNickname] = useState<string | null>(null); const [hasActive, setHasActive] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
-  useEffect(() => { initializeDatabase().then(async (db) => { const [profile, settings] = await Promise.all([getActiveChildProfile(db), getSettings(db)]); const active = await getActivePlaySession(db, profile.id); setNickname(profile.name ?? settings.childNickname); setHasActive(active !== null); }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Could not load Child Mode.')).finally(() => setLoading(false)); }, []);
-  if (loading) return <PageShell child scroll={false}><LoadingState label="Getting Pip ready…" /></PageShell>;
-  if (error) return <PageShell child><ErrorStateCard message={error} /></PageShell>;
-  return <PageShell child><View style={styles.hero}><Text style={styles.hello}>Hi{nickname ? `, ${nickname}` : ''}</Text><Text accessibilityRole="header" style={styles.title}>What feels fun today?</Text><View style={styles.garden}><View style={styles.hill} /><View style={styles.sun} /><View style={styles.leafOne} /><View style={styles.leafTwo} /></View></View><View style={styles.actions}><ChildChoice title="Find a toy" detail="Choose what sounds good" tone="plain" onPress={() => router.push('/child/categories')} /><ChildChoice title="Surprise me" detail="Let Pip choose" tone="yellow" onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything', surprise: '1' } })} /><ChildChoice disabled={!hasActive} title="My current toy" detail={hasActive ? 'See what you are playing with' : 'Nothing is playing right now'} tone="plain" onPress={() => router.push('/child/current-toy')} /></View><Pressable accessibilityRole="button" onPress={() => router.push('/child/parent-return')} style={styles.parent}><Text style={styles.parentText}>Grown-up area</Text></Pressable></PageShell>;
+  const [child, setChild] = useState<ChildProfile | null>(null);
+  const [session, setSession] = useState<ActivePlaySession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const database = await initializeDatabase();
+      const profile = await getActiveChildProfile(database);
+      setChild(profile);
+      setSession(await getActivePlaySession(database, profile.id));
+      setError(null);
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Pip could not get ready.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    void load();
+  }, [load]));
+
+  if (loading) {
+    return (
+      <ChildPage>
+        <SkeletonRows label="Getting Pip ready…" rows={3} />
+      </ChildPage>
+    );
+  }
+
+  const name = child?.name?.trim();
+
+  return (
+    <ChildPage
+      /*
+       * The way out to Parent Mode is pinned to the bottom of the screen rather
+       * than trailing the choices, as the approved design has it. It sits
+       * outside the scroll view, so it covers nothing and the choices keep
+       * their own scroll room at large text sizes.
+       */
+      footer={
+        <View style={styles.grownUpsRow}>
+          <Pressable
+            accessibilityHint="Asks for a grown-up’s PIN"
+            accessibilityLabel="Grown-ups"
+            accessibilityRole="button"
+            onPress={() => router.push('/child/parent-return')}
+            style={({ pressed }) => [styles.grownUps, pressed && styles.pressed]}
+          >
+            <PipIcon color={theme.colors.mutedText} name="lock" size={16} />
+            <Text style={styles.grownUpsText}>Grown-ups</Text>
+          </Pressable>
+        </View>
+      }
+      footerPlain
+    >
+      {error ? <Banner message={error} tone="alert" /> : null}
+
+      <View style={styles.greeting}>
+        {child ? <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={56} /> : null}
+        <View style={styles.greetingCopy}>
+          <Text style={styles.hello}>{name ? `Hi ${name}` : 'Hi'}</Text>
+          <Text accessibilityRole="header" style={styles.title}>What sounds fun?</Text>
+        </View>
+      </View>
+
+      <View style={styles.choices}>
+        <Choice
+          detail="Pick what sounds good"
+          icon="library"
+          onPress={() => router.push('/child/categories')}
+          title="Find a toy"
+          tone="primary"
+        />
+        <Choice
+          detail="Let Pip pick one"
+          icon="sparkle"
+          onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything', surprise: '1' } })}
+          title="Surprise me"
+          tone="sunshine"
+        />
+        <Choice
+          detail={session?.toy ? session.toy.name : 'Nothing is out yet'}
+          disabled={!session}
+          icon="check"
+          onPress={() => router.push('/child/current-toy')}
+          title="Playing now"
+          tone="plain"
+        />
+      </View>
+
+    </ChildPage>
+  );
 }
-function ChildChoice({ title, detail, tone, onPress, disabled }: { title: string; detail: string; tone: 'plain' | 'yellow'; onPress(): void; disabled?: boolean }) { return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}><Card tone={tone} style={disabled ? disabledStyles.card : undefined}><View style={styles.choiceRow}><View><Text style={[styles.choiceTitle, disabled && disabledStyles.text]}>{title}</Text><Text style={[styles.choiceDetail, disabled && disabledStyles.text]}>{detail}</Text></View><Text accessible={false} style={[styles.arrow, disabled && disabledStyles.text]}>›</Text></View></Card></Pressable>; }
-const disabledStyles = StyleSheet.create({ card: { backgroundColor: theme.colors.disabled, borderColor: theme.colors.disabledText, opacity: 0.72 }, text: { color: theme.colors.disabledText } });
-const styles = StyleSheet.create({ hero: { gap: 7 }, hello: { color: theme.colors.primaryText, fontSize: 17, fontWeight: '800' }, title: { color: theme.colors.primaryText, fontFamily: 'Georgia', fontSize: 38, fontWeight: '700', lineHeight: 45, maxWidth: 390 }, garden: { backgroundColor: theme.colors.surfaceMint, borderRadius: 24, height: 132, marginTop: 10, overflow: 'hidden', position: 'relative' }, hill: { backgroundColor: theme.colors.surfaceSage, borderRadius: 150, bottom: -68, height: 165, left: -30, position: 'absolute', width: '125%' }, sun: { backgroundColor: theme.colors.surfaceYellow, borderRadius: 30, height: 54, position: 'absolute', right: 32, top: 25, width: 54 }, leafOne: { backgroundColor: theme.colors.sageAction, borderRadius: 28, height: 70, left: 56, position: 'absolute', top: 43, transform: [{ rotate: '-30deg' }], width: 25 }, leafTwo: { backgroundColor: theme.colors.coralAction, borderRadius: 26, height: 55, left: 91, position: 'absolute', top: 64, transform: [{ rotate: '34deg' }], width: 22 }, actions: { gap: 10 }, choiceRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, choiceTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', fontSize: 24, fontWeight: '700' }, choiceDetail: { color: theme.colors.secondaryText, fontSize: 16, marginTop: 4 }, arrow: { color: theme.colors.primaryText, fontSize: 34 }, parent: { alignItems: 'center', minHeight: 48, justifyContent: 'center' }, parentText: { color: theme.colors.secondaryText, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' }, pressed: { opacity: 0.78 }, disabled: { backgroundColor: theme.colors.disabled, borderRadius: theme.radii.card } });
+
+function Choice({
+  title, detail, icon, tone, onPress, disabled = false,
+}: {
+  title: string;
+  detail: string;
+  icon: PipIconName;
+  tone: 'primary' | 'sunshine' | 'plain';
+  onPress(): void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityHint={disabled ? undefined : detail}
+      accessibilityLabel={`${title}. ${detail}`}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.choice,
+        tone === 'primary' && styles.choicePrimary,
+        tone === 'sunshine' && styles.choiceSunshine,
+        disabled && styles.choiceDisabled,
+        pressed && !disabled && styles.pressed,
+      ]}
+    >
+      <View style={[styles.choiceIcon, disabled && styles.choiceIconDisabled]}>
+        <PipIcon color={disabled ? theme.colors.disabledText : theme.colors.brandInk} name={icon} size={24} />
+      </View>
+      <View style={styles.choiceCopy}>
+        <Text style={[styles.choiceTitle, disabled && styles.disabledText]}>{title}</Text>
+        <Text numberOfLines={2} style={[styles.choiceDetail, disabled && styles.disabledText]}>{detail}</Text>
+      </View>
+      {disabled ? null : <PipIcon color={theme.colors.brandInk} name="chevron-right" size={20} />}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  pressed: { opacity: 0.78 },
+  disabledText: { color: theme.colors.disabledText },
+  greeting: { alignItems: 'center', flexDirection: 'row', gap: theme.spacing[12], paddingVertical: theme.spacing[8] },
+  greetingCopy: { flex: 1, gap: 2 },
+  hello: { color: theme.colors.secondaryText, ...theme.typography.rowTitle },
+  title: { color: theme.colors.primaryText, ...theme.typography.childTitle, fontSize: 30, lineHeight: 34 },
+  choices: { gap: theme.spacing[12] },
+  choice: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.cardSurface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.sheet,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing[16],
+    minHeight: 92,
+    padding: theme.spacing[16],
+  },
+  choicePrimary: { backgroundColor: theme.colors.selectedSurface, borderColor: theme.colors.infoBorder },
+  choiceSunshine: { backgroundColor: theme.colors.surfaceSunshine, borderColor: theme.colors.borderSunshine },
+  choiceDisabled: { backgroundColor: theme.colors.mutedSurface, borderColor: theme.colors.mutedBorder },
+  choiceIcon: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radii.card,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  choiceIconDisabled: { backgroundColor: theme.colors.neutralSurface },
+  choiceCopy: { flex: 1, gap: 2 },
+  choiceTitle: { color: theme.colors.primaryText, ...theme.typography.sectionTitle, fontSize: 22 },
+  choiceDetail: { color: theme.colors.secondaryText, ...theme.typography.body },
+  grownUpsRow: { alignItems: 'flex-end' },
+  grownUps: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: theme.measurements.minimumTouchTarget,
+    paddingHorizontal: theme.spacing[8],
+  },
+  grownUpsText: { color: theme.colors.mutedText, ...theme.typography.label, fontSize: 14 },
+});

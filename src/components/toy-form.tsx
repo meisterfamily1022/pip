@@ -19,13 +19,26 @@ import { listToySetupDrafts } from '@/features/toys/toy-setup-draft-repository';
 import type { ParentToy } from '@/repositories/toys-repository';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
+import { PipIcon } from './pip-icon';
 import { ToyBatchReview } from './toy-batch-review';
-import { FormCard, PrimaryButton, QuietButton, RoundedTextInput, ToggleRow } from './playmap-ui';
-import { ToyButton, ToyImagePreview } from './toy-ui';
+import {
+  Banner,
+  FilterChip,
+  ListCard,
+  ListRow,
+  PrimaryButton,
+  RoundedSelect,
+  RoundedTextInput,
+  SecondaryButton,
+  SegmentedControl,
+  Sheet,
+  ToggleRow,
+  ToyImage,
+} from './playmap-ui';
 
 const CATEGORY_LABELS: Record<PlayCategory, string> = {
-  quiet: 'Quiet', active: 'Active', creative: 'Creative', building: 'Building', pretend: 'Pretend',
-  sensory: 'Sensory', independent: 'Independent', together: 'Play Together', indoor: 'Indoor', outdoor: 'Outdoor',
+  quiet: 'Quiet', active: 'Active', creative: 'Make', building: 'Build', pretend: 'Pretend',
+  sensory: 'Touch & feel', independent: 'Alone', together: 'Together', indoor: 'Indoor', outdoor: 'Outdoor',
 };
 
 type ToyFormProps = {
@@ -58,6 +71,7 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, 
   const [manualFeedback, setManualFeedback] = useState<IntakeFeedback>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<ToySetupDraft[]>([]);
+  const [picker, setPicker] = useState<'room' | 'spot' | null>(null);
   const replacingDraft = useRef<ToySetupDraft | null>(null);
   const draftWriteChains = useRef(new Map<string, Promise<void>>());
   const batchSaving = useRef(false);
@@ -245,63 +259,180 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, 
     await onSubmit({ name, sourceImageUri, existingImageUri, roomId, storageSpotId: effectiveStorageSpotId, categories, cleanupDifficulty, adultHelpRequired, isAvailable });
   };
 
-  return <View style={styles.content}>
-    {error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
-    {feedback && <Text accessibilityLiveRegion="polite" style={feedback.tone === 'error' ? styles.error : feedback.tone === 'success' ? styles.success : styles.notice}>{feedback.message}</Text>}
-    {validationError && <Text accessibilityLiveRegion="polite" style={styles.error}>{validationError}</Text>}
+  const roomOptions = locations.map((room) => ({ id: room.id, label: room.name }));
 
-    {!toy && onBulkSubmit && drafts.length > 0 && <ToyBatchReview drafts={drafts} locations={locations} saving={saving || intakeBusy} onAddMore={() => { void chooseFromLibrary(true); }} onCaptureMore={() => { void captureForIntakeQueue(); }} onRemove={removeDraft} onReplace={(draft) => { replacingDraft.current = draft; void chooseFromLibrary(false, draft); }} onSaveAll={() => { void saveBatch(); }} onUpdate={updateDraft} />}
+  return (
+    <View style={styles.content}>
+      {error ? <Banner message={error} tone="alert" /> : null}
+      {feedback ? <Banner message={feedback.message} tone={feedback.tone === 'error' ? 'alert' : feedback.tone === 'success' ? 'success' : 'info'} /> : null}
+      {validationError ? <Banner message={validationError} tone="alert" /> : null}
 
-    {!toy && onBulkSubmit && startInBulkMode && drafts.length === 0 && <FormCard tone="sage">
-      <Text accessibilityRole="header" style={styles.sectionTitle}>Add multiple toys from photos</Text>
-      <Text style={styles.caption}>Choose several photos, then create one separate toy record for each image. You will confirm every name, room, storage spot, category, and Child Mode setting before saving.</Text>
-      <PrimaryButton disabled={saving || intakeBusy} label={intakeBusy ? 'Opening Photos…' : 'Choose Multiple Photos'} onPress={() => { void chooseFromLibrary(true); }} />
-      <QuietButton disabled={saving || intakeBusy} label={intakeBusy ? 'Opening Camera…' : 'Take a Photo'} onPress={() => { void captureForIntakeQueue(); }} />
-    </FormCard>}
+      {!toy && onBulkSubmit && drafts.length > 0 ? (
+        <ToyBatchReview
+          drafts={drafts}
+          locations={locations}
+          onAddMore={() => { void chooseFromLibrary(true); }}
+          onCaptureMore={() => { void captureForIntakeQueue(); }}
+          onRemove={removeDraft}
+          onReplace={(draft) => { replacingDraft.current = draft; void chooseFromLibrary(false, draft); }}
+          onSaveAll={() => { void saveBatch(); }}
+          onUpdate={updateDraft}
+          saving={saving || intakeBusy}
+        />
+      ) : (
+        <>
+          {manualFeedback ? (
+            <Banner message={manualFeedback.message} tone={manualFeedback.tone === 'error' ? 'alert' : manualFeedback.tone === 'success' ? 'success' : 'info'} />
+          ) : null}
 
-    {manualFeedback && <Text accessibilityLiveRegion="polite" style={manualFeedback.tone === 'error' ? styles.error : manualFeedback.tone === 'success' ? styles.success : styles.notice}>{manualFeedback.message}</Text>}
-    <FormCard>
-      <Text accessibilityRole="header" style={styles.sectionTitle}>{toy ? 'Toy photo' : startInBulkMode ? 'Or add one toy manually' : 'Add one toy manually'}</Text>
-      <Text style={styles.caption}>A photo is optional. You can add or replace it later.</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Choose a toy photo" disabled={saving || intakeBusy} onPress={() => { void chooseFromLibrary(); }} style={styles.uploadZone}>
-        {selectedImageUri ? <ToyImagePreview uri={selectedImageUri} /> : <View accessibilityLabel="No photo yet" style={styles.uploadHint}><Text style={styles.cameraIcon}>⌾</Text><Text style={styles.uploadTitle}>No photo yet</Text><Text style={styles.uploadCaption}>Add a photo now, or save the toy without one.</Text></View>}
-      </Pressable>
-      <View style={styles.actions}>
-        <ToyButton disabled={saving || intakeBusy} label={intakeBusy ? 'Opening Camera or Photos…' : 'Use Camera'} onPress={() => { void openSystemCamera(); }} />
-        <ToyButton disabled={saving || intakeBusy} label={intakeBusy ? 'Opening Camera or Photos…' : 'Choose Photo'} onPress={() => { void chooseFromLibrary(); }} />
-        {!toy && onBulkSubmit && !startInBulkMode && <ToyButton disabled={saving || intakeBusy} label="Choose Multiple" onPress={() => { void chooseFromLibrary(true); }} />}
-        {selectedImageUri && <ToyButton disabled={saving || intakeBusy} label="Remove Photo" onPress={() => { setSourceImageUri(null); setExistingImageUri(null); setManualFeedback({ tone: 'neutral', message: 'Photo removed. You can still save this toy.' }); }} />}
-      </View>
-    </FormCard>
+          <View style={styles.section}>
+            <Text style={styles.fieldLabel}>Photo</Text>
+            <Pressable
+              accessibilityHint="Opens your photo library"
+              accessibilityLabel={selectedImageUri ? 'Change the toy photo' : 'Add a toy photo'}
+              accessibilityRole="button"
+              disabled={saving || intakeBusy}
+              onPress={() => { void chooseFromLibrary(); }}
+              style={({ pressed }) => [styles.uploadZone, pressed && styles.pressed]}
+            >
+              {selectedImageUri ? (
+                <ToyImage accessibilityLabel="Selected toy photo" style={styles.uploadImage} uri={selectedImageUri} />
+              ) : (
+                <View accessibilityElementsHidden style={styles.uploadHint}>
+                  <PipIcon color={theme.colors.brandInk} name="camera" size={26} />
+                  <Text style={styles.uploadTitle}>No photo yet</Text>
+                  <Text style={styles.uploadCaption}>A photo is optional. You can add one later.</Text>
+                </View>
+              )}
+            </Pressable>
+            <View style={styles.actions}>
+              <SecondaryButton disabled={saving || intakeBusy} icon="camera" label="Camera" onPress={() => { void openSystemCamera(); }} style={styles.action} />
+              <SecondaryButton disabled={saving || intakeBusy} icon="photos" label="Photos" onPress={() => { void chooseFromLibrary(); }} style={styles.action} />
+              {selectedImageUri ? (
+                <SecondaryButton
+                  disabled={saving || intakeBusy}
+                  label="Remove"
+                  onPress={() => {
+                    setSourceImageUri(null);
+                    setExistingImageUri(null);
+                    setManualFeedback({ tone: 'neutral', message: 'Photo removed. You can still save this toy.' });
+                  }}
+                  style={styles.action}
+                />
+              ) : null}
+            </View>
+          </View>
 
-    <FormCard><RoundedTextInput accessibilityLabel="Toy name" label="Toy name" onChangeText={(value) => { setName(value); setValidationError(null); }} placeholder="Magnetic Tiles" value={name} /></FormCard>
-    <FormCard><Text style={styles.label}>Room</Text><View style={styles.optionRow}>{locations.map((room) => <Option key={room.id} label={room.name} selected={room.id === roomId} onPress={() => { setRoomId(room.id); setStorageSpotId(room.storageSpots[0]?.id ?? null); }} />)}</View></FormCard>
-    <FormCard><Text style={styles.label}>Storage spot</Text><View style={styles.optionRow}>{availableSpots.map((spot) => <Option key={spot.id} label={spot.name} selected={spot.id === effectiveStorageSpotId} onPress={() => setStorageSpotId(spot.id)} />)}</View></FormCard>
-    <FormCard><Text style={styles.label}>Categories</Text><View style={styles.optionRow}>{PLAY_CATEGORIES.map((category) => <Pressable key={category} accessibilityRole="checkbox" accessibilityState={{ checked: categories.includes(category) }} onPress={() => { toggleCategory(category); setValidationError(null); }} style={[styles.option, categories.includes(category) && styles.optionSelected]}><Text style={styles.optionText}>{categories.includes(category) ? '✓ ' : ''}{CATEGORY_LABELS[category]}</Text></Pressable>)}</View></FormCard>
-    <FormCard><Text style={styles.label}>Cleanup required</Text><View style={styles.optionRow}>{(['easy', 'medium', 'big'] as const).map((difficulty) => <Option key={difficulty} label={difficulty === 'easy' ? 'Quick cleanup' : difficulty === 'medium' ? 'Some cleanup' : 'Big cleanup'} selected={cleanupDifficulty === difficulty} onPress={() => setCleanupDifficulty(difficulty)} />)}</View></FormCard>
-    <ToggleRow description="Mark toys that need a grown-up nearby." label="Adult help required" value={adultHelpRequired} onValueChange={setAdultHelpRequired} />
-    <ToggleRow description="Show this toy as a choice in Child Mode." label="Available to child" value={isAvailable} onValueChange={setIsAvailable} />
-    <PrimaryButton disabled={saving} label={saving ? 'Saving…' : submitLabel} onPress={() => { void submit(); }} />
-  </View>;
-}
+          <RoundedTextInput
+            accessibilityLabel="Toy name"
+            label="Toy name"
+            onChangeText={(value) => { setName(value); setValidationError(null); }}
+            placeholder="Magnetic tiles"
+            returnKeyType="done"
+            value={name}
+          />
 
-function Option({ label, selected, onPress }: { label: string; selected: boolean; onPress(): void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.option, selected && styles.optionSelected]}><Text style={styles.optionText}>{selected ? '✓ ' : ''}{label}</Text></Pressable>;
+          <RoundedSelect
+            label="Room"
+            onPress={() => setPicker('room')}
+            value={locations.find((room) => room.id === roomId)?.name}
+          />
+          <RoundedSelect
+            label="Storage spot"
+            onPress={() => setPicker('spot')}
+            value={availableSpots.find((spot) => spot.id === effectiveStorageSpotId)?.name}
+          />
+
+          <View style={styles.section}>
+            <Text style={styles.fieldLabel}>Kind of play</Text>
+            <View style={styles.chips}>
+              {PLAY_CATEGORIES.map((category) => (
+                <FilterChip
+                  key={category}
+                  label={CATEGORY_LABELS[category]}
+                  onPress={() => { toggleCategory(category); setValidationError(null); }}
+                  selected={categories.includes(category)}
+                />
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.fieldLabel}>Tidy-up size</Text>
+            <SegmentedControl<ToyFormInput['cleanupDifficulty']>
+              accessibilityLabel="Tidy-up size"
+              getOptionLabel={(value) => (value === 'easy' ? 'Quick' : value === 'medium' ? 'Some' : 'Big')}
+              onChange={setCleanupDifficulty}
+              options={['easy', 'medium', 'big']}
+              value={cleanupDifficulty}
+            />
+          </View>
+
+          <ToggleRow
+            description="Mark toys that need a grown-up nearby."
+            label="Grown-up help needed"
+            onValueChange={setAdultHelpRequired}
+            value={adultHelpRequired}
+          />
+          <ToggleRow
+            description="Offer this toy as a choice in Child Mode."
+            label="Shown in Child Mode"
+            onValueChange={setIsAvailable}
+            value={isAvailable}
+          />
+
+          <PrimaryButton busy={saving} label={saving ? 'Saving…' : submitLabel} onPress={() => { void submit(); }} />
+
+          <Sheet onDismiss={() => setPicker(null)} title={picker === 'room' ? 'Which room?' : 'Which spot?'} visible={picker !== null}>
+            <ListCard>
+              {(picker === 'room' ? roomOptions : availableSpots.map((spot) => ({ id: spot.id, label: spot.name }))).map((option) => (
+                <ListRow
+                  accessory={
+                    (picker === 'room' ? option.id === roomId : option.id === effectiveStorageSpotId) ? 'check' : 'none'
+                  }
+                  key={option.id}
+                  onPress={() => {
+                    if (picker === 'room') {
+                      setRoomId(option.id);
+                      setStorageSpotId(locations.find((room) => room.id === option.id)?.storageSpots[0]?.id ?? null);
+                    } else {
+                      setStorageSpotId(option.id);
+                    }
+                    setPicker(null);
+                  }}
+                  title={option.label}
+                />
+              ))}
+            </ListCard>
+            <SecondaryButton label="Cancel" onPress={() => setPicker(null)} />
+          </Sheet>
+        </>
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  content: { gap: 20 },
-  error: { backgroundColor: theme.colors.errorSoft, borderRadius: theme.radii.md, color: theme.colors.danger, fontSize: 15, padding: 12 },
-  success: { backgroundColor: theme.colors.successSoft, borderRadius: theme.radii.md, color: theme.colors.success, fontSize: 15, padding: 12 },
-  notice: { backgroundColor: theme.colors.surfaceSage, borderRadius: theme.radii.md, color: theme.colors.primaryText, fontSize: 15, padding: 12 },
-  caption: { color: theme.colors.secondaryText, fontSize: 14, lineHeight: 20 },
-  label: { color: theme.colors.text, fontSize: 17, fontWeight: '700' },
-  sectionTitle: { color: theme.colors.primaryText, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
-  option: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.pill, borderWidth: 1, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14, paddingVertical: 8 },
-  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionSelected: { backgroundColor: theme.colors.mintSoft, borderColor: theme.colors.primary, borderWidth: 2 },
-  optionText: { color: theme.colors.text, fontSize: 15 },
-  uploadZone: { alignItems: 'center', backgroundColor: theme.colors.surfaceWarm, borderColor: theme.colors.peach, borderRadius: theme.radii.lg, borderStyle: 'dashed', borderWidth: 2, minHeight: 210, overflow: 'hidden', justifyContent: 'center' },
-  uploadHint: { alignItems: 'center', gap: 5, padding: 24 }, cameraIcon: { color: theme.colors.coral, fontSize: 38 }, uploadTitle: { color: theme.colors.text, fontSize: 18, fontWeight: '700' }, uploadCaption: { color: theme.colors.mutedText, fontSize: 13, textAlign: 'center' },
+  content: { gap: theme.spacing[16] },
+  pressed: { opacity: 0.72 },
+  section: { gap: 6 },
+  fieldLabel: { color: theme.colors.primaryText, ...theme.typography.fieldLabel },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[8] },
+  actions: { flexDirection: 'row', gap: theme.spacing[8] },
+  action: { flex: 1, minHeight: theme.measurements.minimumTouchTarget, paddingHorizontal: theme.spacing[8] },
+  uploadZone: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.cardSurface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    minHeight: 180,
+    overflow: 'hidden',
+  },
+  uploadImage: { aspectRatio: 4 / 3, width: '100%' },
+  uploadHint: { alignItems: 'center', gap: 5, padding: theme.spacing[24] },
+  uploadTitle: { color: theme.colors.primaryText, ...theme.typography.label },
+  uploadCaption: { color: theme.colors.secondaryText, textAlign: 'center', ...theme.typography.meta },
 });

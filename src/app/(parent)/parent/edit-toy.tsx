@@ -3,12 +3,11 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ToyForm } from '@/components/toy-form';
 import { ToyLoading } from '@/components/toy-ui';
 import { ParentModeHeader } from '@/components/parent-ui';
-import { ErrorStateCard, PageShell, PrimaryButton } from '@/components/playmap-ui';
+import { BackNavigation, ErrorStateCard, PageShell, PrimaryButton } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import { loadLocationTree, type LocationTreeItem } from '@/features/locations/location-service';
 import { updateParentToy, type ToyFormInput } from '@/features/toys/toy-service';
 import { getParentToy, type ParentToy } from '@/repositories/toys-repository';
-import { parentBackTargets } from '@/features/navigation/parent-navigation';
 
 export default function EditToyRoute() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -37,12 +36,12 @@ export default function EditToyRoute() {
     if (submitting.current) return;
     submitting.current = true;
     setSaving(true); setError(null);
-    try { const database = await initializeDatabase(); await updateParentToy(database, toyId, input); router.replace('/parent/toy-library'); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not save toy.'); } finally { submitting.current = false; setSaving(false); }
+    try { const database = await initializeDatabase(); await updateParentToy(database, toyId, input); router.replace(`/parent/toy-detail?id=${toyId}`); } catch (caught: unknown) { setError(caught instanceof Error ? caught.message : 'Could not save toy.'); } finally { submitting.current = false; setSaving(false); }
   };
-  const errorScreen = (message: string, retry = false) => <PageShell><ParentModeHeader backLabel="Toy Library" backTo={parentBackTargets.editToy} subtitle="Update a toy’s details and Child Mode availability." title="Edit Toy" /><ErrorStateCard action={<PrimaryButton label={retry ? 'Retry' : 'Return to Toy Library'} onPress={() => { if (retry) void load(); else router.replace('/parent/toy-library'); }} />} message={message} /></PageShell>;
+  const errorScreen = (message: string, retry = false) => <PageShell><BackNavigation label="Back" onPress={() => router.replace('/parent/toy-library')} /><ParentModeHeader subtitle="Change the details. Play history is kept." title="Edit toy" /><ErrorStateCard action={<PrimaryButton label={retry ? 'Try again' : 'Back to the library'} onPress={() => { if (retry) void load(); else router.replace('/parent/toy-library'); }} />} message={message} /></PageShell>;
   if (!Number.isInteger(toyId) || toyId < 1) return errorScreen('This toy link is invalid.');
   if (loading) return <ToyLoading />;
   if (error && !toy) return errorScreen(error, error !== 'Toy not found.');
   if (!toy) return errorScreen('Toy not found.');
-  return <PageShell><ParentModeHeader backLabel="Toy Library" backTo={parentBackTargets.editToy} subtitle={`Update ${toy.name} without changing its play history.`} title="Edit Toy" /><ToyForm error={error} locations={locations} onSubmit={submit} saving={saving} submitLabel="Save Changes" toy={toy} /></PageShell>;
+  return <PageShell><BackNavigation label={toy.name} onPress={() => router.replace(`/parent/toy-detail?id=${toyId}`)} /><ParentModeHeader subtitle={`Change ${toy.name} without changing its play history.`} title="Edit toy" /><ToyForm error={error} locations={locations} onSubmit={submit} saving={saving} submitLabel="Save changes" toy={toy} /></PageShell>;
 }

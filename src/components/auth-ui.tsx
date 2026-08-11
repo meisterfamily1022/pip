@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   checkboxChecked: { backgroundColor: theme.colors.brandPrimary, borderColor: theme.colors.brandInk },
   checkboxError: { borderColor: theme.colors.error },
-  checkmark: { color: theme.colors.white, fontSize: 16, fontWeight: "700" },
+  checkmark: { color: theme.colors.white, ...theme.typography.label },
   consentLabel: { flex: 1 },
   consentRow: {
     alignItems: "flex-start",

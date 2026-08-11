@@ -1,107 +1,102 @@
-import { useEffect, useState } from "react";
-import { router } from "expo-router";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { Field } from "@/components/onboarding-controls";
-import {
-  ChildButton,
-  ChildModeHeader,
-  LocationPanel,
-  ToyImage,
-} from "@/components/child-ui";
-import { PageHeader, PageShell } from "@/components/playmap-ui";
-import { initializeDatabase } from "@/database/client";
-import { verifyParentPin } from "@/features/child/parent-access";
+import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { ChildButton, ChildModeHeader, ChildPage, LocationPanel, ToyImage } from '@/components/child-ui';
+import { PipIcon } from '@/components/pip-icon';
+import { Banner, PinInput, PrimaryButton, SecondaryButton, SkeletonRows } from '@/components/playmap-ui';
+import { initializeDatabase } from '@/database/client';
+import { verifyParentPin } from '@/features/child/parent-access';
 import {
   beginCleanup,
   completeCleanup,
   completeCleanupWithParentOverride,
   loadCleanupState,
   requestCleanupHelp,
-} from "@/features/child/cleanup-service";
-import { pinStorage } from "@/services/pin-storage";
-import type { ActivePlaySession } from "@/repositories/play-sessions-repository";
-import { playmapTheme as theme } from "@/theme/playmap-theme";
-import { getActiveChildProfile } from "@/repositories/child-profiles-repository";
+} from '@/features/child/cleanup-service';
+import { getActiveChildProfile } from '@/repositories/child-profiles-repository';
+import type { ActivePlaySession } from '@/repositories/play-sessions-repository';
+import { pinStorage } from '@/services/pin-storage';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
-type HelpMode = "child" | "pin" | "parent";
+/**
+ * Putting the toy away.
+ *
+ * Three steps, advanced only by the child. Nothing counts down, nothing
+ * expires, and nothing auto-advances — the reassurance that there is no hurry
+ * is on the screen, in words, because that is the part children are told least
+ * often. Asking for a grown-up is always available and is never framed as
+ * giving up.
+ */
+const steps = [
+  { key: 'pieces', label: 'Pieces', title: 'Find all the pieces', body: 'Have a look around. Under things counts too.' },
+  { key: 'back', label: 'Put it back', title: 'Put it back where it lives', body: null },
+  { key: 'done', label: 'All done', title: 'Is everything away?', body: 'Have a last look, then tell Pip you are done.' },
+] as const;
+
+type HelpMode = 'child' | 'asking' | 'parent';
 
 export default function CleanupRoute() {
   const [session, setSession] = useState<ActivePlaySession | null>(null);
-  const [cleanupRequired, setCleanupRequired] = useState(true);
-  const [step, setStep] = useState(1);
-  const [helpMode, setHelpMode] = useState<HelpMode>("child");
-  const [pin, setPin] = useState("");
+  const [childId, setChildId] = useState<number | null>(null);
+  const [step, setStep] = useState(0);
+  const [helpMode, setHelpMode] = useState<HelpMode>('child');
+  const [pin, setPin] = useState('');
+  const [finished, setFinished] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [childId, setChildId] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    initializeDatabase()
-      .then(async (database) => {
+    void (async () => {
+      try {
+        const database = await initializeDatabase();
         const child = await getActiveChildProfile(database);
-        setChildId(child.id);
         const state = await loadCleanupState(database, child.id);
-        if (!state.activeSession) return state;
-        const active = state.cleanupRequired
+        // Marking cleanup as started is what lets a parent see, on Home, that
+        // tidying is under way rather than untouched.
+        const active = state.activeSession && state.cleanupRequired
           ? await beginCleanup(database, child.id)
           : state.activeSession;
-        return { ...state, activeSession: active };
-      })
-      .then((state) => {
         if (!mounted) return;
-        setSession(state.activeSession);
-        setCleanupRequired(state.cleanupRequired);
-        if (state.activeSession?.helpRequested) setHelpMode("child");
-      })
-      .catch((caught: unknown) =>
-        setError(
-          caught instanceof Error ? caught.message : "Could not load cleanup.",
-        ),
-      )
-      .finally(() => {
+        setChildId(child.id);
+        setSession(active);
+      } catch (caught: unknown) {
+        if (mounted) setError(caught instanceof Error ? caught.message : 'Pip could not open tidy-up.');
+      } finally {
         if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  const finish = async (parentOverride = false): Promise<void> => {
-    if (saving) return;
+  const finish = useCallback(async (parentOverride = false): Promise<void> => {
+    if (saving || childId === null) return;
     setSaving(true);
     setError(null);
     try {
       const database = await initializeDatabase();
-      if (!childId) throw new Error("Child profile could not be recovered.");
-      if (parentOverride)
-        await completeCleanupWithParentOverride(database, childId);
+      if (parentOverride) await completeCleanupWithParentOverride(database, childId);
       else await completeCleanup(database, childId);
-      router.replace("/child/home");
+      setFinished(true);
     } catch (caught: unknown) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not finish cleanup.",
-      );
-      setSaving(false);
-    }
-  };
-
-  const needHelp = async (): Promise<void> => {
-    if (saving) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const database = await initializeDatabase();
-      if (!childId) throw new Error("Child profile could not be recovered.");
-      setSession(await requestCleanupHelp(database, childId));
-      setHelpMode("child");
-    } catch (caught: unknown) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not request help.",
-      );
+      setError(caught instanceof Error ? caught.message : 'Pip could not finish tidy-up.');
     } finally {
       setSaving(false);
+    }
+  }, [childId, saving]);
+
+  const askForHelp = async (): Promise<void> => {
+    if (childId === null) return;
+    setHelpMode('asking');
+    try {
+      const database = await initializeDatabase();
+      // Recorded so a parent can see help was asked for, even if they were not
+      // in the room at the time.
+      setSession(await requestCleanupHelp(database, childId));
+    } catch {
+      // Failing to record the request must not block asking for one.
     }
   };
 
@@ -111,316 +106,225 @@ export default function CleanupRoute() {
     setError(null);
     try {
       if (!(await verifyParentPin(pinStorage, pin))) {
-        setError("That PIN is not correct.");
+        setError('That PIN doesn’t match.');
+        setPin('');
         return;
       }
-      setHelpMode("parent");
+      setHelpMode('parent');
     } catch (caught: unknown) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not verify the PIN.",
-      );
+      setError(caught instanceof Error ? caught.message : 'Pip could not check that PIN.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <PageShell child scroll={false}>
-        <ChildModeHeader onBack={() => router.replace("/child/home")} />
-        <ActivityIndicator color={theme.colors.sageAction} />
-        <Text style={styles.helper}>Loading cleanup…</Text>
-      </PageShell>
-    );
-  if (error && !session)
-    return (
-      <PageShell child>
-        <ChildModeHeader onBack={() => router.replace("/child/home")} />
-        <PageHeader
-          eyebrow="CLEANUP TIME"
-          title="Cleanup"
-          subtitle="Let’s get ready for the next play."
-        />
-        <Text style={styles.error}>{error}</Text>
-      </PageShell>
-    );
-  if (!session)
-    return (
-      <PageShell child>
-        <ChildModeHeader onBack={() => router.replace("/child/home")} />
-        <PageHeader
-          eyebrow="CLEANUP TIME"
-          title="Cleanup"
-          subtitle="Let’s get ready for the next play."
-        />
-        <Text style={styles.stepText}>There is no active toy to clean up.</Text>
-      </PageShell>
-    );
-  if (!session.toy)
-    return (
-      <PageShell child>
-        <ChildModeHeader onBack={() => router.replace("/child/home")} />
-        <PageHeader
-          eyebrow="CLEANUP TIME"
-          title="Cleanup"
-          subtitle="Let’s get ready for the next play."
-        />
-        <Text style={styles.stepText}>
-          This toy is missing from the toy library.
-        </Text>
-        <ChildButton
-          label="Mark It Put Away"
-          onPress={() => {
-            void finish(true);
-          }}
-        />
-      </PageShell>
-    );
-
-  if (!cleanupRequired) {
-    return (
-      <PageShell child>
-        <ChildModeHeader
-          backLabel="Current toy"
-          onBack={() => router.replace("/child/current-toy")}
-        />
-        <ToyImage uri={session.toy.imageUri} />
-        <Text accessibilityRole="header" style={styles.title}>
-          All done with {session.toy.name}?
-        </Text>
-        {error && <Text style={styles.error}>{error}</Text>}
-        <ChildButton
-          label={saving ? "Finishing…" : "Yes, All Done"}
-          disabled={saving}
-          onPress={() => {
-            void finish(false);
-          }}
-        />
-      </PageShell>
+      <ChildPage>
+        <ChildModeHeader backLabel="Back" onBack={() => router.replace('/child/home')} />
+        <SkeletonRows label="Opening tidy-up…" rows={2} />
+      </ChildPage>
     );
   }
 
-  if (session.helpRequested && helpMode === "child") {
+  if (!session?.toy && !finished) {
     return (
-      <PageShell child>
-        <ChildModeHeader
-          backLabel="Current toy"
-          onBack={() => router.replace("/child/current-toy")}
-        />
-        <Text accessibilityRole="header" style={styles.title}>
-          Ask a grown-up for help.
-        </Text>
-        <Text style={styles.helper}>
-          You can keep playing, or ask a grown-up to help put things away.
-        </Text>
-        {error && <Text style={styles.error}>{error}</Text>}
-        <ChildButton label="Grown-Up Help" onPress={() => setHelpMode("pin")} />
-      </PageShell>
+      <ChildPage>
+        <ChildModeHeader backLabel="Back" onBack={() => router.replace('/child/home')} />
+        {error ? <Banner message={error} tone="alert" /> : null}
+        <Text accessibilityRole="header" style={styles.title}>Nothing to tidy up</Text>
+        <Text style={styles.body}>No toy is out right now.</Text>
+        <ChildButton label="Find a toy" onPress={() => router.replace('/child/categories')} />
+      </ChildPage>
     );
   }
 
-  if (helpMode === "pin") {
+  const toy = session?.toy;
+
+  if (finished) {
     return (
-      <PageShell child>
-        <ChildModeHeader
-          backLabel="Cleanup"
-          onBack={() => setHelpMode("child")}
-        />
-        <Text style={styles.eyebrow}>GROWN-UP HELP</Text>
-        <Text accessibilityRole="header" style={styles.title}>
-          Enter the parent PIN
-        </Text>
-        <Text style={styles.helper}>A grown-up can help finish cleanup.</Text>
-        <Field
-          label="Parent PIN"
-          value={pin}
-          onChangeText={(value) => {
-            setPin(value.replace(/\D/g, ""));
-            setError(null);
-          }}
-          keyboardType="number-pad"
-          secureTextEntry
-          maxLength={4}
-          error={error}
-        />
-        <ChildButton
-          label={saving ? "Checking…" : "Continue"}
-          disabled={saving}
-          onPress={() => {
-            void verifyPin();
-          }}
-        />
-      </PageShell>
+      <ChildPage
+        footer={
+          <>
+            <ChildButton label="Find another toy" onPress={() => router.replace('/child/categories')} />
+            <ChildButton label="I’m finished for now" onPress={() => router.replace('/child/home')} secondary />
+          </>
+        }
+      >
+        <View style={styles.doneBlock}>
+          <View style={styles.doneMark}>
+            <PipIcon color={theme.colors.success} name="check" size={30} strokeWidth={2.6} />
+          </View>
+          <Text accessibilityRole="header" style={styles.doneTitle}>All tidy</Text>
+          <Text style={styles.doneBody}>
+            {toy ? `The ${toy.name.toLocaleLowerCase()} is back on the ${toy.storageSpotName}.` : 'Everything is back where it lives.'}
+          </Text>
+        </View>
+      </ChildPage>
     );
   }
 
-  if (helpMode === "parent") {
+  if (helpMode === 'asking') {
     return (
-      <PageShell child>
-        <ChildModeHeader
-          backLabel="Cleanup"
-          onBack={() => setHelpMode("child")}
-        />
-        <Text accessibilityRole="header" style={styles.title}>
-          Grown-Up Help
-        </Text>
-        {error && <Text style={styles.error}>{error}</Text>}
-        <ChildButton
-          label={saving ? "Finishing…" : "Mark It Put Away"}
-          disabled={saving}
-          onPress={() => {
-            void finish(true);
-          }}
-        />
-      </PageShell>
+      <ChildPage
+        footer={
+          <>
+            <PrimaryButton
+              busy={saving}
+              disabled={pin.length !== 4}
+              label="Continue"
+              onPress={() => {
+                void verifyPin();
+              }}
+            />
+            <SecondaryButton label="Never mind, I’ll keep going" onPress={() => { setHelpMode('child'); setPin(''); setError(null); }} />
+          </>
+        }
+      >
+        <ChildModeHeader backLabel="Back" onBack={() => { setHelpMode('child'); setPin(''); }} />
+        <View style={styles.copy}>
+          <Text accessibilityRole="header" style={styles.title}>Ask a grown-up</Text>
+          <Text style={styles.body}>A grown-up can finish tidy-up for you with their PIN.</Text>
+        </View>
+        {error ? <Banner message={error} tone="alert" /> : null}
+        <PinInput accessibilityLabel="Parent PIN" error={error ? '' : null} onChangeText={(value) => { setPin(value); setError(null); }} value={pin} />
+      </ChildPage>
     );
   }
+
+  if (helpMode === 'parent') {
+    return (
+      <ChildPage
+        footer={
+          <>
+            <PrimaryButton
+              busy={saving}
+              label="Mark it tidied up"
+              onPress={() => {
+                void finish(true);
+              }}
+            />
+            <SecondaryButton label="Back to tidy-up" onPress={() => setHelpMode('child')} />
+          </>
+        }
+      >
+        <View style={styles.copy}>
+          <Text accessibilityRole="header" style={styles.title}>Finish tidy-up for {session?.childName ?? 'this child'}?</Text>
+          <Text style={styles.body}>
+            {toy ? `${toy.name} goes back on the ${toy.storageSpotName} in the ${toy.roomName}.` : 'The toy will be marked as put away.'}
+            {' This is recorded as a grown-up finishing it.'}
+          </Text>
+        </View>
+        {error ? <Banner message={error} tone="alert" /> : null}
+      </ChildPage>
+    );
+  }
+
+  const current = steps[step];
+  const isLast = step === steps.length - 1;
 
   return (
-    <PageShell child>
+    <ChildPage
+      footer={
+        <>
+          <ChildButton
+            disabled={saving}
+            label={isLast ? 'Done — what’s next?' : 'Done — next step'}
+            onPress={() => {
+              if (isLast) void finish();
+              else setStep((value) => Math.min(value + 1, steps.length - 1));
+            }}
+          />
+          <ChildButton label="I need a grown-up" onPress={() => { void askForHelp(); }} secondary />
+        </>
+      }
+    >
       <ChildModeHeader
-        backLabel="Current toy"
-        onBack={() => router.replace("/child/current-toy")}
+        backLabel="Back"
+        onBack={() => (step === 0 ? router.replace('/child/current-toy') : setStep((value) => value - 1))}
       />
-      <Text style={styles.eyebrow}>CLEANUP TIME</Text>
-      <Text accessibilityRole="header" style={styles.title}>
-        Let’s put it away together.
-      </Text>
-      <Text style={styles.helper}>
-        Three gentle steps, then you’re all done.
-      </Text>
-      <View style={styles.progress}>
-        {[1, 2, 3].map((number) => (
-          <View key={number} style={styles.progressItem}>
-            <View
-              style={[
-                styles.progressDot,
-                number === step && styles.progressDotActive,
-              ]}
-            >
-              <Text style={[styles.progressNumber, number === step && styles.progressNumberActive]}>{number}</Text>
+
+      {error ? <Banner message={error} tone="alert" /> : null}
+
+      <View accessibilityLabel={`Step ${step + 1} of ${steps.length}: ${current.label}`} accessibilityRole="progressbar" style={styles.steps}>
+        {steps.map((candidate, index) => (
+          <View key={candidate.key} accessibilityElementsHidden style={styles.stepItem}>
+            <View style={[styles.stepMark, index <= step && styles.stepMarkActive]}>
+              {index < step
+                ? <PipIcon color={theme.colors.white} name="check" size={13} strokeWidth={3} />
+                : <Text style={[styles.stepNumber, index === step && styles.stepNumberActive]}>{index + 1}</Text>}
             </View>
-            <Text
-              style={[
-                styles.progressLabel,
-                number === step && styles.progressLabelActive,
-              ]}
-            >
-              {number === 1 ? "Pieces" : number === 2 ? "Location" : "Finished"}
-            </Text>
+            <Text numberOfLines={1} style={[styles.stepLabel, index === step && styles.stepLabelActive]}>{candidate.label}</Text>
           </View>
         ))}
       </View>
-      <View style={styles.stepBox}>
-        {step === 1 && (
-          <Text style={styles.stepText}>First, put all the pieces back.</Text>
-        )}
-        {step === 2 && (
-          <>
-            <Text style={styles.stepText}>
-              Next, put it back where it belongs.
-            </Text>
-            <LocationPanel
-              room={session.toy.roomName}
-              spot={session.toy.storageSpotName}
-            />
-          </>
-        )}
-        {step === 3 && (
-          <>
-            <Text style={styles.stepText}>
-              Is everything back where it belongs?
-            </Text>
-            <LocationPanel
-              room={session.toy.roomName}
-              spot={session.toy.storageSpotName}
-            />
-          </>
-        )}
+
+      <Text accessibilityRole="header" style={styles.stepTitle}>
+        {step === 1 && toy ? `Put the ${toy.name.toLocaleLowerCase()} back where it lives` : current.title}
+      </Text>
+      {current.body ? <Text style={styles.body}>{current.body}</Text> : null}
+
+      {toy ? (
+        <>
+          <View style={styles.photoFrame}>
+            <ToyImage uri={toy.imageUri} />
+          </View>
+          <LocationPanel room={toy.roomName} spot={toy.storageSpotName} />
+        </>
+      ) : null}
+
+      <View style={styles.reassurance}>
+        <Text style={styles.reassuranceText}>Take as long as you like. Nothing is counting.</Text>
       </View>
-      {error && <Text style={styles.error}>{error}</Text>}
-      {step < 3 ? (
-        <ChildButton
-          label="Next"
-          onPress={() => setStep((current) => current + 1)}
-        />
-      ) : (
-        <ChildButton
-          label={saving ? "Finishing…" : "Yes, All Done"}
-          disabled={saving}
-          onPress={() => {
-            void finish(false);
-          }}
-        />
-      )}
-      <ChildButton
-        label="I Need Help"
-        secondary
-        onPress={() => {
-          void needHelp();
-        }}
-      />
-    </PageShell>
+
+      {session?.helpRequested ? (
+        <Banner message="A grown-up has been asked to help. You can keep going while you wait." tone="info" />
+      ) : null}
+    </ChildPage>
   );
 }
 
 const styles = StyleSheet.create({
-  eyebrow: {
-    color: theme.colors.coralDark,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.4,
+  copy: { gap: 6, paddingTop: theme.spacing[16] },
+  title: { color: theme.colors.primaryText, ...theme.typography.childTitle, fontSize: 28, lineHeight: 33 },
+  body: { color: theme.colors.secondaryText, ...theme.typography.body },
+
+  steps: { flexDirection: 'row', gap: theme.spacing[8] },
+  stepItem: { alignItems: 'center', flex: 1, gap: 6 },
+  stepMark: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.neutralSurface,
+    borderRadius: theme.radii.pill,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
   },
-  helper: { color: theme.colors.secondaryText, fontSize: 17, lineHeight: 25 },
-  error: { color: theme.colors.error, fontSize: 17, textAlign: "center" },
-  stepBox: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radii.large,
+  stepMarkActive: { backgroundColor: theme.colors.brandInk },
+  stepNumber: { color: theme.colors.secondaryText, ...theme.typography.label, fontSize: 14 },
+  stepNumberActive: { color: theme.colors.white },
+  stepLabel: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  stepLabelActive: { color: theme.colors.brandInk, fontFamily: theme.fonts.bold },
+
+  stepTitle: { color: theme.colors.primaryText, ...theme.typography.childTitle, fontSize: 28, lineHeight: 33 },
+  photoFrame: { borderRadius: theme.radii.sheet, overflow: 'hidden' },
+  reassurance: {
+    backgroundColor: theme.colors.surfaceSunshine,
+    borderColor: theme.colors.borderSunshine,
+    borderRadius: theme.radii.card,
     borderWidth: 1,
-    gap: 12,
-    padding: 18,
+    padding: theme.spacing[16],
   },
-  stepText: {
-    color: theme.colors.primaryText,
-    fontFamily: "Georgia",
-    fontSize: 24,
-    fontWeight: "700",
-    lineHeight: 32,
-    textAlign: "center",
+  reassuranceText: { color: theme.colors.primaryText, ...theme.typography.body },
+
+  doneBlock: { alignItems: 'center', gap: theme.spacing[12], paddingTop: theme.spacing[40] },
+  doneMark: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.successMark,
+    borderRadius: theme.radii.pill,
+    height: 64,
+    justifyContent: 'center',
+    width: 64,
   },
-  title: {
-    color: theme.colors.primaryText,
-    fontFamily: "Georgia",
-    fontSize: 32,
-    fontWeight: "700",
-    lineHeight: 40,
-  },
-  progress: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  progressItem: { alignItems: "center", flex: 1, gap: 6 },
-  progressDot: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceYellow,
-    borderRadius: 28,
-    height: 52,
-    justifyContent: "center",
-    width: 52,
-  },
-  progressDotActive: { backgroundColor: theme.colors.sageAction },
-  progressNumber: {
-    color: theme.colors.primaryText,
-    fontSize: 22,
-    fontWeight: "800",
-  },
-  progressNumberActive: { color: theme.colors.white },
-  progressLabel: {
-    color: theme.colors.mutedText,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  progressLabelActive: { color: theme.colors.primaryText },
+  doneTitle: { color: theme.colors.primaryText, textAlign: 'center', ...theme.typography.childTitle },
+  doneBody: { color: theme.colors.secondaryText, textAlign: 'center', ...theme.typography.body },
 });

@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { initializeApp } from '@/startup/initialize-app';
 import { PipLaunchState } from '@/components/pip-brand-mark';
 import { LandingPage } from '@/features/landing/landing-page';
+import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 type StartupState = 'loading' | 'error';
 
@@ -46,4 +47,4 @@ function StartupScreen() {
   return <View style={styles.container}><Text style={styles.errorTitle}>Pip could not start.</Text><Text>{error?.message}</Text><Button title="Try again" onPress={start} /></View>;
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }, errorTitle: { fontSize: 20, fontWeight: '700' } });
+const styles = StyleSheet.create({ container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }, errorTitle: { color: theme.colors.primaryText, ...theme.typography.sectionTitle } });

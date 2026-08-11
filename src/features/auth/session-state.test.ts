@@ -103,9 +103,20 @@ describe("child avatar catalog", () => {
     for (const color of ACCENT_COLORS) expect(color.label.length).toBeGreaterThan(0);
   });
 
-  it("distinguishes avatars by shape and motif, not colour", () => {
-    const signatures = CHILD_AVATARS.map((avatar) => `${avatar.shape}/${avatar.motif}`);
-    expect(new Set(signatures).size).toBe(CHILD_AVATARS.length);
+  it("distinguishes avatars by drawn character, not colour", () => {
+    expect(new Set(CHILD_AVATARS.map((avatar) => avatar.character)).size).toBe(CHILD_AVATARS.length);
+  });
+
+  it("keeps the stored avatar ids that pre-redesign profiles were saved with", () => {
+    // These ids live in child_profiles.avatar_id. The redesign changed the
+    // artwork each one draws; changing an id would orphan an existing profile.
+    expect(CHILD_AVATARS.map((avatar) => avatar.id)).toEqual([
+      "circle-dot", "circle-ring", "rounded-bar", "rounded-pair",
+      "arch-dot", "arch-cross", "petal-ring", "petal-corner",
+    ]);
+    expect(ACCENT_COLORS.map((color) => color.id)).toEqual([
+      "mint", "sage", "yellow", "lavender", "blush", "sky",
+    ]);
   });
 
   it("falls back to a usable avatar and colour for unknown or missing ids", () => {

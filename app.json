@@ -8,8 +8,8 @@
     "icon": "./assets/brand/generated/pip-app-icon.png",
     "scheme": "playmapmobile",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#FFF9F0",
-    "primaryColor": "#72B8C5",
+    "backgroundColor": "#FFFFFF",
+    "primaryColor": "#8FD3EE",
     "ios": {
       "icon": "./assets/brand/generated/pip-app-icon.png",
       "bundleIdentifier": "com.meister23.playmapmobile",
@@ -21,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FFF9F0",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/brand/generated/pip-android-foreground.png"
       },
       "predictiveBackGestureEnabled": false
@@ -43,14 +43,24 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFF9F0",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/brand/generated/pip-splash.png",
-          "imageWidth": 220
+          "imageWidth": 200
         }
       ],
       "expo-sqlite",
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Montserrat-Regular.ttf",
+            "./assets/fonts/Montserrat-Bold.ttf",
+            "./assets/fonts/Quicksand-Medium.ttf"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,3 +1,4 @@
+import { useFonts } from 'expo-font';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect, useSyncExternalStore } from 'react';
@@ -8,12 +9,23 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { ErrorStateCard, PageShell, PrimaryButton } from '@/components/playmap-ui';
 import { PipLaunchState } from '@/components/pip-brand-mark';
 import { pipBrand } from '@/brand/pip-brand';
+import { pipFontAssets } from '@/theme/fonts';
 import { createSessionRestorer } from '@/features/auth/auth-client';
 import { getSessionSnapshot, restoreSession, subscribeSession } from '@/features/auth/session-state';
 import { getRouteAccessSnapshot, initializeRouteAccess, subscribeRouteAccess } from '@/startup/route-access';
 import { isPublicGroup, resolveRouteGuard, type RouteGroup } from '@/startup/route-guards';
 
+/**
+ * The document title, on web only.
+ *
+ * `expo-router/head` sets the page title in a browser, but on native the same
+ * component drives Handoff, which requires an `origin` in the Expo config and
+ * throws `Add the handoff origin to the Expo Config` when there isn't one. That
+ * threw during the root layout's first render, so the app died on launch before
+ * any screen appeared. A page title is a web concern; native never renders it.
+ */
 function PipWebHead() {
+  if (Platform.OS !== 'web') return null;
   return (
     <Head>
       <title>
@@ -34,6 +46,11 @@ function Frame({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   const segments = useSegments();
+  // Montserrat carries every label in the app, so the first frame waits for it
+  // rather than painting in the system face and reflowing a moment later. A
+  // font that fails to load is not fatal: `error` releases the gate and the
+  // platform face stands in.
+  const [fontsLoaded, fontError] = useFonts(pipFontAssets);
   const access = useSyncExternalStore(subscribeRouteAccess, getRouteAccessSnapshot, getRouteAccessSnapshot);
   const session = useSyncExternalStore(subscribeSession, getSessionSnapshot, getSessionSnapshot);
   const group = segments[0] as RouteGroup;
@@ -62,6 +79,16 @@ export default function RootLayout() {
     childModeLocked: access.childModeLocked,
     sessionStatus: session.status,
   });
+
+  if (!fontsLoaded && !fontError) {
+    return (
+      <Frame>
+        <PageShell scroll={false}>
+          <PipLaunchState />
+        </PageShell>
+      </Frame>
+    );
+  }
 
   if (decision.kind === 'launching') {
     return (

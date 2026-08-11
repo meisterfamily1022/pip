@@ -93,7 +93,7 @@ export default function AccountRoute() {
       {notice ? <NoticeBanner message={notice} tone="success" /> : null}
 
       {account ? (
-        <FormCard tone="sage">
+        <FormCard tone="surface">
           <Text style={styles.title}>Signed in</Text>
           <Text style={styles.body}>{account.email}</Text>
           {!account.emailVerified ? (
@@ -112,7 +112,7 @@ export default function AccountRoute() {
           <Text style={styles.hint}>Signing out keeps every toy, room, and photo on this device.</Text>
         </FormCard>
       ) : (
-        <FormCard tone="sage">
+        <FormCard tone="surface">
           <Text style={styles.title}>Not signed in</Text>
           <Text style={styles.body}>
             {`${pipBrand.name} works on this device without an account. Sign in to keep a backup or use ${pipBrand.name} elsewhere.`}

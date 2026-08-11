@@ -1,35 +1,53 @@
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { PropsWithChildren, ReactNode } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+
 import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { PageShell, StepEyebrow } from './playmap-ui';
 
-type OnboardingScreenProps = PropsWithChildren<{ step?: string; title: string; description?: string; footer?: ReactNode }>;
+/**
+ * The shape every setup step shares.
+ *
+ * The step rule and the back control sit on one line above the title, the
+ * primary action sits in a sticky footer that rides above the keyboard, and the
+ * body scrolls between them. That is what stops the last field of a form from
+ * hiding underneath the button that submits it.
+ *
+ * The first step deliberately has no back control: there is nothing behind it.
+ */
+type OnboardingScreenProps = PropsWithChildren<{
+  /** 1-based. Omit on screens outside the numbered run, like Welcome. */
+  step?: number;
+  totalSteps?: number;
+  title: string;
+  description?: string;
+  footer?: ReactNode;
+  onBack?(): void;
+}>;
 
-export function OnboardingScreen({ step, title, description, children, footer }: OnboardingScreenProps) {
+export function OnboardingScreen({
+  step,
+  totalSteps = 3,
+  title,
+  description,
+  children,
+  footer,
+  onBack,
+}: OnboardingScreenProps) {
   return (
-    <View style={styles.safeArea}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardAvoidingView}>
-        <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {step && <Text style={styles.step}>{step}</Text>}
-          {step && <View accessibilityLabel={`${step} progress`} style={styles.progress}><View style={[styles.progressFill, { width: step.startsWith('Step 1') ? '33%' : step.startsWith('Step 2') ? '66%' : '100%' }]} /></View>}
-          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-          {description && <Text style={styles.description}>{description}</Text>}
-          <View style={styles.body}>{children}</View>
-        </ScrollView>
-        {footer && <View style={styles.footer}><View style={styles.footerContent}>{footer}</View></View>}
-      </KeyboardAvoidingView>
-    </View>
+    <PageShell footer={footer}>
+      {step ? <StepEyebrow current={step} onBack={onBack} total={totalSteps} /> : null}
+      <View style={styles.copy}>
+        <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+        {description ? <Text style={styles.description}>{description}</Text> : null}
+      </View>
+      <View style={styles.body}>{children}</View>
+    </PageShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  keyboardAvoidingView: { flex: 1 },
-  content: { alignSelf: 'center', flexGrow: 1, maxWidth: 680, padding: 24, paddingTop: 44, width: '100%' },
-  step: { color: theme.colors.mutedText, fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  progress: { backgroundColor: theme.colors.surfacePeach, borderRadius: theme.radii.pill, height: 6, marginBottom: 24, overflow: 'hidden', width: '100%' }, progressFill: { backgroundColor: theme.colors.coral, borderRadius: theme.radii.pill, height: '100%' },
-  title: { color: theme.colors.text, fontFamily: 'Georgia', fontSize: theme.type.title, fontWeight: '700', lineHeight: 40 },
-  description: { color: theme.colors.mutedText, fontSize: 17, lineHeight: 25, marginTop: 14 },
-  body: { flex: 1, gap: 16, marginTop: 32 },
-  footer: { backgroundColor: theme.colors.background, borderTopColor: theme.colors.border, borderTopWidth: 1, padding: 16 },
-  footerContent: { alignSelf: 'center', maxWidth: 680, width: '100%' },
+  copy: { gap: 6 },
+  title: { color: theme.colors.primaryText, ...theme.typography.pageTitle },
+  description: { color: theme.colors.secondaryText, ...theme.typography.body },
+  body: { gap: theme.spacing[16] },
 });

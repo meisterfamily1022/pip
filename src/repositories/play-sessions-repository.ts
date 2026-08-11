@@ -62,6 +62,18 @@ export async function listActivePlaySessions(database: DatabaseConnection): Prom
   return rows.map(mapActive);
 }
 
+/**
+ * Whether a child has ever been handed the phone.
+ *
+ * Read from the sessions that already exist rather than from a new settings
+ * column, so the answer is right for households created before Parent Home
+ * started asking the question.
+ */
+export async function hasEverPlayed(database: DatabaseConnection): Promise<boolean> {
+  const row = await database.getFirstAsync<{ total: number }>('SELECT COUNT(*) AS total FROM play_sessions;');
+  return (row?.total ?? 0) > 0;
+}
+
 export async function startPlaySessionIfNoneActive(database: DatabaseConnection, childId: number, toyId: number): Promise<ActivePlaySession> {
   let session: ActivePlaySession | null = null;
   await database.withTransactionAsync(async () => {
