@@ -1,38 +1,40 @@
-import { playmapTheme as theme } from "@/theme/playmap-theme";
+import type { PipIconName } from "@/components/pip-icon";
+import { pipAvatarPalette } from "@/theme/playmap-theme";
 
 /**
  * The safe built-in avatar set for child profiles.
  *
- * Avatars are drawn from geometry rather than photographs or uploads, so no
- * image of a child is ever stored. Each avatar carries a spoken `label`, and
- * the picker renders shape plus name, so a profile is never identified by
- * colour alone — that matters for the accessibility requirement and for
- * children who cannot yet read.
+ * Each avatar is a drawn character with a spoken name — "Teddy bear", "Fish" —
+ * so a profile is never identified by colour alone. Nothing is uploaded or
+ * photographed: no image of a child is ever stored.
+ *
+ * The `id` values are a data contract. They are written into `child_profiles`
+ * and must keep resolving for households created before the redesign, so the
+ * redesign changed the artwork each id draws and left the ids alone.
  */
 
-/** Outer silhouette of the avatar badge. */
-export type AvatarShape = "circle" | "rounded" | "arch" | "petal";
-
-/** Mark drawn inside the silhouette. */
-export type AvatarMotif = "dot" | "ring" | "bar" | "pair" | "cross" | "corner";
+/** The character drawn inside the badge. */
+export type AvatarCharacter = Extract<
+  PipIconName,
+  "bear" | "chick" | "star" | "fish" | "balloon" | "cat" | "rocket" | "flower"
+>;
 
 export type ChildAvatar = {
   id: string;
-  /** Spoken name, e.g. "Ring badge". Used as the accessibility label. */
+  /** Spoken name, e.g. "Teddy bear". Used as the accessibility label. */
   label: string;
-  shape: AvatarShape;
-  motif: AvatarMotif;
+  character: AvatarCharacter;
 };
 
 export const CHILD_AVATARS: readonly ChildAvatar[] = [
-  { id: "circle-dot", label: "Dot circle", shape: "circle", motif: "dot" },
-  { id: "circle-ring", label: "Ring circle", shape: "circle", motif: "ring" },
-  { id: "rounded-bar", label: "Bar square", shape: "rounded", motif: "bar" },
-  { id: "rounded-pair", label: "Two dots square", shape: "rounded", motif: "pair" },
-  { id: "arch-dot", label: "Dot arch", shape: "arch", motif: "dot" },
-  { id: "arch-cross", label: "Cross arch", shape: "arch", motif: "cross" },
-  { id: "petal-ring", label: "Ring petal", shape: "petal", motif: "ring" },
-  { id: "petal-corner", label: "Corner petal", shape: "petal", motif: "corner" },
+  { id: "circle-dot", label: "Teddy bear", character: "bear" },
+  { id: "circle-ring", label: "Chick", character: "chick" },
+  { id: "rounded-bar", label: "Star", character: "star" },
+  { id: "rounded-pair", label: "Fish", character: "fish" },
+  { id: "arch-dot", label: "Balloon", character: "balloon" },
+  { id: "arch-cross", label: "Cat", character: "cat" },
+  { id: "petal-ring", label: "Rocket", character: "rocket" },
+  { id: "petal-corner", label: "Flower", character: "flower" },
 ];
 
 export const DEFAULT_AVATAR_ID = CHILD_AVATARS[0].id;
@@ -51,13 +53,18 @@ export type AccentColor = {
   foreground: string;
 };
 
+/**
+ * Six grounds, each paired with an ink that clears 4.5:1 against it. The ids
+ * are stored on the profile, so they are fixed even though the redesign
+ * retuned every value.
+ */
 export const ACCENT_COLORS: readonly AccentColor[] = [
-  { id: "mint", label: "Mint", background: theme.colors.surfaceMint, foreground: theme.colors.brandInk },
-  { id: "sage", label: "Sage", background: theme.colors.surfaceSage, foreground: "#3C4A38" },
-  { id: "yellow", label: "Sunshine", background: theme.colors.surfaceYellow, foreground: theme.colors.warning },
-  { id: "lavender", label: "Lavender", background: theme.colors.surfaceLavender, foreground: "#4A3A73" },
-  { id: "blush", label: "Blush", background: theme.colors.surfaceBlush, foreground: theme.colors.error },
-  { id: "sky", label: "Sky", background: theme.colors.brandPrimarySoft, foreground: theme.colors.brandInk },
+  { id: "mint", label: "Mint", background: pipAvatarPalette[3].surface, foreground: pipAvatarPalette[3].ink },
+  { id: "sage", label: "Sage", background: pipAvatarPalette[1].surface, foreground: pipAvatarPalette[1].ink },
+  { id: "yellow", label: "Sunshine", background: pipAvatarPalette[2].surface, foreground: pipAvatarPalette[2].ink },
+  { id: "lavender", label: "Lavender", background: pipAvatarPalette[4].surface, foreground: pipAvatarPalette[4].ink },
+  { id: "blush", label: "Blush", background: pipAvatarPalette[5].surface, foreground: pipAvatarPalette[5].ink },
+  { id: "sky", label: "Sky", background: pipAvatarPalette[0].surface, foreground: pipAvatarPalette[0].ink },
 ];
 
 export const DEFAULT_ACCENT_COLOR_ID = ACCENT_COLORS[0].id;

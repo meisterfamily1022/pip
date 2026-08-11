@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { pipBrand } from '@/brand/pip-brand';
-import { MINIMUM_PASSWORD_LENGTH } from '@/server/auth/credentials';
+import { MINIMUM_PASSWORD_LENGTH } from '@/domain/password-policy';
 
 /**
  * Sign-up form rules and the small amount of state that has to outlive the

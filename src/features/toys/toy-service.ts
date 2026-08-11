@@ -8,6 +8,7 @@ import {
   deleteToy,
   getParentToy,
   getParentToyByIntakeKey,
+  listParentToys,
   setToyArchived,
   setToyAvailable,
   updateToy,
@@ -147,6 +148,26 @@ export async function restoreParentToy(database: DatabaseConnection, id: number)
 export async function setParentToyAvailability(database: DatabaseConnection, id: number, available: boolean): Promise<void> {
   if (!available && await countActivePlaySessionsForToy(database, id)) throw new Error('This toy is checked out. Finish that child’s cleanup before hiding it.');
   await setToyAvailable(database, id, available);
+}
+
+/**
+ * An existing toy with the same name, so intake can warn before adding a second
+ * record for something already catalogued.
+ *
+ * This is a warning, not a block: two identical puzzles are a real thing to own,
+ * and the parent is the one who knows which case they are in. Archived toys are
+ * included, because "you already have one, it's archived" is the more useful
+ * answer than silence.
+ */
+export async function findDuplicateToyByName(
+  database: DatabaseConnection,
+  name: string,
+  excludeToyId?: number,
+): Promise<ParentToy | null> {
+  const wanted = name.trim().toLocaleLowerCase();
+  if (!wanted) return null;
+  const candidates = await listParentToys(database, { search: wanted, archived: 'all' });
+  return candidates.find((toy) => toy.id !== excludeToyId && toy.name.trim().toLocaleLowerCase() === wanted) ?? null;
 }
 
 export type ToyDeletionImpact = {

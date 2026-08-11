@@ -55,7 +55,7 @@ export default function EditLocationRoute() {
   const header = <ParentModeHeader backLabel="Rooms & Storage" backTo={parentBackTargets.editLocation} subtitle={isStorage ? `Rename this storage spot in ${roomLabel ?? 'its room'}.` : 'Rename this room without changing its storage spots.'} title={title} />;
   if (loading) return <PageShell scroll={false}>{header}<LoadingState label="Loading location…" /></PageShell>;
   if (invalidRoute || (error && !currentName)) return <PageShell>{header}<ErrorStateCard message={error ?? 'Location not found.'} /></PageShell>;
-  return <PageShell>{header}<FormCard tone={isStorage ? 'sage' : 'peach'}><RoundedTextInput error={error} label={isStorage ? 'Storage spot name' : 'Room name'} onChangeText={(value) => { setCurrentName(value); setError(null); }} value={currentName} />{isStorage && roomLabel && <ReadOnlyValue label="Room" value={roomLabel} />}<View style={styles.actions}><PrimaryButton disabled={saving || !currentName.trim()} label={saving ? 'Saving…' : 'Save Changes'} onPress={() => { void save(); }} /></View></FormCard></PageShell>;
+  return <PageShell>{header}<FormCard tone="surface"><RoundedTextInput error={error} label={isStorage ? 'Storage spot name' : 'Room name'} onChangeText={(value) => { setCurrentName(value); setError(null); }} value={currentName} />{isStorage && roomLabel && <ReadOnlyValue label="Room" value={roomLabel} />}<View style={styles.actions}><PrimaryButton disabled={saving || !currentName.trim()} label={saving ? 'Saving…' : 'Save Changes'} onPress={() => { void save(); }} /></View></FormCard></PageShell>;
 }
 
 const styles = StyleSheet.create({

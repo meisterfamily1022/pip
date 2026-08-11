@@ -1,29 +1,23 @@
 import { useCallback, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { NoticeBanner } from '@/components/auth-ui';
-import { ParentModeHeader } from '@/components/parent-ui';
+import { ParentDetailScreen } from '@/components/parent-ui';
+import { PipIcon } from '@/components/pip-icon';
 import { ProfileAvatar } from '@/components/profile-ui';
 import {
+  Banner,
   ConfirmationDialog,
   EmptyStateCard,
-  FormCard,
-  LoadingState,
-  PageShell,
   PrimaryButton,
+  SecondaryButton,
+  SkeletonRows,
 } from '@/components/playmap-ui';
-import { ToyButton } from '@/components/toy-ui';
 import { initializeDatabase } from '@/database/client';
 import { parentBackTargets } from '@/features/navigation/parent-navigation';
 import { READING_SUPPORT_LABELS, isReadingSupport } from '@/domain/child-avatars';
 import type { ChildProfile } from '@/domain/models';
-import {
-  deleteChildProfile,
-  loadChildProfiles,
-  reorderChildren,
-  setChildHidden,
-} from '@/features/children/child-profile-service';
+import { deleteChildProfile, loadChildProfiles, reorderChildren } from '@/features/children/child-profile-service';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 /**
@@ -38,6 +32,7 @@ export default function ChildrenRoute() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChildProfile | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -85,81 +80,109 @@ export default function ChildrenRoute() {
     });
   };
 
-  if (loading) return <PageShell scroll={false}><LoadingState label="Loading child profiles…" /></PageShell>;
+  if (loading) {
+    return (
+      <ParentDetailScreen backLabel="Settings" backTo={parentBackTargets.children}>
+        <SkeletonRows label="Loading child profiles…" rows={3} />
+      </ParentDetailScreen>
+    );
+  }
 
   return (
-    <PageShell>
-      <ParentModeHeader
-        backTo={parentBackTargets.children}
-        subtitle="Each child gets their own choices and play history. Toys, rooms, and photos stay shared."
-        title="Children"
-      />
+    <ParentDetailScreen
+      backLabel="Settings"
+      backTo={parentBackTargets.children}
+      footer={<PrimaryButton label="Add a child" onPress={() => router.push({ pathname: '/parent/edit-child' })} />}
+    >
+      <View style={styles.header}>
+        <View style={styles.headerCopy}>
+          <Text accessibilityRole="header" style={styles.title}>Children</Text>
+          <Text style={styles.subtitle}>
+            Each child keeps their own choices and play history. Toys, rooms and photos stay shared.
+          </Text>
+        </View>
+        {children.length > 1 ? (
+          <Pressable
+            accessibilityLabel={reordering ? 'Done reordering' : 'Reorder children'}
+            accessibilityRole="button"
+            hitSlop={10}
+            onPress={() => setReordering((value) => !value)}
+            style={({ pressed }) => [styles.reorderAction, pressed && styles.pressed]}
+          >
+            <Text style={styles.reorderLabel}>{reordering ? 'Done' : 'Reorder'}</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
-      {error ? <NoticeBanner message={error} tone="error" /> : null}
+      {error ? <Banner message={error} tone="alert" /> : null}
 
       {children.length === 0 ? (
         <EmptyStateCard
-          message="No profiles yet. Pip works without them, and Child Mode will offer one shared experience."
-          title="No child profiles"
+          icon="together"
+          message="Pip works without them, and Child Mode offers one shared experience until you add one."
+          title="No child profiles yet"
         />
       ) : (
-        <View style={styles.list}>
-          {children.map((child, index) => (
-            <FormCard key={child.id}>
-              <View style={styles.row}>
-                <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} name={child.name} size={52} />
-                <View style={styles.details}>
-                  <Text style={styles.name}>{child.name}</Text>
-                  <Text style={styles.meta}>
-                    {`${child.choiceLimit} choice${child.choiceLimit === 1 ? '' : 's'} · ${
-                      isReadingSupport(child.readingSupport)
-                        ? READING_SUPPORT_LABELS[child.readingSupport]
-                        : READING_SUPPORT_LABELS['pictures-words']
-                    }`}
-                  </Text>
-                  {/* Stated in words, never by colour alone. */}
-                  {child.hiddenAt ? <Text style={styles.hidden}>Paused — not shown in Child Mode</Text> : null}
-                </View>
+        children.map((child, index) => (
+          <View key={child.id} style={[styles.card, child.hiddenAt ? styles.cardPaused : null]}>
+            <Pressable
+              accessibilityHint="Opens this child’s profile"
+              accessibilityLabel={`${child.name}. ${child.choiceLimit} ${child.choiceLimit === 1 ? 'choice' : 'choices'}. ${child.hiddenAt ? 'Paused, not offered in Child Mode' : ''}`}
+              accessibilityRole="button"
+              disabled={reordering}
+              onPress={() => router.push({ pathname: '/parent/edit-child', params: { id: child.id } })}
+              style={({ pressed }) => [styles.cardRow, pressed && styles.pressed]}
+            >
+              <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={52} />
+              <View style={styles.details}>
+                <Text numberOfLines={2} style={styles.name}>{child.name}</Text>
+                <Text numberOfLines={2} style={styles.meta}>
+                  {`${child.choiceLimit} choice${child.choiceLimit === 1 ? '' : 's'} · ${
+                    isReadingSupport(child.readingSupport)
+                      ? READING_SUPPORT_LABELS[child.readingSupport]
+                      : READING_SUPPORT_LABELS['pictures-words']
+                  }`}
+                </Text>
+                {/* Stated in words, never by colour alone. */}
+                {child.hiddenAt ? <Text style={styles.paused}>Paused — not offered in Child Mode</Text> : null}
               </View>
+              {reordering ? null : <PipIcon color={theme.colors.mutedText} name="chevron-right" size={18} />}
+            </Pressable>
 
-              <View style={styles.actions}>
-                <ToyButton label="Edit" onPress={() => router.push({ pathname: '/parent/edit-child', params: { id: child.id } })} />
-                <ToyButton
-                  label={child.hiddenAt ? 'Unpause' : 'Pause'}
-                  onPress={() =>
-                    void run(async () => {
-                      const database = await initializeDatabase();
-                      await setChildHidden(database, child.id, !child.hiddenAt);
-                    })
-                  }
-                />
-                <ToyButton
+            {reordering ? (
+              <View style={styles.reorderRow}>
+                <SecondaryButton
                   accessibilityLabel={`Move ${child.name} up`}
-                  disabled={index === 0}
+                  disabled={index === 0 || busy}
                   label="Move up"
                   onPress={() => move(child, -1)}
+                  style={styles.reorderButton}
                 />
-                <ToyButton
+                <SecondaryButton
                   accessibilityLabel={`Move ${child.name} down`}
-                  disabled={index === children.length - 1}
+                  disabled={index === children.length - 1 || busy}
                   label="Move down"
                   onPress={() => move(child, 1)}
+                  style={styles.reorderButton}
                 />
-                <ToyButton destructive label="Delete" onPress={() => setPendingDelete(child)} />
               </View>
-            </FormCard>
-          ))}
-        </View>
+            ) : null}
+          </View>
+        ))
       )}
 
-      <PrimaryButton label="Add a child" onPress={() => router.push({ pathname: '/parent/edit-child' })} />
+      <Banner
+        message="Guest play is always available without a profile. Nothing about a guest session is saved."
+        tone="info"
+      />
 
       <ConfirmationDialog
+        cancelLabel="Keep the profile"
         confirmLabel="Delete profile"
         destructive
         message={
           pendingDelete
-            ? `This removes ${pendingDelete.name}'s profile and their play history. Your toys, rooms, storage spots, and photos are not affected.`
+            ? `This removes ${pendingDelete.name}'s profile and their play history. Your toys, rooms, storage spots and photos are not affected. This cannot be undone.`
             : ''
         }
         onCancel={() => setPendingDelete(null)}
@@ -176,16 +199,43 @@ export default function ChildrenRoute() {
         title={pendingDelete ? `Delete ${pendingDelete.name}?` : ''}
         visible={pendingDelete !== null}
       />
-    </PageShell>
+    </ParentDetailScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[8] },
+  pressed: { opacity: 0.72 },
+  header: { alignItems: 'flex-start', flexDirection: 'row', gap: theme.spacing[12] },
+  headerCopy: { flex: 1, gap: 2 },
+  title: { color: theme.colors.primaryText, ...theme.typography.pageTitle },
+  subtitle: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  reorderAction: { justifyContent: 'center', minHeight: theme.measurements.minimumTouchTarget },
+  reorderLabel: { color: theme.colors.brandInk, ...theme.typography.label },
+  card: {
+    backgroundColor: theme.colors.cardSurface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  cardPaused: { backgroundColor: theme.colors.mutedSurface, borderColor: theme.colors.mutedBorder },
+  cardRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing[12],
+    minHeight: 68,
+    padding: theme.spacing[12],
+  },
   details: { flex: 1, gap: 2 },
-  hidden: { color: theme.colors.warning, ...theme.typography.supporting },
-  list: { gap: theme.spacing[12] },
-  meta: { color: theme.colors.secondaryText, ...theme.typography.supporting },
-  name: { color: theme.colors.primaryText, ...theme.typography.sectionTitle },
-  row: { alignItems: 'center', flexDirection: 'row', gap: theme.spacing[16] },
+  name: { color: theme.colors.primaryText, ...theme.typography.rowTitle },
+  meta: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  paused: { color: theme.colors.error, ...theme.typography.meta },
+  reorderRow: {
+    borderTopColor: theme.colors.divider,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing[8],
+    padding: theme.spacing[12],
+  },
+  reorderButton: { flex: 1, minHeight: theme.measurements.minimumTouchTarget },
 });

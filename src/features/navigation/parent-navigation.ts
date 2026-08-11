@@ -4,6 +4,7 @@ export const BULK_TOY_INTAKE_ROUTE = '/parent/add-toy?mode=bulk' as const;
 export const LOCATIONS_ROUTE = '/parent/locations' as const;
 export const SETTINGS_ROUTE = '/parent/settings' as const;
 export const CHILDREN_ROUTE = '/parent/children' as const;
+export const TOY_DETAIL_ROUTE = '/parent/toy-detail' as const;
 export const ACCOUNT_ROUTE = '/parent/account' as const;
 
 export const parentBackTargets = {

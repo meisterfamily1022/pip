@@ -1,32 +1,136 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+
 import type { ChoiceLimit } from '@/domain/models';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
-import { PrimaryButton as SharedPrimaryButton, RoundedTextInput, SegmentedControl } from './playmap-ui';
+import {
+  BackNavigation,
+  PrimaryButton as SharedPrimaryButton,
+  RoundedTextInput,
+  SegmentedControl,
+  ToggleRow,
+} from './playmap-ui';
 
-type PrimaryButtonProps = { label: string; onPress(): void; disabled?: boolean; accessibilityLabel?: string };
-export function PrimaryButton({ label, onPress, disabled = false, accessibilityLabel }: PrimaryButtonProps) {
-  return <SharedPrimaryButton accessibilityLabel={accessibilityLabel} disabled={disabled} label={label} onPress={onPress} />;
+/**
+ * The controls setup screens share. They are thin wrappers over the design
+ * system so onboarding cannot drift into its own button and field styles.
+ */
+
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled = false,
+  busy = false,
+  accessibilityLabel,
+}: {
+  label: string;
+  onPress(): void;
+  disabled?: boolean;
+  busy?: boolean;
+  accessibilityLabel?: string;
+}) {
+  return <SharedPrimaryButton accessibilityLabel={accessibilityLabel} busy={busy} disabled={disabled} label={label} onPress={onPress} />;
 }
 
-type BackButtonProps = { onPress(): void };
-export function BackButton({ onPress }: BackButtonProps) { return <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={onPress} style={styles.backButton}><Text style={styles.backButtonText}>Back</Text></Pressable>; }
-
-type FieldProps = { label: string; value: string; onChangeText(value: string): void; error?: string | null; placeholder?: string; keyboardType?: 'default' | 'number-pad'; secureTextEntry?: boolean; maxLength?: number; editable?: boolean };
-export function Field({ label, value, onChangeText, error, placeholder, keyboardType, secureTextEntry, maxLength, editable = true }: FieldProps) {
-  return <RoundedTextInput accessibilityLabel={label} editable={editable} error={error} keyboardType={keyboardType} label={label} maxLength={maxLength} onChangeText={onChangeText} placeholder={placeholder} secureTextEntry={secureTextEntry} value={value} />;
+export function BackButton({ onPress }: { onPress(): void }) {
+  return <BackNavigation label="Back" onPress={onPress} />;
 }
 
-type ChoiceControlProps = { choiceLimit: ChoiceLimit; onChoiceLimitChange(value: ChoiceLimit): void; cleanupRequired: boolean; onCleanupRequiredChange(value: boolean): void };
-export function ChoiceControls({ choiceLimit, onChoiceLimitChange, cleanupRequired, onCleanupRequiredChange }: ChoiceControlProps) {
-  return <View style={styles.choiceGroup}><Text style={styles.label}>Toy choices</Text><SegmentedControl accessibilityLabel="Toy choices" getOptionLabel={(limit) => `${limit} toy${limit === 1 ? '' : 's'}`} onChange={onChoiceLimitChange} options={[1, 3, 5]} value={choiceLimit} /><Text style={styles.label}>Require cleanup before another choice?</Text><SegmentedControl accessibilityLabel="Cleanup requirement" getOptionLabel={(required) => required ? 'Yes' : 'Not required'} onChange={onCleanupRequiredChange} options={[true, false]} value={cleanupRequired} /></View>;
+export function Field({
+  label,
+  value,
+  onChangeText,
+  error,
+  placeholder,
+  keyboardType,
+  secureTextEntry,
+  maxLength,
+  editable = true,
+  hint,
+  autoFocus,
+  returnKeyType,
+  onSubmitEditing,
+}: {
+  label: string;
+  value: string;
+  onChangeText(value: string): void;
+  error?: string | null;
+  placeholder?: string;
+  keyboardType?: 'default' | 'number-pad';
+  secureTextEntry?: boolean;
+  maxLength?: number;
+  editable?: boolean;
+  hint?: string;
+  autoFocus?: boolean;
+  returnKeyType?: 'done' | 'next';
+  onSubmitEditing?(): void;
+}) {
+  return (
+    <RoundedTextInput
+      accessibilityLabel={label}
+      autoFocus={autoFocus}
+      editable={editable}
+      error={error}
+      hint={hint}
+      keyboardType={keyboardType}
+      label={label}
+      maxLength={maxLength}
+      onChangeText={onChangeText}
+      onSubmitEditing={onSubmitEditing}
+      placeholder={placeholder}
+      returnKeyType={returnKeyType}
+      secureTextEntry={secureTextEntry}
+      value={value}
+    />
+  );
+}
+
+/**
+ * How many toys a child is offered at once, and whether tidying the last toy
+ * away comes before the next one.
+ */
+export function ChoiceControls({
+  choiceLimit,
+  onChoiceLimitChange,
+  cleanupRequired,
+  onCleanupRequiredChange,
+  childName,
+}: {
+  choiceLimit: ChoiceLimit;
+  onChoiceLimitChange(value: ChoiceLimit): void;
+  cleanupRequired: boolean;
+  onCleanupRequiredChange(value: boolean): void;
+  childName?: string;
+}) {
+  return (
+    <View style={styles.group}>
+      <View style={styles.field}>
+        <Text style={styles.label}>How many choices at once?</Text>
+        <SegmentedControl<ChoiceLimit>
+          accessibilityLabel="How many choices at once"
+          getOptionLabel={(limit) => `${limit} toy${limit === 1 ? '' : 's'}`}
+          onChange={onChoiceLimitChange}
+          options={[1, 3, 5]}
+          value={choiceLimit}
+        />
+        <Text style={styles.caption}>
+          {choiceLimit === 1
+            ? 'One at a time is the calmest place to start.'
+            : `${childName ? `${childName} sees` : 'Your child sees'} ${choiceLimit} toys to pick between.`}
+        </Text>
+      </View>
+      <ToggleRow
+        description="Pip walks through putting the last toy away first."
+        label="Tidy up before the next toy"
+        onValueChange={onCleanupRequiredChange}
+        value={cleanupRequired}
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  primaryButton: { ...theme.shadows.card, alignItems: 'center', backgroundColor: theme.colors.coral, borderRadius: theme.radii.lg, minHeight: theme.sizes.button, justifyContent: 'center', paddingHorizontal: 20 },
-  primaryButtonText: { color: theme.colors.white, fontSize: 17, fontWeight: '700' },
-  disabled: { opacity: 0.45 }, pressed: { opacity: 0.82 },
-  backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }, backButtonText: { color: theme.colors.primary, fontSize: 16, fontWeight: '600' },
-  field: { gap: 6 }, label: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
-  input: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.md, borderWidth: 1, color: theme.colors.text, fontSize: 18, minHeight: theme.sizes.input, paddingHorizontal: 16 }, inputError: { borderColor: theme.colors.danger }, error: { color: theme.colors.danger, minHeight: 18 },
-  choiceGroup: { gap: 12 }, optionRow: { flexDirection: 'row', gap: 10 }, option: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.lg, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 52 }, optionSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft, borderWidth: 2 }, optionText: { color: theme.colors.text, fontSize: 16, fontWeight: '600' },
+  group: { gap: theme.spacing[16] },
+  field: { gap: 6 },
+  label: { color: theme.colors.primaryText, ...theme.typography.fieldLabel },
+  caption: { color: theme.colors.secondaryText, ...theme.typography.meta },
 });

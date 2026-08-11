@@ -45,7 +45,7 @@ export default function AddLocationRoute() {
 
   return <PageShell>
     <ParentModeHeader backLabel="Rooms & Storage" backTo={parentBackTargets.addLocation} subtitle={isStorage ? `Add a storage spot inside ${roomLabel ?? 'the selected room'}.` : 'Create a room where toys can belong.'} title={isStorage ? 'Add Storage Spot' : 'Add Room'} />
-    <FormCard tone={isStorage ? 'sage' : 'peach'}>
+    <FormCard tone="surface">
       <RoundedTextInput error={error} label={isStorage ? 'Storage spot name' : 'Room name'} onChangeText={(value) => { setName(value); setError(null); }} placeholder={isStorage ? 'Blue Bin' : 'Playroom'} value={name} />
       {isStorage && roomLabel && <ReadOnlyValue label="Room" value={roomLabel} />}
       <View style={styles.actions}><PrimaryButton disabled={saving || !name.trim() || invalidRoomId || (isStorage && !roomLabel)} label={saving ? 'Saving…' : isStorage ? 'Add Storage Spot' : 'Add Room'} onPress={() => { void save(); }} /></View>

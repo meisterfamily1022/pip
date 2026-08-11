@@ -12,6 +12,7 @@ import {
   getStorageSpot,
   listRooms,
   listStorageSpots,
+  reassignToys,
   roomNameExists,
   storageSpotNameExists,
   updateRoom,
@@ -149,4 +150,45 @@ export async function getParentRoomDeletionImpact(database: DatabaseConnection, 
       ? `This room still contains ${dependencies.join(' and ')}. Move or delete those records before deleting the room.`
       : 'This room has no storage spots or toys. Deleting it removes the room permanently.',
   };
+}
+
+/**
+ * Deletes a room after moving its toys somewhere real.
+ *
+ * The rule this preserves is that a toy always has a room and a spot. The
+ * design's flow makes that visible to the parent: choose the new home, see the
+ * consequence stated, then delete. Both halves happen in one transaction, so an
+ * interruption leaves either the old room intact or the toys safely moved —
+ * never a room half-removed with toys pointing at it.
+ */
+export async function removeParentRoomWithReassignment(
+  database: DatabaseConnection,
+  roomId: number,
+  targetStorageSpotId: number,
+): Promise<number> {
+  const target = await getStorageSpot(database, targetStorageSpotId);
+  if (!target) throw new Error('Choose somewhere for these toys to go.');
+  if (target.roomId === roomId) throw new LocationDeletionBlockedError('Choose a spot in a different room.');
+  let moved = 0;
+  await database.withTransactionAsync(async () => {
+    moved = await reassignToys(database, { roomId }, targetStorageSpotId);
+    for (const spot of await listStorageSpots(database, roomId)) await deleteStorageSpot(database, spot.id);
+    await deleteRoom(database, roomId);
+  });
+  return moved;
+}
+
+/** The same, for a single storage spot: move its toys, then remove it. */
+export async function removeParentStorageSpotWithReassignment(
+  database: DatabaseConnection,
+  storageSpotId: number,
+  targetStorageSpotId: number,
+): Promise<number> {
+  if (storageSpotId === targetStorageSpotId) throw new LocationDeletionBlockedError('Choose a different spot.');
+  let moved = 0;
+  await database.withTransactionAsync(async () => {
+    moved = await reassignToys(database, { storageSpotId }, targetStorageSpotId);
+    await deleteStorageSpot(database, storageSpotId);
+  });
+  return moved;
 }

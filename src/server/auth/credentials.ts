@@ -1,5 +1,7 @@
 import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 
+import { MINIMUM_PASSWORD_LENGTH, isAcceptablePassword } from '@/domain/password-policy';
+
 /**
  * Password hashing, session tokens, and one-time codes.
  *
@@ -12,7 +14,8 @@ import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 const SCRYPT = { N: 16_384, r: 8, p: 1, keyLength: 64 } as const;
 const HASH_PREFIX = 'scrypt$1';
 
-export const MINIMUM_PASSWORD_LENGTH = 10;
+// Re-exported so server callers keep one import for everything credentials.
+export { MINIMUM_PASSWORD_LENGTH, isAcceptablePassword };
 
 function constantTimeEquals(left: string, right: string): boolean {
   const a = Buffer.from(left);
@@ -20,11 +23,6 @@ function constantTimeEquals(left: string, right: string): boolean {
   // Length is compared first because timingSafeEqual throws on a mismatch. The
   // length of a hash or token is not secret.
   return a.length === b.length && timingSafeEqual(a, b);
-}
-
-/** True when the password satisfies the only rule the product enforces. */
-export function isAcceptablePassword(password: string): boolean {
-  return password.length >= MINIMUM_PASSWORD_LENGTH;
 }
 
 /**

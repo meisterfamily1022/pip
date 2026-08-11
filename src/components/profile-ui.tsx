@@ -1,106 +1,49 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { PipIcon } from "@/components/pip-icon";
 import {
   ACCENT_COLORS,
   CHILD_AVATARS,
   findAccentColor,
   findChildAvatar,
-  type AvatarMotif,
-  type AvatarShape,
 } from "@/domain/child-avatars";
 import { playmapTheme as theme } from "@/theme/playmap-theme";
 
 /**
- * Child profile identity controls: the avatar badge and the two pickers.
+ * Child profile identity controls: the avatar badge and its two pickers.
  *
- * Avatars are geometry, not artwork, so nothing depends on new image assets
- * and no photograph of a child is ever stored.
+ * A badge is a drawn character on a pastel ground. Both the character and the
+ * colour have spoken names, and both are rendered as text in the pickers, so a
+ * child's identity is never carried by colour alone and nothing depends on
+ * reading. No photograph of a child is stored anywhere.
  */
 
-function shapeStyle(shape: AvatarShape, size: number) {
-  switch (shape) {
-    case "circle":
-      return { borderRadius: size / 2 };
-    case "rounded":
-      return { borderRadius: size * 0.28 };
-    case "arch":
-      return { borderTopLeftRadius: size / 2, borderTopRightRadius: size / 2, borderBottomLeftRadius: size * 0.22, borderBottomRightRadius: size * 0.22 };
-    case "petal":
-      return { borderTopLeftRadius: size / 2, borderBottomRightRadius: size / 2, borderTopRightRadius: size * 0.22, borderBottomLeftRadius: size * 0.22 };
-  }
-}
-
-function Motif({ motif, size, color }: { motif: AvatarMotif; size: number; color: string }) {
-  const unit = size * 0.16;
-  switch (motif) {
-    case "dot":
-      return <View style={{ backgroundColor: color, borderRadius: unit, height: unit * 2, width: unit * 2 }} />;
-    case "ring":
-      return (
-        <View
-          style={{
-            borderColor: color,
-            borderRadius: unit * 1.6,
-            borderWidth: Math.max(2, unit * 0.5),
-            height: unit * 3.2,
-            width: unit * 3.2,
-          }}
-        />
-      );
-    case "bar":
-      return <View style={{ backgroundColor: color, borderRadius: unit / 2, height: unit, width: unit * 3.4 }} />;
-    case "pair":
-      return (
-        <View style={{ flexDirection: "row", gap: unit * 0.8 }}>
-          <View style={{ backgroundColor: color, borderRadius: unit, height: unit * 1.6, width: unit * 1.6 }} />
-          <View style={{ backgroundColor: color, borderRadius: unit, height: unit * 1.6, width: unit * 1.6 }} />
-        </View>
-      );
-    case "cross":
-      return (
-        <View style={{ alignItems: "center", height: unit * 3.2, justifyContent: "center", width: unit * 3.2 }}>
-          <View style={{ backgroundColor: color, borderRadius: unit / 2, height: unit * 0.9, position: "absolute", width: unit * 3.2 }} />
-          <View style={{ backgroundColor: color, borderRadius: unit / 2, height: unit * 3.2, position: "absolute", width: unit * 0.9 }} />
-        </View>
-      );
-    case "corner":
-      return (
-        <View style={{ height: unit * 3, width: unit * 3 }}>
-          <View style={{ backgroundColor: color, borderRadius: unit / 2, height: unit * 0.9, width: unit * 3 }} />
-          <View style={{ backgroundColor: color, borderRadius: unit / 2, height: unit * 2.1, marginTop: unit * 0.4, width: unit * 0.9 }} />
-        </View>
-      );
-  }
-}
-
-/**
- * A child's avatar badge. `name` is only used to build the spoken label, so a
- * screen reader announces who the badge belongs to rather than "image".
- */
 export function ProfileAvatar({
   avatarId,
   accentColorId,
   name,
-  size = 64,
+  size = 56,
+  /** Set when the surrounding control already names the child. */
+  decorative = false,
 }: {
   avatarId: string | null;
   accentColorId: string | null;
   name?: string;
   size?: number;
+  decorative?: boolean;
 }) {
   const avatar = findChildAvatar(avatarId);
   const accent = findAccentColor(accentColorId);
+  const label = name ? `${name}, ${avatar.label} in ${accent.label}` : `${avatar.label} in ${accent.label}`;
   return (
     <View
-      accessibilityLabel={name ? `${name}, ${avatar.label} in ${accent.label}` : `${avatar.label} in ${accent.label}`}
-      accessible
-      style={[
-        styles.avatar,
-        shapeStyle(avatar.shape, size),
-        { backgroundColor: accent.background, height: size, width: size },
-      ]}
+      accessibilityElementsHidden={decorative}
+      accessibilityLabel={decorative ? undefined : label}
+      accessible={!decorative}
+      importantForAccessibility={decorative ? "no-hide-descendants" : "yes"}
+      style={[styles.avatar, { backgroundColor: accent.background, borderRadius: size / 2, height: size, width: size }]}
     >
-      <Motif color={accent.foreground} motif={avatar.motif} size={size} />
+      <PipIcon color={accent.foreground} name={avatar.character} size={Math.round(size * 0.62)} strokeWidth={1.5} />
     </View>
   );
 }
@@ -109,33 +52,46 @@ export function AvatarPicker({
   value,
   onChange,
   accentColorId,
-  label = "Choose an avatar",
+  label = "Badge",
 }: {
   value: string;
   onChange: (avatarId: string) => void;
   accentColorId: string | null;
   label?: string;
 }) {
+  const selected = findChildAvatar(value);
   return (
     <View style={styles.pickerGroup}>
       <Text style={styles.pickerLabel}>{label}</Text>
-      <ScrollView contentContainerStyle={styles.pickerRow} horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        accessibilityRole="radiogroup"
+        contentContainerStyle={styles.pickerRow}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
         {CHILD_AVATARS.map((avatar) => {
-          const selected = avatar.id === value;
+          const isSelected = avatar.id === value;
           return (
             <Pressable
               accessibilityLabel={avatar.label}
               accessibilityRole="radio"
-              accessibilityState={{ checked: selected, selected }}
+              accessibilityState={{ checked: isSelected, selected: isSelected }}
               key={avatar.id}
               onPress={() => onChange(avatar.id)}
-              style={[styles.option, selected && styles.optionSelected]}
+              style={({ pressed }) => [styles.option, isSelected && styles.optionSelected, pressed && styles.pressed]}
             >
-              <ProfileAvatar accentColorId={accentColorId} avatarId={avatar.id} size={56} />
+              <ProfileAvatar accentColorId={accentColorId} avatarId={avatar.id} decorative size={52} />
+              {isSelected ? (
+                <View style={styles.optionTick}>
+                  <PipIcon color={theme.colors.brandPrimaryLabel} name="check" size={12} strokeWidth={3} />
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
       </ScrollView>
+      {/* The chosen character is said in words, so the tick is never the only signal. */}
+      <Text accessibilityLiveRegion="polite" style={styles.pickerCaption}>{`Selected: ${selected.label}`}</Text>
     </View>
   );
 }
@@ -143,7 +99,7 @@ export function AvatarPicker({
 export function AccentColorPicker({
   value,
   onChange,
-  label = "Choose a color",
+  label = "Colour",
 }: {
   value: string;
   onChange: (accentColorId: string) => void;
@@ -152,7 +108,7 @@ export function AccentColorPicker({
   return (
     <View style={styles.pickerGroup}>
       <Text style={styles.pickerLabel}>{label}</Text>
-      <View style={styles.swatchRow}>
+      <View accessibilityRole="radiogroup" style={styles.swatchRow}>
         {ACCENT_COLORS.map((color) => {
           const selected = color.id === value;
           return (
@@ -162,8 +118,14 @@ export function AccentColorPicker({
               accessibilityState={{ checked: selected, selected }}
               key={color.id}
               onPress={() => onChange(color.id)}
-              style={[styles.swatch, selected && styles.optionSelected, { backgroundColor: color.background }]}
+              style={({ pressed }) => [
+                styles.swatch,
+                { backgroundColor: color.background },
+                selected && styles.swatchSelected,
+                pressed && styles.pressed,
+              ]}
             >
+              {selected ? <PipIcon color={color.foreground} name="check" size={14} strokeWidth={2.8} /> : null}
               {/* The name is rendered, not just the fill, so the choice is never colour-only. */}
               <Text style={[styles.swatchLabel, { color: color.foreground }]}>{color.label}</Text>
             </Pressable>
@@ -176,28 +138,46 @@ export function AccentColorPicker({
 
 const styles = StyleSheet.create({
   avatar: { alignItems: "center", justifyContent: "center" },
+  pressed: { opacity: 0.72 },
   option: {
     alignItems: "center",
     borderColor: "transparent",
-    borderRadius: theme.radii.large,
-    borderWidth: 3,
+    borderRadius: theme.radii.pill,
+    borderWidth: 2.5,
     justifyContent: "center",
     minHeight: theme.measurements.minimumTouchTarget,
-    padding: theme.spacing[4],
+    padding: 3,
   },
   optionSelected: { borderColor: theme.colors.brandInk },
-  pickerGroup: { gap: theme.spacing[8] },
-  pickerLabel: { color: theme.colors.primaryText, ...theme.typography.label },
-  pickerRow: { gap: theme.spacing[12], paddingVertical: theme.spacing[4] },
+  optionTick: {
+    alignItems: "center",
+    backgroundColor: theme.colors.brandPrimary,
+    borderColor: theme.colors.background,
+    borderRadius: theme.radii.pill,
+    borderWidth: 2,
+    bottom: 0,
+    height: 22,
+    justifyContent: "center",
+    position: "absolute",
+    right: 0,
+    width: 22,
+  },
+  pickerGroup: { gap: 6 },
+  pickerLabel: { color: theme.colors.primaryText, ...theme.typography.fieldLabel },
+  pickerCaption: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  pickerRow: { gap: theme.spacing[8], paddingVertical: theme.spacing[4] },
   swatch: {
     alignItems: "center",
-    borderColor: "transparent",
+    borderColor: theme.colors.border,
     borderRadius: theme.radii.pill,
-    borderWidth: 3,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
     justifyContent: "center",
     minHeight: theme.measurements.minimumTouchTarget,
     paddingHorizontal: theme.spacing[16],
   },
-  swatchLabel: { ...theme.typography.label },
+  swatchSelected: { borderColor: theme.colors.brandInk, borderWidth: 2.5 },
+  swatchLabel: { ...theme.typography.label, fontSize: 14 },
   swatchRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[8] },
 });

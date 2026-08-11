@@ -2,19 +2,22 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { pipBrand } from '@/brand/pip-brand';
-import { BackButton, ChoiceControls, Field, PrimaryButton } from '@/components/onboarding-controls';
+import { Field, PrimaryButton } from '@/components/onboarding-controls';
 import { OnboardingScreen } from '@/components/onboarding-screen';
 import { AccentColorPicker, AvatarPicker, ProfileAvatar } from '@/components/profile-ui';
-import { QuietButton } from '@/components/playmap-ui';
-import { ToyButton } from '@/components/toy-ui';
-import { READING_SUPPORTS, READING_SUPPORT_LABELS } from '@/domain/child-avatars';
+import { QuietButton, SegmentedControl } from '@/components/playmap-ui';
+import { READING_SUPPORT_LABELS, type ReadingSupport } from '@/domain/child-avatars';
+import type { ChoiceLimit } from '@/domain/models';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { validateChildNickname } from '@/features/onboarding/validation';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 /**
- * The first child profile.
+ * Step 2, first half: who is playing.
+ *
+ * Three questions and a live preview, rather than the nine sections this used
+ * to be. Reading support and tidy-up rules are the second half, so neither
+ * screen is a wall.
  *
  * Optional by design: a parent can skip and add profiles later from Settings,
  * because Pip works without any. Nothing here asks for a birthday, a legal
@@ -24,13 +27,18 @@ export default function ChildProfileSetupRoute() {
   const { draft, updateDraft } = useOnboarding();
   const [error, setError] = useState<string | null>(null);
 
-  const continueToLocation = (): void => {
+  const goBack = (): void => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/parent-pin-confirm');
+  };
+
+  const continueToPreferences = (): void => {
     const validationError = validateChildNickname(draft.childNickname);
     if (validationError) {
       setError(validationError);
       return;
     }
-    router.push('/first-location-setup');
+    router.push('/child-profile-preferences');
   };
 
   const skip = (): void => {
@@ -40,33 +48,48 @@ export default function ChildProfileSetupRoute() {
     router.push('/first-location-setup');
   };
 
+  const previewName = draft.childNickname.trim() || 'This profile';
+  const readingLabel = READING_SUPPORT_LABELS[draft.childReadingSupport as ReadingSupport] ?? READING_SUPPORT_LABELS['pictures-words'];
+
   return (
     <OnboardingScreen
-      step="Step 2 of 3"
-      title={`Who will use ${pipBrand.name}?`}
-      description="A nickname and a look, so your child recognises their own space. You can add more children later."
-      footer={<PrimaryButton label="Continue" onPress={continueToLocation} />}
+      description="A name and a badge so your child recognises their own space."
+      footer={
+        <>
+          <PrimaryButton label="Next: reading &amp; cleanup" onPress={continueToPreferences} />
+          <QuietButton label="Set this up later" onPress={skip} />
+        </>
+      }
+      onBack={goBack}
+      step={2}
+      title="Who will be playing?"
     >
-      <BackButton onPress={() => (router.canGoBack() ? router.back() : router.replace('/parent-pin-setup'))} />
-
       <View style={styles.preview}>
         <ProfileAvatar
           accentColorId={draft.childAccentColorId}
           avatarId={draft.childAvatarId}
-          name={draft.childNickname || 'This profile'}
-          size={72}
+          decorative
+          size={64}
         />
+        <View style={styles.previewCopy}>
+          <Text style={styles.previewLabel}>Preview</Text>
+          <Text numberOfLines={1} style={styles.previewName}>{previewName}</Text>
+          <Text numberOfLines={1} style={styles.previewMeta}>
+            {`${draft.choiceLimit} ${draft.choiceLimit === 1 ? 'choice' : 'choices'} · ${readingLabel}`}
+          </Text>
+        </View>
       </View>
 
       <Field
-        label="Child nickname"
-        value={draft.childNickname}
-        onChangeText={(value) => {
-          updateDraft({ childNickname: value });
+        error={error}
+        label="Name"
+        onChangeText={(childNickname) => {
+          updateDraft({ childNickname });
           setError(null);
         }}
-        placeholder="For example, Sam"
-        error={error}
+        placeholder="For example, Ada"
+        returnKeyType="done"
+        value={draft.childNickname}
       />
 
       <AvatarPicker
@@ -79,42 +102,40 @@ export default function ChildProfileSetupRoute() {
         value={draft.childAccentColorId}
       />
 
-      <View style={styles.group}>
-        <Text style={styles.label}>Words and pictures</Text>
-        <View style={styles.row}>
-          {READING_SUPPORTS.map((support) => (
-            <ToyButton
-              key={support}
-              label={READING_SUPPORT_LABELS[support]}
-              onPress={() => updateDraft({ childReadingSupport: support })}
-              selected={draft.childReadingSupport === support}
-            />
-          ))}
-        </View>
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>How many choices at once?</Text>
+        <SegmentedControl<ChoiceLimit>
+          accessibilityLabel="How many choices at once"
+          getOptionLabel={(limit) => `${limit} toy${limit === 1 ? '' : 's'}`}
+          onChange={(choiceLimit) => updateDraft({ choiceLimit })}
+          options={[1, 3, 5]}
+          value={draft.choiceLimit}
+        />
       </View>
 
-      <ChoiceControls
-        choiceLimit={draft.choiceLimit}
-        onChoiceLimitChange={(choiceLimit) => updateDraft({ choiceLimit })}
-        cleanupRequired={draft.cleanupRequired}
-        onCleanupRequiredChange={(cleanupRequired) => updateDraft({ cleanupRequired })}
-      />
-
-      <View style={styles.skip}>
-        <QuietButton label="Skip for now" onPress={skip} />
-        <Text style={styles.skipText}>
-          {`${pipBrand.name} works without profiles. Add or rename children any time in Settings.`}
-        </Text>
-      </View>
+      <Text style={styles.note}>
+        Reading support and cleanup rules come next — or set them any time in Settings.
+      </Text>
     </OnboardingScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  group: { gap: theme.spacing[8] },
-  label: { color: theme.colors.primaryText, ...theme.typography.label },
-  preview: { alignItems: 'center', paddingVertical: theme.spacing[8] },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[8] },
-  skip: { alignItems: 'flex-start', gap: theme.spacing[8] },
-  skipText: { color: theme.colors.mutedText, ...theme.typography.supporting },
+  preview: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.cardSurface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing[12],
+    padding: theme.spacing[12],
+  },
+  previewCopy: { flex: 1, gap: 1 },
+  previewLabel: { color: theme.colors.mutedText, ...theme.typography.caption },
+  previewName: { color: theme.colors.primaryText, ...theme.typography.rowTitle },
+  previewMeta: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  field: { gap: 6 },
+  fieldLabel: { color: theme.colors.primaryText, ...theme.typography.fieldLabel },
+  note: { color: theme.colors.secondaryText, ...theme.typography.meta },
 });

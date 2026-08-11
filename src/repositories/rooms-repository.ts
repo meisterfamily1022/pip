@@ -101,3 +101,30 @@ export async function countToysAssignedToStorageSpot(database: DatabaseConnectio
   const row = await database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM toys WHERE storage_spot_id = ?;', storageSpotId);
   return row?.count ?? 0;
 }
+
+/**
+ * Moves every toy in a room, or in a single spot, to another storage spot.
+ *
+ * Written as one statement inside the caller's transaction so a toy is never
+ * briefly pointing at a room that no longer exists. Returns how many moved, so
+ * the caller can tell the parent what actually happened.
+ */
+export async function reassignToys(
+  database: DatabaseConnection,
+  source: { roomId: number } | { storageSpotId: number },
+  targetStorageSpotId: number,
+): Promise<number> {
+  const target = await getStorageSpot(database, targetStorageSpotId);
+  if (!target) throw new Error('Choose somewhere for these toys to go.');
+  const timestamp = new Date().toISOString();
+  const result = 'roomId' in source
+    ? await database.runAsync(
+      'UPDATE toys SET room_id = ?, storage_spot_id = ?, updated_at = ? WHERE room_id = ?;',
+      target.roomId, target.id, timestamp, source.roomId,
+    )
+    : await database.runAsync(
+      'UPDATE toys SET room_id = ?, storage_spot_id = ?, updated_at = ? WHERE storage_spot_id = ?;',
+      target.roomId, target.id, timestamp, source.storageSpotId,
+    );
+  return result.changes ?? 0;
+}

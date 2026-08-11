@@ -2,10 +2,21 @@ import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { NoticeBanner } from '@/components/auth-ui';
-import { ParentModeHeader } from '@/components/parent-ui';
+import { ParentDetailScreen } from '@/components/parent-ui';
 import { AccentColorPicker, AvatarPicker, ProfileAvatar } from '@/components/profile-ui';
-import { FormCard, LoadingState, PageShell, PrimaryButton, RoundedTextInput } from '@/components/playmap-ui';
+import {
+  Banner,
+  ConfirmationDialog,
+  FilterChip,
+  ListCard,
+  ListRow,
+  OptionCard,
+  PrimaryButton,
+  RoundedTextInput,
+  SegmentedControl,
+  SkeletonRows,
+  ToggleRow,
+} from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import { parentBackTargets } from '@/features/navigation/parent-navigation';
 import {
@@ -19,9 +30,8 @@ import {
   READING_SUPPORTS,
 } from '@/domain/child-avatars';
 import type { ChoiceLimit } from '@/domain/models';
-import { addChildProfile, loadChildProfile, saveChildProfile } from '@/features/children/child-profile-service';
+import { addChildProfile, deleteChildProfile, loadChildProfile, saveChildProfile, setChildHidden } from '@/features/children/child-profile-service';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
-import { ToyButton } from '@/components/toy-ui';
 
 /**
  * Adds or edits one child profile.
@@ -43,6 +53,9 @@ export default function EditChildRoute() {
   const [loading, setLoading] = useState(childId !== null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (childId === null) return;
@@ -58,6 +71,7 @@ export default function EditChildRoute() {
         setAgeRange(profile.ageRange);
         setChoiceLimit(profile.choiceLimit);
         setReadingSupport(profile.readingSupport);
+        setPaused(profile.hiddenAt !== null);
       } catch (caught: unknown) {
         if (active) setError(caught instanceof Error ? caught.message : 'Could not load that profile.');
       } finally {
@@ -85,62 +99,122 @@ export default function EditChildRoute() {
     }
   };
 
-  if (loading) return <PageShell scroll={false}><LoadingState label="Loading profile…" /></PageShell>;
+  const togglePaused = async (next: boolean): Promise<void> => {
+    if (childId === null || busy) return;
+    setBusy(true);
+    setPaused(next);
+    try {
+      const database = await initializeDatabase();
+      await setChildHidden(database, childId, next);
+    } catch (caught: unknown) {
+      setPaused(!next);
+      setError(caught instanceof Error ? caught.message : 'That could not be changed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (): Promise<void> => {
+    if (childId === null) return;
+    setBusy(true);
+    try {
+      const database = await initializeDatabase();
+      await deleteChildProfile(database, childId);
+      router.replace({ pathname: '/parent/children' });
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'That profile could not be deleted.');
+      setPendingDelete(false);
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <ParentDetailScreen backLabel="Children" backTo={parentBackTargets.editChild}>
+        <SkeletonRows label="Loading this profile…" rows={3} />
+      </ParentDetailScreen>
+    );
+  }
 
   return (
-    <PageShell>
-      <ParentModeHeader
-        backTo={parentBackTargets.editChild}
-        subtitle="A nickname and a look. Nothing about birthdays, schools, or diagnoses."
-        title={childId === null ? 'Add a child' : 'Edit profile'}
+    <ParentDetailScreen
+      backLabel="Children"
+      backTo={parentBackTargets.editChild}
+      footer={
+        <PrimaryButton
+          busy={saving}
+          disabled={name.trim().length < 2}
+          label={childId === null ? 'Add this child' : 'Save profile'}
+          onPress={() => {
+            void save();
+          }}
+        />
+      }
+    >
+      <Text accessibilityRole="header" style={styles.title}>
+        {childId === null ? 'Add a child' : name.trim() || 'Edit profile'}
+      </Text>
+
+      {error ? <Banner message={error} tone="alert" /> : null}
+
+      <View style={styles.preview}>
+        <ProfileAvatar accentColorId={accentColorId} avatarId={avatarId} decorative size={64} />
+        <View style={styles.previewCopy}>
+          <Text style={styles.previewLabel}>Preview</Text>
+          <Text numberOfLines={1} style={styles.previewName}>{name.trim() || 'This profile'}</Text>
+          <Text numberOfLines={1} style={styles.previewMeta}>
+            {`${choiceLimit} ${choiceLimit === 1 ? 'choice' : 'choices'} · ${READING_SUPPORT_LABELS[readingSupport as keyof typeof READING_SUPPORT_LABELS] ?? READING_SUPPORT_LABELS['pictures-words']}`}
+          </Text>
+        </View>
+      </View>
+
+      <RoundedTextInput
+        accessibilityLabel="Child name"
+        label="Name"
+        onChangeText={setName}
+        placeholder="For example, Ada"
+        returnKeyType="done"
+        value={name}
       />
 
-      {error ? <NoticeBanner message={error} tone="error" /> : null}
+      <AvatarPicker accentColorId={accentColorId} onChange={setAvatarId} value={avatarId} />
+      <AccentColorPicker onChange={setAccentColorId} value={accentColorId} />
 
-      <FormCard>
-        <View style={styles.preview}>
-          <ProfileAvatar accentColorId={accentColorId} avatarId={avatarId} name={name || 'This profile'} size={72} />
-        </View>
-        <RoundedTextInput
-          accessibilityLabel="Child nickname"
-          label="Nickname"
-          onChangeText={setName}
-          placeholder="For example, Sam"
-          value={name}
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>How many choices at once?</Text>
+        <SegmentedControl<ChoiceLimit>
+          accessibilityLabel="How many choices at once"
+          getOptionLabel={(count) => `${count} toy${count === 1 ? '' : 's'}`}
+          onChange={setChoiceLimit}
+          options={CHOICE_COUNTS}
+          value={choiceLimit}
         />
-        <AvatarPicker accentColorId={accentColorId} onChange={setAvatarId} value={avatarId} />
-        <AccentColorPicker onChange={setAccentColorId} value={accentColorId} />
-      </FormCard>
+      </View>
 
-      <FormCard tone="sage">
-        <Text style={styles.label}>How many choices at a time?</Text>
-        <View style={styles.row}>
-          {CHOICE_COUNTS.map((count) => (
-            <ToyButton
-              key={count}
-              label={`${count} toy${count === 1 ? '' : 's'}`}
-              onPress={() => setChoiceLimit(count)}
-              selected={choiceLimit === count}
-            />
-          ))}
-        </View>
-
-        <Text style={styles.label}>Words and pictures</Text>
-        <View style={styles.row}>
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>How {name.trim() || 'this child'} sees toys</Text>
+        <View accessibilityRole="radiogroup" style={styles.options}>
           {READING_SUPPORTS.map((support) => (
-            <ToyButton
+            <OptionCard
+              description={
+                support === 'pictures' ? 'For children who don’t read yet'
+                  : support === 'pictures-words' ? 'Toy names appear under each photo'
+                    : 'A speaker button reads each name aloud'
+              }
               key={support}
-              label={READING_SUPPORT_LABELS[support]}
               onPress={() => setReadingSupport(support)}
               selected={readingSupport === support}
+              title={READING_SUPPORT_LABELS[support]}
             />
           ))}
         </View>
+      </View>
 
-        <Text style={styles.label}>Rough age range (optional)</Text>
-        <View style={styles.row}>
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>Rough age range (optional)</Text>
+        <View style={styles.chips}>
           {AGE_RANGES.map((range) => (
-            <ToyButton
+            <FilterChip
               key={range}
               label={range}
               onPress={() => setAgeRange((current) => (current === range ? null : range))}
@@ -149,22 +223,74 @@ export default function EditChildRoute() {
           ))}
         </View>
         <Text style={styles.hint}>Used only to pitch wording. Pip never stores a birthday.</Text>
-      </FormCard>
+      </View>
 
-      <PrimaryButton
-        disabled={saving || name.trim().length < 2}
-        label={saving ? 'Saving…' : 'Save profile'}
-        onPress={() => {
-          void save();
+      {childId !== null ? (
+        <>
+          <ToggleRow
+            description="Paused profiles stay saved but are not offered in Child Mode."
+            disabled={busy}
+            label="Pause this profile"
+            onValueChange={(value) => {
+              void togglePaused(value);
+            }}
+            value={paused}
+          />
+
+          <View style={styles.danger}>
+            <Text style={styles.dangerLabel}>DANGER AREA</Text>
+            <ListCard>
+              <ListRow
+                accessory="none"
+                detail="Removes this profile and its play history. Toys, rooms and photos are untouched."
+                icon="trash"
+                onPress={() => setPendingDelete(true)}
+                title="Delete this profile"
+                tone="danger"
+              />
+            </ListCard>
+          </View>
+        </>
+      ) : null}
+
+      <ConfirmationDialog
+        busy={busy}
+        cancelLabel="Keep the profile"
+        confirmLabel="Delete profile"
+        destructive
+        message={`This removes ${name.trim() || 'this child'}'s profile and their play history. Your toys, rooms, storage spots and photos are not affected. This cannot be undone.`}
+        onCancel={() => setPendingDelete(false)}
+        onConfirm={() => {
+          void remove();
         }}
+        title={`Delete ${name.trim() || 'this profile'}?`}
+        visible={pendingDelete}
       />
-    </PageShell>
+    </ParentDetailScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  hint: { color: theme.colors.mutedText, ...theme.typography.supporting },
-  label: { color: theme.colors.primaryText, ...theme.typography.label },
-  preview: { alignItems: 'center', paddingVertical: theme.spacing[8] },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[8] },
+  title: { color: theme.colors.primaryText, ...theme.typography.pageTitle },
+  preview: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.cardSurface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing[12],
+    padding: theme.spacing[12],
+  },
+  previewCopy: { flex: 1, gap: 1 },
+  previewLabel: { color: theme.colors.mutedText, ...theme.typography.caption },
+  previewName: { color: theme.colors.primaryText, ...theme.typography.rowTitle },
+  previewMeta: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  field: { gap: 6 },
+  fieldLabel: { color: theme.colors.primaryText, ...theme.typography.fieldLabel },
+  options: { gap: theme.spacing[8] },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[8] },
+  hint: { color: theme.colors.mutedText, ...theme.typography.meta },
+  danger: { gap: theme.spacing[8] },
+  dangerLabel: { color: theme.colors.error, ...theme.typography.eyebrow },
 });
