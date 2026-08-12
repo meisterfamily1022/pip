@@ -18,6 +18,7 @@ import {
   updateRoom,
   updateStorageSpot,
 } from '@/repositories/rooms-repository';
+import { telemetry } from '@/features/analytics/telemetry-client';
 
 export class LocationConflictError extends Error {}
 export class LocationDeletionBlockedError extends Error {}
@@ -57,7 +58,9 @@ export async function createParentRoom(database: DatabaseConnection, name: strin
   if (!normalizedName) throw new Error('Room name is required.');
   if (await roomNameExists(database, normalizedName)) throw new LocationConflictError('A room with that name already exists.');
   try {
-    return await createRoom(database, normalizedName);
+    const room = await createRoom(database, normalizedName);
+    void telemetry.track('first_room');
+    return room;
   } catch (error: unknown) {
     if (isUniqueConstraintError(error)) throw new LocationConflictError('A room with that name already exists.');
     throw error;
@@ -71,7 +74,9 @@ export async function createParentStorageSpot(database: DatabaseConnection, room
   if (!normalizedName) throw new Error('Storage spot name is required.');
   if (await storageSpotNameExists(database, roomId, normalizedName)) throw new LocationConflictError('A storage spot with that name already exists in this room.');
   try {
-    return await createStorageSpot(database, roomId, normalizedName);
+    const spot = await createStorageSpot(database, roomId, normalizedName);
+    void telemetry.track('first_storage_spot');
+    return spot;
   } catch (error: unknown) {
     if (isUniqueConstraintError(error)) throw new LocationConflictError('A storage spot with that name already exists in this room.');
     throw error;

@@ -3,6 +3,7 @@ import type { PlaySessionRow } from '@/database/rows';
 import type { DatabaseConnection } from '@/database/types';
 import type { ChildToy } from './toys-repository';
 import { selectToyImageUri } from '@/features/toys/toy-image-selection';
+import { telemetry } from '@/features/analytics/telemetry-client';
 
 const now = (): string => new Date().toISOString();
 const SESSION_COLUMNS = 'p.id, p.child_id, p.toy_id, p.status, p.started_at, p.completed_at, p.cleanup_started_at, p.help_requested, p.parent_override_used, p.created_at, p.updated_at';
@@ -89,6 +90,7 @@ export async function startPlaySessionIfNoneActive(database: DatabaseConnection,
     session = await getActivePlaySession(database, childId);
   });
   if (!session) throw new Error('Play session could not be started.');
+  void telemetry.track('session_started');
   return session;
 }
 
@@ -100,6 +102,7 @@ export async function completePlaySession(database: DatabaseConnection, id: numb
   if (result.changes !== 1) throw new Error('Active play session could not be completed.');
   const session = await getPlaySession(database, id);
   if (!session) throw new Error('Completed play session could not be loaded.');
+  void telemetry.track('session_completed');
   return session;
 }
 

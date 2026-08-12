@@ -157,6 +157,7 @@ export default function ParentSettingsRoute() {
         <ListCard>
           <ListRow onPress={() => router.push('/privacy')} title="Privacy" />
           <ListRow onPress={() => router.push('/parent/analytics-privacy' as never)} title="Optional analytics" />
+          <ListRow onPress={() => router.push('/parent/analytics-profile' as never)} title="Optional household profile" />
           <ListRow onPress={() => router.push('/parent/account')} title="Account & your data" />
           <ListRow detail={pipBrand.primaryTagline} title={`About ${pipBrand.name} 1.0`} />
         </ListCard>

@@ -3,6 +3,7 @@ import type { ChoiceLimit } from '@/domain/models';
 import { createRoom, createStorageSpot } from '@/repositories/rooms-repository';
 import { updateSettings } from '@/repositories/settings-repository';
 import { createChildProfile } from '@/repositories/child-profiles-repository';
+import { telemetry } from '@/features/analytics/telemetry-client';
 
 export type CompleteOnboardingInput = {
   childNickname: string;
@@ -36,4 +37,8 @@ export async function completeOnboarding(database: DatabaseConnection, input: Co
       onboardingCompleted: true,
     });
   });
+  void telemetry.track('onboarding_completed');
+  void telemetry.track('first_room');
+  void telemetry.track('first_storage_spot');
+  void telemetry.track('first_child_profile');
 }

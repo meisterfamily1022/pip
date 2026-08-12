@@ -1,6 +1,7 @@
 import { getSessionSnapshot } from '@/features/auth/session-state';
 import { supabase } from '@/lib/supabase';
-import { ANALYTICS_CONSENT_VERSION } from './contracts';
+import { ANALYTICS_CONSENT_VERSION, householdProfileSchema } from './contracts';
+import type { z } from 'zod';
 
 export type AnalyticsPreference = { granted: boolean; consentVersion: number; decidedAt: string };
 
@@ -56,3 +57,11 @@ export class AnalyticsPreferences {
 
 export const analyticsPreferences = new AnalyticsPreferences();
 
+export type AnalyticsHouseholdProfile = z.infer<typeof householdProfileSchema>;
+export async function saveAnalyticsProfile(input: AnalyticsHouseholdProfile): Promise<void> {
+  const account = getSessionSnapshot().account;
+  if (!account) throw new Error('Sign in as a parent to save optional profile information.');
+  const value = householdProfileSchema.parse(input);
+  const { error } = await supabase.from('analytics_profiles').upsert({ household_id: account.accountId, child_count_band: value.childCountBand, caregiver_count_band: value.caregiverCountBand, child_age_bands: value.childAgeBands, country_code: value.countryCode, region_code: value.regionCode, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
