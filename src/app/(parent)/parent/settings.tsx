@@ -156,10 +156,12 @@ export default function ParentSettingsRoute() {
       <Section label="App">
         <ListCard>
           <ListRow onPress={() => router.push('/privacy')} title="Privacy" />
+          <ListRow onPress={() => router.push('/parent/analytics-privacy' as never)} title="Optional analytics" />
           <ListRow onPress={() => router.push('/parent/account')} title="Account & your data" />
           <ListRow detail={pipBrand.primaryTagline} title={`About ${pipBrand.name} 1.0`} />
         </ListCard>
-        <Text style={styles.note}>Everything is stored on this iPhone. Nothing is uploaded.</Text>
+        <Text style={styles.note}>Core family data stays on this device. Optional analytics is off unless a signed-in parent chooses it.</Text>
+        <Text style={styles.note}>Pip is free during launch. Optional Pip Plus features may be introduced later.</Text>
       </Section>
 
       {sampleCount > 0 ? (
