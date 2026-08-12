@@ -18,14 +18,8 @@ const cloudGateway: AnalyticsGateway = {
     return data ? { granted: data.granted, consentVersion: data.consent_version, decidedAt: data.decided_at } : null;
   },
   async write(granted) {
-    const account = getSessionSnapshot().account;
-    if (!account) throw new Error('Sign in as a parent to change analytics settings.');
-    const { error } = await supabase.from('analytics_consents').upsert({
-      household_id: account.accountId,
-      granted,
-      consent_version: ANALYTICS_CONSENT_VERSION,
-      decided_at: new Date().toISOString(),
-    });
+    if (!getSessionSnapshot().account) throw new Error('Sign in as a parent to change analytics settings.');
+    const { error } = await supabase.rpc('set_analytics_consent', { next_granted: granted, next_version: ANALYTICS_CONSENT_VERSION });
     if (error) throw error;
   },
   async deleteData() {
