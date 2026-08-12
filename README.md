@@ -28,31 +28,21 @@ screen, `tsc` may fail on a stale `.expo/types/router.d.ts`; run
 
 ## Accounts, and what needs configuring
 
-Pip works fully with **no account and no internet connection**, and toy photos
-never leave the device. An optional parent account exists for backup, recovery,
-and using Pip on more than one device later.
+Pip keeps toy photos on-device and does not sync household data yet. A parent
+signs in with a six-digit email code before accessing household data.
 
-Authentication runs inside the Expo Router server (`web.output` is `server`),
-under `src/server/auth/**` with thin routes in `src/app/v1/auth/**`. There is no
-separate backend package.
+Authentication is provided directly by Supabase Auth. Native session tokens are
+stored in the iOS Keychain through Expo SecureStore; there is no custom email
+sender or local auth API.
 
-Two things are **not** finished, and neither is a defect:
-
-- **Email delivery needs a provider credential.** Confirmation and password
-  reset are implemented and tested against the `MailSender` interface in
-  `src/server/auth/mail.ts`, but nothing can be delivered until a provider is
-  configured. The confirmation and reset screens say so rather than leaving a
-  parent waiting for a message that cannot arrive.
-- **Backup and sync have no remote transport.** The conflict policy, eligibility
+Household backup and sync have no remote transport yet. The conflict policy, eligibility
   checks, tombstones, and durable import state are built and tested
   (`src/features/sync/**`), but there is no durable server-side store, so
   nothing leaves the device. The landing page therefore makes no backup or sync
   claim, and a test enforces that.
 
-Copy `.env.example` to `.env.local` and fill it in. In production the server
-refuses to start without `PIP_SESSION_SECRET` and `PIP_ONE_TIME_SECRET`. Apple
-and Google sign-in buttons stay hidden until their client ids are set, so Pip
-never offers a method that cannot complete.
+Copy `.env.example` to `.env.local` and set the Supabase Project URL and
+publishable key. Never place a Supabase service-role key in Expo or EAS.
 
 ## Removing things
 
@@ -63,10 +53,6 @@ Four separate actions, deliberately kept apart:
 | Sign out | Account | The session. Nothing is deleted. |
 | Delete a child profile | Children | That profile and its play history. Never toys. |
 | Reset Pip | Settings | Everything on this device. Not the account. |
-| Delete account | Account | The account only. Not the device's library. |
-
-Deleting an account requires confirming your password again, not merely having
-a valid session, and revokes every session on every device.
 
 ## Local data and media
 

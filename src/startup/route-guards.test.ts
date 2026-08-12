@@ -13,7 +13,7 @@ const ready: Omit<GuardInput, "group"> = {
   initializationError: null,
   onboardingComplete: true,
   childModeLocked: false,
-  sessionStatus: "signedOut",
+  sessionStatus: "signedIn",
 };
 
 const GROUPS: RouteGroup[] = ["(public)", "(auth)", "(onboarding)", "(parent)", "(child)", undefined];
@@ -83,7 +83,7 @@ describe("onboarding gating", () => {
   });
 
   it("keeps auth reachable before setup, so a returning parent can sign in", () => {
-    expect(resolveRouteGuard({ ...ready, group: "(auth)", onboardingComplete: false })).toEqual({ kind: "render" });
+    expect(resolveRouteGuard({ ...ready, group: "(auth)", onboardingComplete: false, sessionStatus: "signedOut" })).toEqual({ kind: "render" });
   });
 
   it("sends a completed parent out of onboarding", () => {
@@ -116,8 +116,8 @@ describe("session status", () => {
     expect(resolveRouteGuard({ ...ready, group: "(auth)", sessionStatus: "restoring" })).toEqual({ kind: "launching" });
   });
 
-  it("does not block local surfaces while a session is restoring", () => {
-    expect(resolveRouteGuard({ ...ready, group: "(parent)", sessionStatus: "restoring" })).toEqual({ kind: "render" });
+  it("holds household surfaces while a session is restoring", () => {
+    expect(resolveRouteGuard({ ...ready, group: "(parent)", sessionStatus: "restoring" })).toEqual({ kind: "launching" });
   });
 
   it("sends a signed-in parent away from sign-in", () => {
@@ -131,8 +131,8 @@ describe("session status", () => {
     expect(resolveRouteGuard({ ...ready, group: "(auth)", sessionStatus: "expired" })).toEqual({ kind: "render" });
   });
 
-  it("keeps local surfaces usable when signed out, because an account is optional", () => {
-    expect(resolveRouteGuard({ ...ready, group: "(parent)", sessionStatus: "signedOut" })).toEqual({ kind: "render" });
+  it("redirects unauthenticated visitors away from household data", () => {
+    expect(resolveRouteGuard({ ...ready, group: "(parent)", sessionStatus: "signedOut" })).toEqual({ kind: "redirect", href: "/sign-in" });
   });
 });
 

@@ -43,7 +43,7 @@ export type GuardInput = {
  * Every destination a guard may send someone to. Kept as a literal union so it
  * satisfies Expo Router's typed routes and so a typo cannot become a dead link.
  */
-export type GuardRedirect = '/onboarding' | '/parent/home' | '/child/home' | '/child/parent-return';
+export type GuardRedirect = '/sign-in' | '/onboarding' | '/parent/home' | '/child/home' | '/child/parent-return';
 
 export type GuardDecision =
   | { kind: 'render' }
@@ -67,13 +67,16 @@ export function resolveRouteGuard(input: GuardInput): GuardDecision {
   if (!input.initialized) return { kind: 'launching' };
   if (input.initializationError) return { kind: 'error', message: input.initializationError };
 
-  // A restoring session must not flash the signed-out surface, but every other
-  // group is usable locally while restoration finishes.
-  if (input.sessionStatus === 'restoring' && input.group === '(auth)') return { kind: 'launching' };
+  // Never render household data until the encrypted session has been restored.
+  if (input.sessionStatus === 'restoring') return { kind: 'launching' };
 
   // Signing in is meaningless when a session already exists.
   if (input.sessionStatus === 'signedIn' && input.group === '(auth)') {
     return { kind: 'redirect', href: input.childModeLocked ? '/child/home' : '/parent/home' };
+  }
+
+  if (input.sessionStatus !== 'signedIn' && (input.group === '(onboarding)' || input.group === '(parent)' || input.group === '(child)')) {
+    return { kind: 'redirect', href: '/sign-in' };
   }
 
   // Local setup gates the product surfaces. Auth routes stay reachable so a

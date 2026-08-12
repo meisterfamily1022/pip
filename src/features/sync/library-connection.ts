@@ -9,7 +9,7 @@ import type { DatabaseConnection } from '@/database/types';
  * queues each record for upload.
  *
  * **No remote transport ships yet.** There is no durable server-side store for
- * household data — `src/server/auth` keeps accounts in development memory — so
+ * household data is intentionally not synced yet, so
  * nothing here claims a library is backed up. What is implemented and tested is
  * everything that must be right *before* a transport exists: eligibility,
  * durable per-record state, idempotent retries, tombstones, and a conflict

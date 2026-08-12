@@ -7,19 +7,14 @@ import type { SessionStatus } from '@/startup/route-guards';
  * store in the same shape as `route-access`, so `useSyncExternalStore` can
  * subscribe without a provider.
  *
- * Pip works fully offline with no account: `signedOut` is a normal, supported
- * steady state, not an error. An account is only required for backup, sync,
- * recovery, and household sharing.
- *
- * Prompt 3 supplies the real `SessionRestorer`. Until then the default
- * restorer reports "no stored session", which is accurate: no credential
- * store for accounts exists yet.
+ * Household data is available only after a parent has authenticated.
  */
 
 export type AuthenticatedAccount = {
   accountId: string;
-  householdId: string;
-  firstName: string;
+  /** Legacy local-only UI fields; Supabase profiles currently store identity only. */
+  householdId?: string;
+  firstName?: string;
   email: string;
   emailVerified: boolean;
 };
@@ -53,15 +48,12 @@ export function getSessionSnapshot(): SessionState {
   return state;
 }
 
-/** No account system is wired up yet, so there is never a stored session. */
-const noStoredSession: SessionRestorer = async () => null;
-
 /**
  * Restores once per app start. A restore failure resolves to `signedOut` with
  * `offline` set rather than throwing: losing the network must never strand the
  * parent on a blank screen when the whole product works locally.
  */
-export function restoreSession(restorer: SessionRestorer = noStoredSession): Promise<void> {
+export function restoreSession(restorer: SessionRestorer): Promise<void> {
   if (!restoration) {
     publish({ status: 'restoring', offline: false });
     restoration = restorer()

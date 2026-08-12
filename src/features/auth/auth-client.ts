@@ -1,203 +1,72 @@
-import { authSessionStorage, type AuthSessionStorage } from '@/services/auth-session-storage';
-import {
-  clearSession,
-  setAuthenticatedSession,
-  setOffline,
-  type AuthenticatedAccount,
-  type SessionRestorer,
-} from './session-state';
+import type { User } from '@supabase/supabase-js';
 
-/**
- * Client side of the account API.
- *
- * Pip is local-first: every failure here degrades to "signed out" rather than
- * blocking the app, because the product works fully without an account.
- */
-
-const AUTH_BASE = '/v1/auth';
-
-type AuthErrorBody = { error?: { code?: string; message?: string } };
+import { supabase } from '@/lib/supabase';
+import { clearSession, setAuthenticatedSession, type AuthenticatedAccount, type SessionRestorer } from './session-state';
 
 export class AuthRequestError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-  ) {
+  constructor(readonly code: string, message: string) {
     super(message);
     this.name = 'AuthRequestError';
   }
 }
 
-async function request<T>(
-  path: string,
-  init: RequestInit & { token?: string } = {},
-): Promise<T | null> {
-  const { token, ...rest } = init;
-  const url = path.startsWith('/household') ? `/v1${path}` : `${AUTH_BASE}${path}`;
-  const response = await fetch(url, {
-    ...rest,
-    headers: {
-      'content-type': 'application/json',
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...rest.headers,
-    },
-  });
-
-  if (response.status === 204 || response.status === 202) return null;
-
-  const body: unknown = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const parsed = body as AuthErrorBody;
-    throw new AuthRequestError(parsed.error?.code ?? 'INTERNAL_ERROR', parsed.error?.message ?? 'Something went wrong.');
-  }
-  return body as T;
+function authError(error: { message: string; code?: string; status?: number }): AuthRequestError {
+  const message = error.message.toLowerCase();
+  if (message.includes('expired')) return new AuthRequestError('OTP_EXPIRED', 'That code has expired. Send a new code and try again.');
+  if (message.includes('already') || message.includes('used')) return new AuthRequestError('OTP_USED', 'That code has already been used. Send a new code and try again.');
+  if (message.includes('token') || message.includes('otp') || message.includes('code')) return new AuthRequestError('OTP_INVALID', 'That code is not valid. Check it and try again, or send a new code.');
+  if (error.status === 429) return new AuthRequestError('RATE_LIMITED', 'Please wait a moment before requesting another code.');
+  return new AuthRequestError(error.code ?? 'AUTH_ERROR', 'We could not complete sign-in. Try again shortly.');
 }
 
-type SessionResponse = {
-  token: string;
-  context: AuthenticatedAccount & { sessionId: string };
-};
-
-type ContextResponse = AuthenticatedAccount & { sessionId: string };
-
-const toAccount = (context: ContextResponse): AuthenticatedAccount => ({
-  accountId: context.accountId,
-  householdId: context.householdId,
-  firstName: context.firstName,
-  email: context.email,
-  emailVerified: context.emailVerified,
-});
-
-/**
- * Restores a stored session at launch.
- *
- * A rejected token is discarded so the device does not retry it forever. A
- * network failure keeps the token, because being offline is not the same as
- * being signed out, and the parent should not have to sign in again when the
- * connection returns.
- */
-export function createSessionRestorer(storage: AuthSessionStorage = authSessionStorage): SessionRestorer {
-  return async () => {
-    const token = await storage.read();
-    if (!token) return null;
-
-    try {
-      const context = await request<ContextResponse>('/session', { method: 'GET', token });
-      return context ? toAccount(context) : null;
-    } catch (error: unknown) {
-      if (error instanceof AuthRequestError) {
-        // The server rejected it; it will never work again.
-        await storage.clear();
-        return null;
-      }
-      setOffline(true);
-      throw error;
-    }
-  };
+function toAccount(user: User): AuthenticatedAccount {
+  return { accountId: user.id, email: user.email ?? '', emailVerified: Boolean(user.email_confirmed_at) };
 }
 
-async function adoptSession(result: SessionResponse, storage: AuthSessionStorage): Promise<AuthenticatedAccount> {
-  await storage.save(result.token);
-  const account = toAccount(result.context);
+/** Sends the same passwordless email OTP for both new and returning parents. */
+export async function sendEmailOtp(email: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) throw authError(error);
+}
+
+export const signUp = async (input: { email: string }): Promise<void> => sendEmailOtp(input.email);
+export const signIn = async (email: string, _unusedPassword?: string): Promise<void> => sendEmailOtp(email);
+export const resendVerification = async (email: string): Promise<void> => sendEmailOtp(email);
+
+/** Verifies Supabase's six-digit email OTP and publishes the resulting session. */
+export async function verifyEmail(email: string, code: string): Promise<AuthenticatedAccount> {
+  const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
+  if (error) throw authError(error);
+  if (!data.user) throw new AuthRequestError('AUTH_ERROR', 'We could not complete sign-in. Try again shortly.');
+  const account = toAccount(data.user);
   setAuthenticatedSession(account);
   return account;
 }
 
-export async function signUp(
-  input: { email: string; firstName: string; password: string; householdName?: string; acceptedTerms: boolean },
-): Promise<void> {
-  await request('/sign-up', { method: 'POST', body: JSON.stringify(input) });
+/** Restores the encrypted Supabase session on launch. */
+export function createSessionRestorer(): SessionRestorer {
+  return async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return data.session?.user ? toAccount(data.session.user) : null;
+  };
 }
 
-export async function verifyEmail(
-  email: string,
-  code: string,
-  storage: AuthSessionStorage = authSessionStorage,
-): Promise<AuthenticatedAccount> {
-  const result = await request<SessionResponse>('/verify', { method: 'POST', body: JSON.stringify({ email, code }) });
-  if (!result) throw new AuthRequestError('INTERNAL_ERROR', 'Something went wrong.');
-  return adoptSession(result, storage);
-}
-
-export async function resendVerification(email: string): Promise<void> {
-  await request('/verify', { method: 'PUT', body: JSON.stringify({ email }) });
-}
-
-export async function signIn(
-  email: string,
-  password: string,
-  storage: AuthSessionStorage = authSessionStorage,
-): Promise<AuthenticatedAccount> {
-  const result = await request<SessionResponse>('/sign-in', { method: 'POST', body: JSON.stringify({ email, password }) });
-  if (!result) throw new AuthRequestError('INTERNAL_ERROR', 'Something went wrong.');
-  return adoptSession(result, storage);
-}
-
-/**
- * Ends the server session and forgets the token.
- *
- * Local data is deliberately untouched: signing out must never look like a way
- * to lose a library that has not synced.
- */
-export async function signOut(storage: AuthSessionStorage = authSessionStorage): Promise<void> {
-  const token = await storage.read();
-  try {
-    if (token) await request('/session', { method: 'DELETE', token });
-  } catch {
-    // Even if the server cannot be reached, drop the local token.
-  }
-  await storage.clear();
+export async function signOut(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
   clearSession();
+  if (error) throw authError(error);
 }
 
-/**
- * Names the household after verification.
- *
- * Renaming is idempotent, so a retry after a dropped connection settles on the
- * same value rather than creating a second household.
- */
-export async function renameHousehold(
-  householdId: string,
-  name: string,
-  storage: AuthSessionStorage = authSessionStorage,
-): Promise<void> {
-  const token = await storage.read();
-  if (!token) throw new AuthRequestError('SESSION_INVALID', 'Sign in to continue.');
-  await request('/household', {
-    method: 'PATCH',
-    token,
-    body: JSON.stringify({ householdId, name }),
-  });
-}
-
-/** Confirms the current password before a sensitive action. */
-export async function reauthenticate(
-  password: string,
-  storage: AuthSessionStorage = authSessionStorage,
-): Promise<void> {
-  const token = await storage.read();
-  if (!token) throw new AuthRequestError('SESSION_INVALID', 'Sign in to continue.');
-  await request('/reauthenticate', { method: 'POST', token, body: JSON.stringify({ password }) });
-}
-
-/**
- * Deletes the parent account.
- *
- * Only the server-side account. The local library is deliberately left alone,
- * so this can never be mistaken for a way to clear the device.
- */
-export async function deleteAccount(storage: AuthSessionStorage = authSessionStorage): Promise<void> {
-  const token = await storage.read();
-  if (!token) throw new AuthRequestError('SESSION_INVALID', 'Sign in to continue.');
-  await request('/account', { method: 'DELETE', token });
-  await storage.clear();
-  clearSession();
-}
-
+// These legacy web-only account-management routes are intentionally not backed
+// by the retired local auth server. Profiles are identity-only in this change.
+const unsupported = (): never => {
+  throw new AuthRequestError('UNSUPPORTED', 'This account action is not available yet.');
+};
+export async function renameHousehold(_householdId: string, _name: string): Promise<void> { unsupported(); }
+export async function reauthenticate(_password: string): Promise<void> { unsupported(); }
+export async function deleteAccount(): Promise<void> { unsupported(); }
 export async function requestPasswordReset(email: string): Promise<void> {
-  await request('/password-reset', { method: 'POST', body: JSON.stringify({ email }) });
-}
-
-export async function resetPassword(token: string, password: string): Promise<void> {
-  await request('/password-reset', { method: 'PUT', body: JSON.stringify({ token, password }) });
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) throw authError(error);
 }
