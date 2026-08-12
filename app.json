@@ -33,6 +33,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-dev-client",
+        {
+          "ios": {
+            "toolsButton": false
+          }
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Pip lets you choose toy photos for your local toy library.",
