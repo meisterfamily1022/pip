@@ -22,6 +22,7 @@ import { listChildProfiles, loadParentSettings } from '@/features/settings/setti
 import { parentAccessPreferences } from '@/services/parent-access-preferences';
 import { resetRouteAccess } from '@/startup/route-access';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { getSessionSnapshot } from '@/features/auth/session-state';
 
 /**
  * Settings.
@@ -31,6 +32,7 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * safe to browse. The danger area is separated, labelled, and last.
  */
 export default function ParentSettingsRoute() {
+  const cloudEligible = getSessionSnapshot().status === 'signedIn';
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [choiceLimit, setChoiceLimit] = useState<1 | 3 | 5>(3);
   const [cleanupRequired, setCleanupRequired] = useState(true);
@@ -156,8 +158,8 @@ export default function ParentSettingsRoute() {
       <Section label="App">
         <ListCard>
           <ListRow onPress={() => router.push('/privacy')} title="Privacy" />
-          <ListRow onPress={() => router.push('/parent/analytics-privacy' as never)} title="Optional analytics" />
-          <ListRow onPress={() => router.push('/parent/analytics-profile' as never)} title="Optional household profile" />
+          {cloudEligible ? <ListRow onPress={() => router.push('/parent/analytics-privacy' as never)} title="Optional analytics" /> : null}
+          {cloudEligible ? <ListRow onPress={() => router.push('/parent/analytics-profile' as never)} title="Optional household profile" /> : null}
           <ListRow onPress={() => router.push('/parent/account')} title="Account & your data" />
           <ListRow detail={pipBrand.primaryTagline} title={`About ${pipBrand.name} 1.0`} />
         </ListCard>

@@ -11,18 +11,20 @@ const MAX_QUEUE = 25;
 const KEY = 'pip.analytics.pseudonym.v1';
 
 async function pseudonym(): Promise<string> {
+  const fresh = (raw: string | null): string | null => {
+    try { const value = JSON.parse(raw ?? '') as { value: string; createdAt: number }; return Date.now() - value.createdAt < 30 * 86400000 ? value.value : null; } catch { return null; }
+  };
+  const created = { value: crypto.randomUUID() + crypto.randomUUID(), createdAt: Date.now() };
   if (Platform.OS === 'web') {
-    const key = typeof localStorage === 'undefined' ? null : localStorage.getItem(KEY);
+    const key = fresh(typeof localStorage === 'undefined' ? null : localStorage.getItem(KEY));
     if (key) return key;
-    const created = crypto.randomUUID() + crypto.randomUUID();
-    if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, created);
-    return created;
+    if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, JSON.stringify(created));
+    return created.value;
   }
-  const current = await SecureStore.getItemAsync(KEY);
+  const current = fresh(await SecureStore.getItemAsync(KEY));
   if (current) return current;
-  const created = crypto.randomUUID() + crypto.randomUUID();
-  await SecureStore.setItemAsync(KEY, created, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
-  return created;
+  await SecureStore.setItemAsync(KEY, JSON.stringify(created), { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
+  return created.value;
 }
 
 export class TelemetryClient {
@@ -31,7 +33,7 @@ export class TelemetryClient {
 
   async track(name: TelemetryEventName, values: Record<string, unknown> = {}): Promise<void> {
     try {
-      if (!(await this.consent.get()).granted) return;
+      if (!(await this.consent.get()).granted) { this.queue = []; return; }
       const parsed = parseTelemetryEvent({ name, payload: { ...values, appVersion: Constants.expoConfig?.version ?? 'unknown', platform: Platform.OS } });
       this.queue.push({ ...parsed, idempotencyKey: crypto.randomUUID(), occurredAt: new Date().toISOString() });
       if (this.queue.length > MAX_QUEUE) this.queue.shift();
@@ -41,9 +43,9 @@ export class TelemetryClient {
 
   async flush(): Promise<void> {
     if (!this.queue.length) return;
+    if (!(await this.consent.get()).granted) { this.queue = []; return; }
     const batch = [...this.queue];
     try { await this.transport.send(batch, await pseudonym()); this.queue.splice(0, batch.length); } catch { /* bounded best-effort retry on the next event */ }
   }
 }
 export const telemetry = new TelemetryClient();
-
