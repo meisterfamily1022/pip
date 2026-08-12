@@ -100,8 +100,8 @@ describe('landing copy', () => {
       /backup|sync/i,
     );
 
-    // Where backup is mentioned at all, it must read as future, not present.
-    expect(landingPrivacy.note).toMatch(/when .*(arrive|ready)/i);
+    // Where backup is mentioned at all, it must clearly say it is unavailable.
+    expect(landingPrivacy.note).toMatch(/backup is not available yet/i);
   });
 
   it('claims photos stay on the device, which matches the shipped build', () => {

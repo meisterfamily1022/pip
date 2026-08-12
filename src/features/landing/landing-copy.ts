@@ -98,7 +98,7 @@ export const landingPrivacy = {
     'No account needed to try it.',
     'Children never sign in or create accounts.',
   ],
-  note: 'When accounts and backup arrive, you will choose whether to turn them on.',
+  note: 'Accounts and optional analytics are adult choices. Backup is not available yet, and core family data stays on this device.',
 } as const;
 
 export const landingFinalCta = {

@@ -50,10 +50,15 @@ export default function PrivacyRoute() {
           uploaded, because Pip has no backup or syncing yet.
         </Text>
         <Text style={styles.body}>
-          If you create an optional account, it holds your first name and email address, and nothing about a child. An
+          If you create an optional account, it holds your email address and nothing that identifies a child. An
           account exists so that backup, recovery, and sharing between your own devices are possible later. Pip works
           fully without one.
         </Text>
+
+        <Text accessibilityRole="header" style={styles.heading}>Optional product analytics</Text>
+        <Text style={styles.body}>A signed-in parent may choose to share privacy-minimized analytics for product improvement. The choice starts off and can be changed at any time. Guest, sample, and local-only use sends no cloud telemetry.</Text>
+        <Text style={styles.body}>If enabled, Pip may collect app version and platform, coarse country and state/province selected by the parent, optional household-size and broad age bands, feature counts in bands, onboarding and session milestones, cleanup outcomes, and categorized errors. Pip does not send toy or child names, photos, typed searches, free text, precise location, IP addresses, birthdays, diagnoses, schools, or therapy information.</Text>
+        <Text style={styles.body}>Pip does not sell analytics, use it for advertising, or treat a child as an analytics identity. Raw events are retained for up to 13 months. A parent can stop new collection immediately or delete telemetry and reporting-only profile data without deleting the account or on-device family data.</Text>
 
         <Text accessibilityRole="header" style={styles.heading}>
           What Pip never asks for

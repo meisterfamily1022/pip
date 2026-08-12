@@ -8,6 +8,7 @@ import {
   markCleanupStarted,
 } from '@/repositories/play-sessions-repository';
 import { getSettings } from '@/repositories/settings-repository';
+import { telemetry } from '@/features/analytics/telemetry-client';
 
 export type CleanupState = {
   activeSession: ActivePlaySession | null;
@@ -42,6 +43,7 @@ export async function completeCleanup(database: DatabaseConnection, childId: num
   const active = await getActivePlaySession(database, childId);
   if (!active) throw new Error('There is no active cleanup session.');
   await completePlaySession(database, active.id, childId);
+  void telemetry.track('cleanup_completed');
 }
 
 export async function completeCleanupWithParentOverride(database: DatabaseConnection, childId: number): Promise<void> {
