@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
 export type ReportRange = { start: string; end: string };
-export type AnalyticsReport = { authorized: boolean; timezone?: 'UTC'; range?: ReportRange; totals?: { households: number; events: number }; funnel?: { event_name: string; households: number }[]; active?: { dau: number; wau: number; mau: number }; engagement?: { play_sessions: number; cleanup_completions: number }; demographics?: { kind: string; value: string | null; households: number | null; suppressed: boolean }[]; health?: { feature: string; error_code: string; total: number }[]; entitlements?: { state: string; households: number }[] };
+export type AnalyticsReport = { authorized: boolean; timezone?: 'UTC'; range?: ReportRange; totals?: { households: number; events: number }; funnel?: { event_name: string; households: number }[]; active?: { dau: number; wau: number; mau: number }; engagement?: { play_sessions: number; cleanup_completions: number }; cohorts?: { signup_week: string; denominator: number; d1: number; d7: number; d30: number }[]; libraryBands?: { toy_band: string; households: number }[]; demographics?: { kind: string; value: string | null; households: number | null; suppressed: boolean }[]; health?: { feature: string; error_code: string; total: number }[]; entitlements?: { state: string; households: number }[] };
 
 export function validateReportRange(range: ReportRange): ReportRange {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(range.start) || !/^\d{4}-\d{2}-\d{2}$/.test(range.end)) throw new Error('Use YYYY-MM-DD dates.');
@@ -24,9 +24,10 @@ export function reportToCsv(report: AnalyticsReport): string {
   for (const item of report.funnel ?? []) rows.push(['funnel', item.event_name, '', item.households, false]);
   for (const [metric,value] of Object.entries(report.active ?? {})) rows.push(['active', metric, value, '', false]);
   for (const [metric,value] of Object.entries(report.engagement ?? {})) rows.push(['engagement', metric, value, '', false]);
+  for (const item of report.cohorts ?? []) for (const day of ['d1','d7','d30'] as const) rows.push(['retention', `${item.signup_week}:${day}`, item[day], item.denominator, false]);
+  for (const item of report.libraryBands ?? []) rows.push(['library_band','toys',item.toy_band,item.households,false]);
   for (const item of report.demographics ?? []) rows.push(['demographic', item.kind, item.suppressed ? 'Insufficient data' : item.value, item.suppressed ? '' : item.households, item.suppressed]);
   for (const item of report.health ?? []) rows.push(['health', `${item.feature}:${item.error_code}`, item.total, '', false]);
   for (const item of report.entitlements ?? []) rows.push(['entitlement', item.state, '', item.households, false]);
   return rows.map((row) => row.map(csvCell).join(',')).join('\n');
 }
-

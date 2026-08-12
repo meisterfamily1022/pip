@@ -22,5 +22,7 @@ test('reporting authorizes with an admin claim and suppresses cells under ten ho
   expect(reportingSql).toContain("app_metadata'->>'pip_admin'");
   expect(reportingSql).toContain('households<10');
   expect(reportingSql).toContain('staff_report_audits');
+  expect(reportingSql).toContain("signup_date+30");
+  expect(reportingSql).toContain("event_name='library_scale'");
   expect(reportingSql).not.toMatch(/select \* from public\.profiles/i);
 });

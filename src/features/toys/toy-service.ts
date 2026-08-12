@@ -17,6 +17,7 @@ import {
 } from '@/repositories/toys-repository';
 import { deleteUniqueManagedImages, expoToyImageStorage, type ToyImageStorage } from './toy-image-storage';
 import { telemetry } from '@/features/analytics/telemetry-client';
+import { trackLibraryScale } from '@/features/analytics/library-scale';
 
 export class ToyValidationError extends Error {}
 
@@ -82,6 +83,7 @@ export async function createParentToy(
     const parentToy = await getParentToy(database, toy.id);
     if (!parentToy) throw new Error('Created toy could not be loaded.');
     void telemetry.track('toy_added');
+    void trackLibraryScale(database);
     if (input.sourceImageUri) void telemetry.track('first_photo');
     return parentToy;
   } catch (error: unknown) {
