@@ -7,7 +7,7 @@ import { OnboardingScreen } from '@/components/onboarding-screen';
 import { PrimaryButton } from '@/components/onboarding-controls';
 import { QuietButton, RoundedTextInput } from '@/components/playmap-ui';
 import { AuthRequestError, signIn } from './auth-client';
-import { pendingVerification } from './sign-up-form';
+import { isValidEmail, pendingVerification } from './sign-up-form';
 
 /** Platform-neutral passwordless sign-in screen. */
 export function SignInScreen() {
@@ -16,6 +16,7 @@ export function SignInScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (): Promise<void> => {
+    if (!isValidEmail(email)) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -32,7 +33,7 @@ export function SignInScreen() {
   return (
     <OnboardingScreen
       description={`Your library stays on this device either way. An account is for backup and using ${pipBrand.name} elsewhere.`}
-      footer={<PrimaryButton disabled={submitting || !email.trim()} label={submitting ? 'Sending code…' : 'Email me a code'} onPress={() => void submit()} />}
+      footer={<PrimaryButton disabled={submitting || !isValidEmail(email)} label={submitting ? 'Sending code…' : 'Email me a code'} onPress={() => void submit()} />}
       title="Sign in"
     >
       <ErrorSummary errors={error ? [error] : []} />

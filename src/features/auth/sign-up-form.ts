@@ -23,12 +23,17 @@ export type SignUpFieldErrors = Partial<Record<'firstName' | 'email' | 'password
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Shared email gate for passwordless account actions. */
+export function isValidEmail(email: string): boolean {
+  return EMAIL_PATTERN.test(email.trim());
+}
+
 export const passwordRequirementHint = `At least ${MINIMUM_PASSWORD_LENGTH} characters.`;
 
 export function validateSignUp(fields: SignUpFields): SignUpFieldErrors {
   const errors: SignUpFieldErrors = {};
   if (!fields.firstName.trim()) errors.firstName = 'Enter your first name.';
-  if (!EMAIL_PATTERN.test(fields.email.trim())) errors.email = 'Enter an email address we can reach you at.';
+  if (!isValidEmail(fields.email)) errors.email = 'Enter an email address we can reach you at.';
   if (fields.password.length < MINIMUM_PASSWORD_LENGTH) {
     errors.password = `Use at least ${MINIMUM_PASSWORD_LENGTH} characters.`;
   }
