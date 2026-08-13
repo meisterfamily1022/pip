@@ -2,6 +2,7 @@ import type { DatabaseConnection } from '@/database/types';
 import { deleteUniqueManagedImages, expoToyImageStorage, type ToyImageStorage } from '@/features/toys/toy-image-storage';
 import { pinStorage, type PinStorage } from '@/services/pin-storage';
 import { onboardingProgressStorage } from '@/services/onboarding-progress-storage';
+import { verifyParentPin } from '@/features/child/parent-access';
 
 type StoredImageRow = {
   image_uri: string | null;
@@ -12,6 +13,48 @@ type StoredImageRow = {
 export type ResetPlayMapResult = {
   imageCleanupFailures: number;
 };
+
+export type ResetImpact = {
+  toys: number;
+  photos: number;
+  rooms: number;
+  storageSpots: number;
+  children: number;
+  playRecords: number;
+};
+
+type CountRow = { count: number };
+
+/** Counts the records a reset will irreversibly remove. */
+export async function getResetImpact(database: DatabaseConnection): Promise<ResetImpact> {
+  const [toys, photos, rooms, storageSpots, children, playRecords] = await Promise.all([
+    database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM toys;'),
+    database.getFirstAsync<CountRow>("SELECT COUNT(*) AS count FROM toys WHERE image_uri IS NOT NULL OR original_image_uri IS NOT NULL OR enhanced_image_uri IS NOT NULL;"),
+    database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM rooms;'),
+    database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM storage_spots;'),
+    database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM child_profiles;'),
+    database.getFirstAsync<CountRow>('SELECT COUNT(*) AS count FROM play_sessions;'),
+  ]);
+  return {
+    toys: toys?.count ?? 0,
+    photos: photos?.count ?? 0,
+    rooms: rooms?.count ?? 0,
+    storageSpots: storageSpots?.count ?? 0,
+    children: children?.count ?? 0,
+    playRecords: playRecords?.count ?? 0,
+  };
+}
+
+/** PIN-gated reset entry point for user-facing destructive actions. */
+export async function resetPlayMapDataWithPin(
+  database: DatabaseConnection,
+  enteredPin: string,
+  storage: ToyImageStorage = expoToyImageStorage,
+  pins: PinStorage = pinStorage,
+): Promise<ResetPlayMapResult> {
+  if (!(await verifyParentPin(pins, enteredPin))) throw new Error('That parent PIN does not match. Nothing was removed.');
+  return resetPlayMapData(database, storage, pins);
+}
 
 /** Removes family data without deleting source files or the database itself. */
 export async function resetPlayMapData(

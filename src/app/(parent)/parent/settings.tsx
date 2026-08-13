@@ -10,6 +10,7 @@ import {
   DestructiveButton,
   ListCard,
   ListRow,
+  PinInput,
   SkeletonRows,
   Toast,
   ToggleRow,
@@ -17,7 +18,7 @@ import {
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
 import { countSampleToys, removeSampleLibrary } from '@/features/samples/sample-library';
-import { resetPlayMapData } from '@/features/settings/reset-playmap';
+import { getResetImpact, resetPlayMapDataWithPin, type ResetImpact } from '@/features/settings/reset-playmap';
 import { listChildProfiles, loadParentSettings } from '@/features/settings/settings-service';
 import { parentAccessPreferences } from '@/services/parent-access-preferences';
 import { resetRouteAccess } from '@/startup/route-access';
@@ -43,6 +44,9 @@ export default function ParentSettingsRoute() {
   const [notice, setNotice] = useState<string | null>(null);
   const [resetConfirming, setResetConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [resetPin, setResetPin] = useState('');
+  const [resetImpact, setResetImpact] = useState<ResetImpact | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
   const resettingRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -100,14 +104,25 @@ export default function ParentSettingsRoute() {
     setError(null);
     try {
       const database = await initializeDatabase();
-      await resetPlayMapData(database);
+      await resetPlayMapDataWithPin(database, resetPin);
       await resetRouteAccess();
       router.replace('/onboarding');
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Pip could not be reset.');
-      setResetConfirming(false);
+      setResetError(caught instanceof Error ? caught.message : 'Pip could not be reset.');
       resettingRef.current = false;
       setResetting(false);
+    }
+  };
+
+  const openResetConfirmation = async (): Promise<void> => {
+    setResetPin('');
+    setResetError(null);
+    setResetImpact(null);
+    setResetConfirming(true);
+    try {
+      setResetImpact(await getResetImpact(await initializeDatabase()));
+    } catch {
+      // The reset remains safe even if counts are temporarily unavailable.
     }
   };
 
@@ -189,7 +204,7 @@ export default function ParentSettingsRoute() {
           <DestructiveButton
             disabled={resetting}
             label={resetting ? 'Resetting…' : `Reset ${pipBrand.name}`}
-            onPress={() => setResetConfirming(true)}
+            onPress={() => { void openResetConfirmation(); }}
             style={styles.dangerButton}
           />
         </View>
@@ -200,14 +215,23 @@ export default function ParentSettingsRoute() {
         cancelLabel="Keep everything"
         confirmLabel={`Reset ${pipBrand.name}`}
         destructive
-        message="Every toy, photo, room, storage spot, child profile, play record and the parent PIN will be permanently removed from this device. This cannot be undone."
-        onCancel={() => setResetConfirming(false)}
+        message={resetImpact
+          ? `${resetImpact.toys} toys, ${resetImpact.photos} photos, ${resetImpact.rooms} rooms, ${resetImpact.storageSpots} storage spots, ${resetImpact.children} child profiles, ${resetImpact.playRecords} play records, all settings, and the parent PIN will be permanently removed from this device. This cannot be undone.`
+          : 'Every toy, photo, room, storage spot, child profile, play record, setting, and the parent PIN will be permanently removed from this device. This cannot be undone.'}
+        onCancel={() => { if (!resetting) { setResetConfirming(false); setResetPin(''); setResetError(null); } }}
         onConfirm={() => {
           void resetData();
         }}
         title={`Reset ${pipBrand.name}?`}
         visible={resetConfirming}
-      />
+      >
+        <PinInput
+          accessibilityLabel="Parent PIN to confirm reset"
+          error={resetError}
+          onChangeText={(value) => { setResetPin(value); setResetError(null); }}
+          value={resetPin}
+        />
+      </ConfirmationDialog>
     </ParentScreen>
   );
 }

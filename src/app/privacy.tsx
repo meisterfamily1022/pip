@@ -8,9 +8,8 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * The public privacy notice.
  *
  * The landing page footer links here, so this must exist rather than 404 — the
- * brief requires privacy links to resolve to a real page or a clearly labelled
- * placeholder awaiting review. This is the latter, and says so plainly: it
- * describes what the build actually does and makes no legal claim.
+ * brief requires privacy links to resolve to a real page. This describes the
+ * behavior implemented by the current build in plain language.
  *
  * Every statement here is the same one the landing page makes, drawn from the
  * same module, so the two cannot drift apart.
@@ -22,13 +21,6 @@ export default function PrivacyRoute() {
         <Text accessibilityRole="header" style={styles.title}>
           {`${pipBrand.name} privacy notice`}
         </Text>
-
-        <View style={styles.draftBanner}>
-          <Text style={styles.draftTitle}>Draft, pending review</Text>
-          <Text style={styles.body}>
-            {`${pipBrand.name} is in development. This page describes how the current build behaves. It has not been reviewed by a lawyer and is not a legal agreement.`}
-          </Text>
-        </View>
 
         <Text accessibilityRole="header" style={styles.heading}>
           What Pip does
@@ -57,7 +49,7 @@ export default function PrivacyRoute() {
 
         <Text accessibilityRole="header" style={styles.heading}>Optional product analytics</Text>
         <Text style={styles.body}>A signed-in parent may choose to share privacy-minimized analytics for product improvement. The choice starts off and can be changed at any time. Guest, sample, and local-only use sends no cloud telemetry.</Text>
-        <Text style={styles.body}>If enabled, Pip may collect app version and platform, coarse country and state/province selected by the parent, optional household-size and broad age bands, feature counts in bands, onboarding and session milestones, cleanup outcomes, and categorized errors. Pip does not send toy or child names, photos, typed searches, free text, precise location, IP addresses, birthdays, diagnoses, schools, or therapy information.</Text>
+        <Text style={styles.body}>If enabled, Pip may collect app version and platform, coarse country and state/province selected by the parent, optional household-size and broad age bands, feature counts in bands, onboarding and session milestones, cleanup outcomes, and categorized errors. Analytics event payloads do not include toy or child names, photos, typed searches, free text, precise location, IP addresses, birthdays, diagnoses, schools, or therapy information.</Text>
         <Text style={styles.body}>Pip does not sell analytics, use it for advertising, or treat a child as an analytics identity. Raw events are retained for up to 13 months. A parent can stop new collection immediately or delete telemetry and reporting-only profile data without deleting the account or on-device family data.</Text>
 
         <Text accessibilityRole="header" style={styles.heading}>
@@ -72,16 +64,7 @@ export default function PrivacyRoute() {
           Your controls
         </Text>
         <Text style={styles.body}>
-          You can export everything Pip holds as a readable file, delete a child profile without losing any toys, clear
-          this device entirely, or delete your account. These are separate actions, and each says what it does and does
-          not remove.
-        </Text>
-
-        <Text accessibilityRole="header" style={styles.heading}>
-          What this page does not claim
-        </Text>
-        <Text style={styles.body}>
-          Pip makes no COPPA, GDPR, HIPAA, or SOC 2 compliance claim. Those require review that has not happened yet.
+          You can export the structured family data stored by Pip as a readable file, delete a child profile without losing any toys, clear this device entirely, or sign out of an optional account. Exported photo entries refer to files on this device; the photos themselves are not included in the export. Pip does not currently provide in-app account deletion.
         </Text>
 
         <Text style={styles.footer}>{`${pipBrand.name} — ${pipBrand.primaryTagline}`}</Text>
@@ -98,15 +81,6 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     width: '100%',
   },
-  draftBanner: {
-    backgroundColor: theme.colors.warningSoft,
-    borderColor: theme.colors.warning,
-    borderLeftWidth: 4,
-    borderRadius: theme.radii.medium,
-    gap: theme.spacing[4],
-    padding: theme.spacing[16],
-  },
-  draftTitle: { color: theme.colors.warning, ...theme.typography.label },
   footer: {
     borderTopColor: theme.colors.border,
     borderTopWidth: 1,

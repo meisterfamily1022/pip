@@ -1,7 +1,7 @@
 import type { DatabaseConnection, SqlParameters, SqlRunResult } from '@/database/types';
 import type { ToyImageStorage } from '@/features/toys/toy-image-storage';
 import type { PinStorage } from '@/services/pin-storage';
-import { resetPlayMapData } from './reset-playmap';
+import { getResetImpact, resetPlayMapData, resetPlayMapDataWithPin } from './reset-playmap';
 
 class ResetDatabase implements DatabaseConnection {
   public calls: string[] = [];
@@ -9,7 +9,16 @@ class ResetDatabase implements DatabaseConnection {
   async execAsync(): Promise<void> {}
   async withTransactionAsync(task: () => Promise<void>): Promise<void> { this.calls.push('BEGIN'); await task(); this.calls.push('COMMIT'); }
   async runAsync(source: string, ..._params: SqlParameters): Promise<SqlRunResult> { this.calls.push(source.split(';')[0] ?? source); if (this.failDuringReset && source.startsWith('DELETE FROM toys')) throw new Error('database reset failed'); return { lastInsertRowId: 0, changes: 1 }; }
-  async getFirstAsync<T>(): Promise<T | null> { return null; }
+  async getFirstAsync<T>(source: string): Promise<T | null> {
+    const count = source.includes('FROM toys WHERE') ? 3
+      : source.includes('FROM toys') ? 4
+      : source.includes('FROM rooms') ? 2
+      : source.includes('FROM storage_spots') ? 5
+      : source.includes('FROM child_profiles') ? 1
+      : source.includes('FROM play_sessions') ? 6
+      : 0;
+    return { count } as T;
+  }
   async getAllAsync<T>(): Promise<T[]> {
     return [{ image_uri: 'managed://one', original_image_uri: 'managed://one', enhanced_image_uri: 'managed://two' }] as T[];
   }
@@ -32,6 +41,27 @@ class ResetPins implements PinStorage {
 }
 
 describe('resetPlayMapData', () => {
+  it('reports the records affected by reset', async () => {
+    await expect(getResetImpact(new ResetDatabase())).resolves.toEqual({
+      toys: 4,
+      photos: 3,
+      rooms: 2,
+      storageSpots: 5,
+      children: 1,
+      playRecords: 6,
+    });
+  });
+
+  it('requires the correct parent PIN and changes nothing after a wrong PIN', async () => {
+    const database = new ResetDatabase();
+    const pins = new ResetPins();
+    await expect(resetPlayMapDataWithPin(database, '0000', new ResetImages(), pins)).rejects.toThrow('Nothing was removed');
+    expect(database.calls).toEqual([]);
+    expect(pins.deleted).toBe(false);
+    await expect(resetPlayMapDataWithPin(database, '2468', new ResetImages(), pins)).resolves.toEqual({ imageCleanupFailures: 0 });
+    expect(pins.deleted).toBe(true);
+  });
+
   it('deletes personalized rows in foreign-key-safe order and deduplicates images', async () => {
     const database = new ResetDatabase();
     const images = new ResetImages();
