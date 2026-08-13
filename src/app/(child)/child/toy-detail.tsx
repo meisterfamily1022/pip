@@ -6,6 +6,7 @@ import { ChildButton, ChildModeHeader, ChildPage, LocationPanel, ToyImage } from
 import { PipIcon } from '@/components/pip-icon';
 import { Banner, SkeletonRows } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
+import { displayToyName } from '@/domain/presentation';
 import { offersSpokenLabels, readingSupportOf, speakToyName } from '@/features/child/spoken-labels';
 import { getActiveChildProfile } from '@/repositories/child-profiles-repository';
 import { getActivePlaySession, startPlaySessionIfNoneActive } from '@/repositories/play-sessions-repository';
@@ -99,17 +100,19 @@ export default function ChildToyDetailRoute() {
         <ChildModeHeader backLabel="Back" onBack={backToChoices} />
         <Text accessibilityRole="header" style={styles.title}>That one is busy</Text>
         <Text style={styles.subtitle}>{error ?? 'Somebody else is playing with this one right now.'}</Text>
-        <ChildButton label="Show me another toy" onPress={backToChoices} />
+          <ChildButton label="Pick another toy" onPress={backToChoices} />
       </ChildPage>
     );
   }
+
+  const toyName = displayToyName(toy.name);
 
   return (
     <ChildPage
       footer={
         <>
           <ChildButton disabled={saving} label={saving ? 'Just a moment…' : 'I found it!'} onPress={() => { void found(); }} />
-          <ChildButton label="Show me something else" onPress={backToChoices} secondary />
+          <ChildButton label="Pick another toy" onPress={backToChoices} secondary />
         </>
       }
     >
@@ -122,12 +125,12 @@ export default function ChildToyDetailRoute() {
       </View>
 
       <View style={styles.nameRow}>
-        <Text accessibilityRole="header" style={styles.name}>{toy.name}</Text>
+        <Text accessibilityRole="header" style={styles.name}>{toyName}</Text>
         {speak ? (
           <Pressable
-            accessibilityLabel={`Say the name, ${toy.name}`}
+            accessibilityLabel={`Say the name, ${toyName}`}
             accessibilityRole="button"
-            onPress={() => speakToyName(toy.name)}
+            onPress={() => speakToyName(toyName)}
             style={({ pressed }) => [styles.speaker, pressed && styles.pressed]}
           >
             <PipIcon color={theme.colors.brandInk} name="speaker" size={24} />
@@ -142,7 +145,7 @@ export default function ChildToyDetailRoute() {
 
 const styles = StyleSheet.create({
   pressed: { opacity: 0.78 },
-  photoFrame: { borderRadius: theme.radii.sheet, overflow: 'hidden' },
+  photoFrame: { alignSelf: 'center', borderRadius: theme.radii.sheet, overflow: 'hidden', width: '78%' },
   nameRow: { alignItems: 'center', flexDirection: 'row', gap: theme.spacing[12] },
   name: { color: theme.colors.primaryText, flex: 1, ...theme.typography.childTitle },
   speaker: {
