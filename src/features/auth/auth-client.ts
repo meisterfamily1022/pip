@@ -1,6 +1,4 @@
 import type { User } from '@supabase/supabase-js';
-import { isDevice } from 'expo-device';
-import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import { clearSession, setAuthenticatedSession, type AuthenticatedAccount, type SessionRestorer } from './session-state';
@@ -19,7 +17,20 @@ export function authError(error: { message: string; code?: string; status?: numb
   if (error.status === 429 || code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit' || code === 'over_sms_send_rate_limit') {
     return new AuthRequestError('RATE_LIMITED', 'Please wait a moment before requesting or checking another code.');
   }
-  if (error.name === 'AuthRetryableFetchError' || error.status === 0 || ['failed to fetch', 'network request failed', 'network error', 'offline'].some((value) => message.includes(value))) {
+  // AuthRetryableFetchError also represents HTTP 5xx responses. Only a zero or
+  // absent status means no response reached the client; treating every
+  // retryable response as offline hid real email-provider failures in Release.
+  const hasNoResponse = error.status === 0 || error.status == null;
+  if (hasNoResponse && ['dns', 'cannot find host', 'name not resolved'].some((value) => message.includes(value))) {
+    return new AuthRequestError('DNS_ERROR', 'Pip could not find the sign-in service. Check your connection and try again.');
+  }
+  if (hasNoResponse && ['tls', 'ssl', 'certificate', 'secure connection'].some((value) => message.includes(value))) {
+    return new AuthRequestError('TLS_ERROR', 'Pip could not establish a secure connection to the sign-in service. Try again shortly.');
+  }
+  if (hasNoResponse && ['timed out', 'timeout', 'cannot connect', 'connection refused', 'connection lost'].some((value) => message.includes(value))) {
+    return new AuthRequestError('CONNECTION_ERROR', 'Pip could not connect to the sign-in service. Check your connection and try again.');
+  }
+  if (hasNoResponse && (error.name === 'AuthRetryableFetchError' || ['failed to fetch', 'network request failed', 'network error', 'offline'].some((value) => message.includes(value)))) {
     return new AuthRequestError('NETWORK_ERROR', 'You appear to be offline. Check your connection and try again.');
   }
   if (message.includes('already') || message.includes('used')) return new AuthRequestError('OTP_USED', 'That code has already been used. Send a new code and try again.');
@@ -40,24 +51,8 @@ function toAccount(user: User): AuthenticatedAccount {
   return { accountId: user.id, email: user.email ?? '', emailVerified: Boolean(user.email_confirmed_at) };
 }
 
-export function shouldBypassSimulatorAuth(input: {
-  enabled: boolean;
-  platform: string;
-  isPhysicalDevice: boolean;
-}): boolean {
-  return input.enabled && input.platform === 'ios' && !input.isPhysicalDevice;
-}
-
 /** Sends the same passwordless email OTP for both new and returning parents. */
 export async function sendEmailOtp(email: string): Promise<void> {
-  // Release-mode UI automation needs a deterministic success path without
-  // weakening a device build. Expo only inlines this opt-in at bundle time,
-  // and a physical iPhone can never take the bypass even if misconfigured.
-  if (shouldBypassSimulatorAuth({
-    enabled: process.env.EXPO_PUBLIC_PIP_SIMULATOR_AUTH === 'true',
-    platform: Platform.OS,
-    isPhysicalDevice: isDevice,
-  })) return;
   const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
   if (error) throw authError(error);
 }
@@ -78,16 +73,6 @@ export const resendVerification = async (email: string): Promise<void> => reques
 
 /** Verifies Supabase's six-digit email OTP and publishes the resulting session. */
 export async function verifyEmail(email: string, code: string): Promise<AuthenticatedAccount> {
-  if (shouldBypassSimulatorAuth({
-    enabled: process.env.EXPO_PUBLIC_PIP_SIMULATOR_AUTH === 'true',
-    platform: Platform.OS,
-    isPhysicalDevice: isDevice,
-  })) {
-    if (code !== '123456') throw new AuthRequestError('OTP_INVALID', 'That code is incorrect. Check the newest code and try again.');
-    const account = { accountId: 'simulator-auth-user', email, emailVerified: true };
-    setAuthenticatedSession(account);
-    return account;
-  }
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
   if (error) throw authError(error);
   if (!data.user) throw new AuthRequestError('AUTH_ERROR', 'We could not complete sign-in. Try again shortly.');

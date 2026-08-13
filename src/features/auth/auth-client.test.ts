@@ -4,7 +4,7 @@ jest.mock('@/lib/supabase', () => ({
   supabase: { auth: { signInWithOtp: jest.fn(), verifyOtp: jest.fn(), getSession: jest.fn(), signOut: jest.fn() } },
 }));
 
-import { authError, resendVerification, sendEmailOtp, shouldBypassSimulatorAuth, signIn, verifyEmail } from './auth-client';
+import { authError, resendVerification, sendEmailOtp, signIn, verifyEmail } from './auth-client';
 import { getSessionSnapshot, resetSessionStateForTests } from './session-state';
 import { pendingVerification } from './sign-up-form';
 import { supabase } from '@/lib/supabase';
@@ -59,13 +59,6 @@ describe('Supabase email OTP authentication', () => {
     expect(pendingVerification.set).not.toHaveBeenCalled();
   });
 
-  it('allows the controlled OTP path only in an opted-in iOS simulator bundle', () => {
-    expect(shouldBypassSimulatorAuth({ enabled: true, platform: 'ios', isPhysicalDevice: false })).toBe(true);
-    expect(shouldBypassSimulatorAuth({ enabled: false, platform: 'ios', isPhysicalDevice: false })).toBe(false);
-    expect(shouldBypassSimulatorAuth({ enabled: true, platform: 'ios', isPhysicalDevice: true })).toBe(false);
-    expect(shouldBypassSimulatorAuth({ enabled: true, platform: 'android', isPhysicalDevice: false })).toBe(false);
-  });
-
   it('verifies the six-digit email OTP and publishes the authenticated user', async () => {
     mockAuth.verifyOtp.mockResolvedValue({
       error: null,
@@ -83,7 +76,11 @@ describe('Supabase email OTP authentication', () => {
     [{ code: 'otp_invalid', message: 'Invalid OTP' }, 'OTP_INVALID', 'incorrect'],
     [{ code: 'otp_used', message: 'Token was already used' }, 'OTP_USED', 'already been used'],
     [{ code: 'over_email_send_rate_limit', message: 'Too many requests', status: 429 }, 'RATE_LIMITED', 'wait'],
+    [{ name: 'AuthRetryableFetchError', message: 'DNS lookup failed', status: 0 }, 'DNS_ERROR', 'find the sign-in service'],
+    [{ name: 'AuthRetryableFetchError', message: 'The TLS certificate is invalid', status: 0 }, 'TLS_ERROR', 'secure connection'],
+    [{ name: 'AuthRetryableFetchError', message: 'The connection timed out', status: 0 }, 'CONNECTION_ERROR', 'could not connect'],
     [{ name: 'AuthRetryableFetchError', message: 'Failed to fetch', status: 0 }, 'NETWORK_ERROR', 'offline'],
+    [{ name: 'AuthRetryableFetchError', message: 'Error sending confirmation email', status: 500 }, 'SERVICE_ERROR', 'service'],
     [{ code: 'service_failure', message: 'Database unavailable', status: 500 }, 'SERVICE_ERROR', 'service'],
   ])('maps %p to a distinct %s state', (source, expectedCode, copy) => {
     expect(authError(source)).toMatchObject({ code: expectedCode, message: expect.stringContaining(copy) });

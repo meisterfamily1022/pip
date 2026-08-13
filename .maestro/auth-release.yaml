@@ -27,7 +27,7 @@ name: Release auth interaction regression
 - eraseText
 - tapOn:
     point: "50%,28%"
-- inputText: "parent@example.com"
+- inputText: "${PIP_QA_EMAIL}"
 - tapOn: "Create an account instead"
 - extendedWaitUntil:
     visible: "Create your Pip account"
@@ -39,7 +39,7 @@ name: Release auth interaction regression
     timeout: 10000
 - tapOn:
     point: "50%,28%"
-- inputText: "parent@example.com"
+- inputText: "${PIP_QA_EMAIL}"
 - tapOn: "Email me a code"
 - extendedWaitUntil:
     visible: "Confirm your email"
@@ -62,7 +62,7 @@ name: Release auth interaction regression
     visible: "A new code is on its way. Use the newest code in your email."
     timeout: 10000
 - tapOn: "Six-digit code"
-- inputText: "123456"
+- inputText: "${PIP_QA_OTP}"
 - tapOn: "Confirm email"
 - extendedWaitUntil:
     visible: "Set up Pip"

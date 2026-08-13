@@ -89,7 +89,11 @@ describe('email OTP verification interactions', () => {
     ['OTP_INVALID', 'That code is incorrect. Check the newest code and try again.'],
     ['OTP_USED', 'That code has already been used. Send a new code and try again.'],
     ['RATE_LIMITED', 'Please wait a moment before requesting or checking another code.'],
+    ['DNS_ERROR', 'Pip could not find the sign-in service. Check your connection and try again.'],
+    ['TLS_ERROR', 'Pip could not establish a secure connection to the sign-in service. Try again shortly.'],
+    ['CONNECTION_ERROR', 'Pip could not connect to the sign-in service. Check your connection and try again.'],
     ['NETWORK_ERROR', 'You appear to be offline. Check your connection and try again.'],
+    ['SERVICE_ERROR', 'The sign-in service could not complete the request. Try again shortly.'],
   ])('renders the distinct %s message', async (code, message) => {
     (verifyEmail as jest.Mock).mockRejectedValue(new AuthRequestError(code, message));
     const renderer = await renderScreen();
