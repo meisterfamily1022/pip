@@ -65,8 +65,8 @@ export default function ChildProfileSetupRoute() {
         />
         <View style={styles.previewCopy}>
           <Text style={styles.previewLabel}>Preview</Text>
-          <Text numberOfLines={1} style={styles.previewName}>{previewName}</Text>
-          <Text numberOfLines={1} style={styles.previewMeta}>
+          <Text style={styles.previewName}>{previewName}</Text>
+          <Text style={styles.previewMeta}>
             {`${draft.choiceLimit} ${draft.choiceLimit === 1 ? 'choice' : 'choices'} · ${readingLabel}`}
           </Text>
         </View>

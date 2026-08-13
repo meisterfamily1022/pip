@@ -138,7 +138,7 @@ export function ToyCard({
           <ToyImage accessibilityLabel={`${name} photo`} uri={toy.imageUri} />
         </View>
         {showName ? <Text style={styles.toyName}>{name}</Text> : null}
-        <Text numberOfLines={2} style={styles.location}>
+        <Text style={styles.location}>
           {unavailable ? `${unavailableBecause} has this one` : location.compact ?? 'Location not added'}
         </Text>
         {!unavailable ? <Text style={styles.cardAction}>Play with this toy</Text> : null}

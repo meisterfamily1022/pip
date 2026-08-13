@@ -269,7 +269,7 @@ export default function CleanupRoute() {
                 ? <PipIcon color={theme.colors.white} name="check" size={13} strokeWidth={3} />
                 : <Text style={[styles.stepNumber, index === step && styles.stepNumberActive]}>{index + 1}</Text>}
             </View>
-            <Text numberOfLines={1} style={[styles.stepLabel, index === step && styles.stepLabelActive]}>{candidate.label}</Text>
+            <Text style={[styles.stepLabel, index === step && styles.stepLabelActive]}>{candidate.label}</Text>
           </View>
         ))}
       </View>
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   stepMarkActive: { backgroundColor: theme.colors.brandInk },
   stepNumber: { color: theme.colors.secondaryText, ...theme.typography.label, fontSize: 14 },
   stepNumberActive: { color: theme.colors.white },
-  stepLabel: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  stepLabel: { color: theme.colors.secondaryText, textAlign: 'center', ...theme.typography.meta },
   stepLabelActive: { color: theme.colors.brandInk, fontFamily: theme.fonts.bold },
 
   stepTitle: { color: theme.colors.primaryText, ...theme.typography.childTitle, fontSize: 28, lineHeight: 33 },

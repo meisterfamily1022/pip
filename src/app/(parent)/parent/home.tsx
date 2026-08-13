@@ -157,7 +157,7 @@ export default function ParentHomeRoute() {
                   <View style={styles.checkoutCopy}>
                     <Text style={styles.checkoutWho}>{`${displayChildName(session.childName)} · ${formatElapsed(session.startedAt, now)}`}</Text>
                     <Text numberOfLines={2} style={styles.checkoutToy}>{session.toy ? displayToyName(session.toy.name) : 'This toy is no longer in the library'}</Text>
-                    <Text numberOfLines={1} style={styles.meta}>
+                    <Text style={styles.meta}>
                       {session.toy ? presentLocation(session.toy.roomName, session.toy.storageSpotName).compact ?? 'Location not added' : 'The checkout can still be closed safely.'}
                     </Text>
                   </View>
@@ -230,7 +230,7 @@ export default function ParentHomeRoute() {
                     style={({ pressed }) => [styles.handoffCard, pressed && styles.pressed]}
                   >
                     <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={48} />
-                    <Text numberOfLines={1} style={styles.handoffName}>{displayChildName(child.name)}</Text>
+                    <Text style={styles.handoffName}>{displayChildName(child.name)}</Text>
                     <Text style={[styles.handoffState, playing && styles.handoffPlaying]}>{playing ? 'Playing now' : 'Ready'}</Text>
                   </Pressable>
                 ))}
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: theme.radii.card,
     borderWidth: 1,
-    flexBasis: '30%',
+    flexBasis: '46%',
     flexGrow: 1,
     gap: 5,
     paddingHorizontal: theme.spacing[8],
