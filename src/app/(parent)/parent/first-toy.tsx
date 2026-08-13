@@ -38,7 +38,7 @@ export default function FirstToyRoute() {
       await enterChildMode();
       router.replace('/child/home');
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Child Mode could not open.');
+      setError(caught instanceof Error ? caught.message : 'Child mode could not open.');
       setStarting(false);
     }
   };
@@ -47,7 +47,7 @@ export default function FirstToyRoute() {
     <PageShell
       footer={hasFirstToy ? (
         <>
-          <PrimaryButton busy={starting} label={starting ? 'Opening Child Mode…' : 'Try Child Mode'} onPress={() => void tryChildMode()} />
+          <PrimaryButton busy={starting} label={starting ? 'Opening Child mode…' : 'Try Child mode'} onPress={() => void tryChildMode()} />
           <QuietButton label="Go to Parent Home" onPress={() => router.replace('/parent/home')} />
         </>
       ) : (

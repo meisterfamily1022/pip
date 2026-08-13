@@ -13,6 +13,7 @@ import {
 } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
+import { displayChildName } from '@/domain/presentation';
 import { listChildProfiles } from '@/repositories/child-profiles-repository';
 import { clearActiveChild, markChildModeUsed, setActiveChild } from '@/repositories/settings-repository';
 import { enterChildMode } from '@/startup/route-access';
@@ -60,12 +61,12 @@ export default function SelectChildRoute() {
       router.replace('/child/home');
       await enterChildMode();
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Child Mode could not open.');
+      setError(caught instanceof Error ? caught.message : 'Child mode could not open.');
       setStarting(false);
     }
   };
 
-  const chosenName = choice === GUEST ? 'Guest' : children.find((child) => child.id === choice)?.name;
+  const chosenName = choice === GUEST ? 'Guest' : displayChildName(children.find((child) => child.id === choice)?.name, '');
 
   if (loading) {
     return (
@@ -98,7 +99,7 @@ export default function SelectChildRoute() {
           <ChoiceTile
             key={child.id}
             avatar={<ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={68} />}
-            name={child.name}
+            name={displayChildName(child.name)}
             onPress={() => setChoice(child.id)}
             selected={choice === child.id}
           />

@@ -63,7 +63,7 @@ export default function CurrentToyRoute() {
         {error ? <Banner message={error} tone="alert" /> : null}
         <Text accessibilityRole="header" style={styles.title}>Nothing is out right now</Text>
         <Text style={styles.subtitle}>Pick a toy whenever you are ready.</Text>
-        <ChildButton label="Find a toy" onPress={() => router.replace('/child/categories')} />
+        <ChildButton label="Pick a toy" onPress={() => router.replace('/child/categories')} />
       </ChildPage>
     );
   }

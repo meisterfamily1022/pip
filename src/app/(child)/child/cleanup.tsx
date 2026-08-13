@@ -137,7 +137,7 @@ export default function CleanupRoute() {
         {error ? <Banner message={error} tone="alert" /> : null}
         <Text accessibilityRole="header" style={styles.title}>Nothing to tidy up</Text>
         <Text style={styles.body}>No toy is out right now.</Text>
-        <ChildButton label="Find a toy" onPress={() => router.replace('/child/categories')} />
+        <ChildButton label="Pick a toy" onPress={() => router.replace('/child/categories')} />
       </ChildPage>
     );
   }

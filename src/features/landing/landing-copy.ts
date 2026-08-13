@@ -71,7 +71,7 @@ export const landingFeatures: readonly LandingFeature[] = [
   { id: 'child-mode', title: 'Child Mode', body: 'A calm, photo-led screen made for small hands.', available: true },
   { id: 'suggestions', title: 'Toy suggestions', body: 'A short list to choose from, not an overwhelming grid.', available: true },
   { id: 'cleanup', title: 'Tidy-up guidance', body: 'Where the toy goes, shown before the next choice.', available: true },
-  { id: 'pin', title: 'Grown-up PIN', body: 'Parent settings stay behind a four-digit PIN.', available: true },
+  { id: 'pin', title: 'Parent PIN', body: 'Parent settings stay behind a four-digit PIN.', available: true },
   { id: 'hidden', title: 'Hidden and archived toys', body: 'Keep some things out of rotation without deleting them.', available: true },
   { id: 'profiles', title: 'Multiple child profiles', body: 'Each child gets their own choices and play history.', available: true },
   { id: 'per-child', title: 'Per-child settings', body: 'Choice count and reading support, tuned per child.', available: true },

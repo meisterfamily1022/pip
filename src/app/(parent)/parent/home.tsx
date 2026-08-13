@@ -92,7 +92,7 @@ export default function ParentHomeRoute() {
       router.replace('/child/home');
       await enterChildMode();
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Child Mode could not open.');
+      setError(caught instanceof Error ? caught.message : 'Child mode could not open.');
     }
   };
 
@@ -205,13 +205,13 @@ export default function ParentHomeRoute() {
             {overview.handoff.length === 0 ? (
               <Pressable
                 accessibilityHint="Guest play works without a profile"
-                accessibilityLabel="Start Child Mode"
+                accessibilityLabel="Start Child mode"
                 accessibilityRole="button"
                 onPress={() => router.replace('/parent/select-child')}
                 style={({ pressed }) => [styles.startChildMode, pressed && styles.pressed]}
               >
                 <View style={styles.rowCopy}>
-                  <Text style={styles.cardTitle}>Start Child Mode</Text>
+                  <Text style={styles.cardTitle}>Start Child mode</Text>
                   <Text style={styles.meta}>Choose who is playing</Text>
                 </View>
                 <PipIcon color={theme.colors.brandInk} name="chevron-right" size={18} />
@@ -220,7 +220,7 @@ export default function ParentHomeRoute() {
               <View style={styles.handoff}>
                 {overview.handoff.map(({ child, playing }) => (
                   <Pressable
-                    accessibilityHint={playing ? 'Already has a toy out' : 'Opens Child Mode for this child'}
+                    accessibilityHint={playing ? 'Already has a toy out' : 'Opens Child mode for this child'}
                     accessibilityLabel={`${displayChildName(child.name)}. ${playing ? 'Playing now' : 'Ready to play'}`}
                     accessibilityRole="button"
                     key={child.id}
