@@ -1,0 +1,23 @@
+appId: com.meister23.playmapmobile
+name: Embedded Release first-toy defer and durable home
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Finish setting up"
+    timeout: 30000
+- tapOn:
+    point: "80%,39%"
+- extendedWaitUntil:
+    visible: "Add your first toy"
+    timeout: 30000
+- assertVisible: "Photograph a shelf"
+- assertVisible: "Add one toy by hand"
+- tapOn: "I’ll do this later"
+- extendedWaitUntil:
+    visible: "Finish setting up"
+    timeout: 30000
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Finish setting up"
+    timeout: 30000

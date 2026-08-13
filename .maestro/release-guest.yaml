@@ -1,0 +1,50 @@
+appId: com.meister23.playmapmobile
+name: Embedded Release guest onboarding and resume
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Set up Pip on this device"
+    timeout: 30000
+- tapOn: "Set up Pip on this device"
+- assertVisible: "Choose a parent PIN"
+- tapOn: "Parent PIN"
+- inputText: "2468"
+- tapOn: "Continue"
+- assertVisible: "Type it once more"
+- tapOn: "Confirm parent PIN"
+- inputText: "2468"
+- tapOn: "Continue"
+- assertVisible: "Who will be playing?"
+- tapOn: "For example, Ada"
+- inputText: "Juniper"
+- tapOn: "Next: reading & cleanup"
+- assertVisible: "How Juniper sees toys"
+- tapOn: "Save Juniper’s profile"
+- extendedWaitUntil:
+    visible: "Where do toys live?"
+    timeout: 10000
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Where do toys live?"
+    timeout: 30000
+- tapOn: "Playroom"
+- inputText: "Playroom"
+- tapOn: "White shelf"
+- inputText: "Shelf"
+- tapOn: "Finish setup"
+- extendedWaitUntil:
+    visible: "Add your first toy"
+    timeout: 30000
+- assertVisible: "Photograph a shelf"
+- assertVisible: "Add one toy by hand"
+- tapOn: "I’ll do this later"
+- extendedWaitUntil:
+    visible: "Finish setting up"
+    timeout: 30000
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Finish setting up"
+    timeout: 30000

@@ -35,6 +35,7 @@ export type GuardInput = {
   initialized: boolean;
   initializationError: string | null;
   onboardingComplete: boolean;
+  postOnboardingDestination?: '/parent/first-toy' | null;
   onboardingDestination?: '/onboarding' | '/parent-pin-setup' | '/child-profile-setup' | '/first-location-setup' | '/parent/home';
   childModeLocked: boolean;
   sessionStatus: SessionStatus;
@@ -45,7 +46,7 @@ export type GuardInput = {
  * Every destination a guard may send someone to. Kept as a literal union so it
  * satisfies Expo Router's typed routes and so a typo cannot become a dead link.
  */
-export type GuardRedirect = '/sign-in' | '/sign-up' | '/verify-email' | '/onboarding' | '/parent-pin-setup' | '/child-profile-setup' | '/first-location-setup' | '/parent/home' | '/child/home' | '/child/parent-return';
+export type GuardRedirect = '/sign-in' | '/sign-up' | '/verify-email' | '/onboarding' | '/parent-pin-setup' | '/child-profile-setup' | '/first-location-setup' | '/parent/first-toy' | '/parent/home' | '/child/home' | '/child/parent-return';
 
 export type GuardDecision =
   | { kind: 'render' }
@@ -99,6 +100,7 @@ export function resolveRouteGuard(input: GuardInput): GuardDecision {
   }
 
   if (input.onboardingComplete && input.group === '(onboarding)') {
+    if (input.postOnboardingDestination) return { kind: 'redirect', href: input.postOnboardingDestination };
     return { kind: 'redirect', href: input.childModeLocked ? '/child/home' : '/parent/home' };
   }
 

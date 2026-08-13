@@ -122,6 +122,13 @@ describe("onboarding gating", () => {
     expect(resolveRouteGuard({ ...ready, group: "(onboarding)" })).toEqual({ kind: "redirect", href: "/parent/home" });
   });
 
+  it("preserves the explicit first-toy handoff when setup just completed", () => {
+    expect(resolveRouteGuard({ ...ready, group: "(onboarding)", postOnboardingDestination: "/parent/first-toy" })).toEqual({
+      kind: "redirect",
+      href: "/parent/first-toy",
+    });
+  });
+
   it("returns a locked child to Child Mode rather than Parent Home", () => {
     expect(resolveRouteGuard({ ...ready, group: "(onboarding)", childModeLocked: true })).toEqual({
       kind: "redirect",

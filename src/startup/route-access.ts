@@ -7,6 +7,7 @@ export type RouteAccessState = {
   onboardingComplete: boolean;
   onboardingState: OnboardingState | null;
   childModeLocked: boolean;
+  postOnboardingDestination: '/parent/first-toy' | null;
   initializationError: string | null;
 };
 
@@ -17,6 +18,7 @@ let state: RouteAccessState = {
   onboardingComplete: false,
   onboardingState: null,
   childModeLocked: false,
+  postOnboardingDestination: null,
   initializationError: null,
 };
 
@@ -50,6 +52,7 @@ export function initializeRouteAccess(
           onboardingComplete,
           onboardingState,
           childModeLocked: onboardingComplete && storedLock,
+          postOnboardingDestination: null,
           initializationError: null,
         });
       })
@@ -65,7 +68,7 @@ export function initializeRouteAccess(
 }
 
 export function markOnboardingComplete(): void {
-  publish({ initialized: true, onboardingComplete: true, initializationError: null });
+  publish({ initialized: true, onboardingComplete: true, postOnboardingDestination: '/parent/first-toy', initializationError: null });
 }
 
 export function getOnboardingDestination(authenticated: boolean): OnboardingDestination {
@@ -85,5 +88,5 @@ export async function leaveChildMode(lockStorage: ChildModeLockStorage = childMo
 export async function resetRouteAccess(lockStorage: ChildModeLockStorage = childModeLockStorage): Promise<void> {
   initialization = null;
   await lockStorage.setLocked(false);
-  publish({ initialized: true, onboardingComplete: false, onboardingState: null, childModeLocked: false, initializationError: null });
+  publish({ initialized: true, onboardingComplete: false, onboardingState: null, childModeLocked: false, postOnboardingDestination: null, initializationError: null });
 }

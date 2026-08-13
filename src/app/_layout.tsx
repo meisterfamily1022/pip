@@ -90,6 +90,7 @@ export default function RootLayout() {
     initialized: access.initialized,
     initializationError: access.initializationError,
     onboardingComplete: access.onboardingComplete,
+    postOnboardingDestination: access.postOnboardingDestination,
     onboardingDestination: getOnboardingDestination(session.status === 'signedIn'),
     childModeLocked: access.childModeLocked,
     sessionStatus: session.status,

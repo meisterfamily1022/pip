@@ -4,6 +4,7 @@ import {
   getRouteAccessSnapshot,
   initializeRouteAccess,
   leaveChildMode,
+  markOnboardingComplete,
   resetRouteAccess,
 } from './route-access';
 
@@ -60,5 +61,13 @@ describe('route access', () => {
     await leaveChildMode(storage);
     expect(storage.locked).toBe(false);
     expect(getRouteAccessSnapshot().childModeLocked).toBe(false);
+  });
+
+  it('records the first-toy destination only for the just-completed setup handoff', () => {
+    markOnboardingComplete();
+    expect(getRouteAccessSnapshot()).toMatchObject({
+      onboardingComplete: true,
+      postOnboardingDestination: '/parent/first-toy',
+    });
   });
 });
