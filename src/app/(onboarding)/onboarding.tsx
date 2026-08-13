@@ -29,7 +29,6 @@ export default function OnboardingHomeRoute() {
         <>
           <PrimaryButton label="Get started" onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
           <QuietButton label="Sign in" onPress={() => router.push('/sign-in')} />
-          <Text style={styles.footnote}>Takes about two minutes. Nothing leaves this device.</Text>
         </>
       }
     >
@@ -58,6 +57,7 @@ export default function OnboardingHomeRoute() {
         </Text>
         <QuietButton label="Create an account" onPress={() => router.push('/sign-up')} />
       </View>
+      <Text style={styles.footnote}>Takes about two minutes. Nothing leaves this device.</Text>
     </PageShell>
   );
 }

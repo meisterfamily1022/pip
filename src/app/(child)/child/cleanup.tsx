@@ -196,6 +196,7 @@ export default function CleanupRoute() {
   }
 
   if (helpMode === 'parent') {
+    const location = toy ? presentLocation(toy.roomName, toy.storageSpotName) : null;
     return (
       <ChildPage
         footer={
@@ -214,7 +215,11 @@ export default function CleanupRoute() {
         <View style={styles.copy}>
           <Text accessibilityRole="header" style={styles.title}>Finish tidy-up for {displayChildName(session?.childName, 'this child')}?</Text>
           <Text style={styles.body}>
-            {toy ? `${displayToyName(toy.name)} goes back to ${presentLocation(toy.roomName, toy.storageSpotName).instruction}.` : 'The toy will be marked as put away.'}
+            {toy && location?.compact
+              ? `${displayToyName(toy.name)} goes back to ${location.instruction}.`
+              : toy
+                ? `${displayToyName(toy.name)}’s location hasn’t been added.`
+                : 'The toy will be marked as put away.'}
             {' This is recorded as a grown-up finishing it.'}
           </Text>
         </View>
