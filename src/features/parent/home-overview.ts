@@ -8,7 +8,7 @@ import type { ActivePlaySession } from '@/repositories/play-sessions-repository'
  */
 
 export type SetupStep = {
-  id: 'child' | 'room' | 'toys' | 'child-mode';
+  id: 'child' | 'room';
   label: string;
   done: boolean;
   /** Where tapping the step leads, when there is something left to do. */
@@ -19,6 +19,7 @@ export type SetupStep = {
 export type HomeOverview = {
   /** Present only while setup is genuinely unfinished. */
   setup: { remaining: number; steps: SetupStep[] } | null;
+  libraryMilestone: { count: number; target: number; childModeUsed: boolean } | null;
   checkouts: ActivePlaySession[];
   handoff: { child: ChildProfile; playing: boolean }[];
   toyCount: number;
@@ -56,25 +57,9 @@ export function buildHomeOverview(input: {
   childModeUsed: boolean;
 }): HomeOverview {
   const { children, sessions, toyCount, roomCount, spotCount, childModeUsed } = input;
-  const firstChild = children[0];
-
   const steps: SetupStep[] = [
     { id: 'child', label: 'Add a child', done: children.length > 0, href: '/parent/children', actionLabel: 'Add' },
     { id: 'room', label: 'Add a room', done: roomCount > 0, href: '/parent/locations', actionLabel: 'Add' },
-    {
-      id: 'toys',
-      label: `Photograph ${STARTER_TOY_TARGET} toys`,
-      done: toyCount >= STARTER_TOY_TARGET,
-      href: '/parent/first-toy',
-      actionLabel: 'Start',
-    },
-    {
-      id: 'child-mode',
-      label: firstChild ? `Try Child Mode with ${firstChild.name}` : 'Try Child Mode',
-      done: childModeUsed,
-      href: '/parent/select-child',
-      actionLabel: 'Open',
-    },
   ];
 
   const remaining = steps.filter((step) => !step.done).length;
@@ -85,6 +70,7 @@ export function buildHomeOverview(input: {
     // Once everything is done the card disappears rather than sitting there
     // fully ticked, which would be one more thing to read past every morning.
     setup: remaining === 0 ? null : { remaining, steps },
+    libraryMilestone: toyCount >= STARTER_TOY_TARGET ? null : { count: toyCount, target: STARTER_TOY_TARGET, childModeUsed },
     checkouts: [...sessions],
     handoff: children.map((child) => ({ child, playing: playingChildIds.has(child.id) })),
     toyCount,
@@ -93,11 +79,11 @@ export function buildHomeOverview(input: {
   };
 }
 
-/** "Two things left before Ada can choose a toy." */
+/** Setup is useful housekeeping, not a false gate on choosing a toy. */
 export function describeRemainingSetup(remaining: number, childName?: string): string {
   const count = remaining === 1 ? 'One thing' : remaining === 2 ? 'Two things' : `${remaining} things`;
-  const who = childName ? `${childName} can choose a toy` : 'your child can choose a toy';
-  return `${count} left before ${who}.`;
+  const who = childName ? `for ${childName}` : 'for your family';
+  return `${count} left to set up ${who}.`;
 }
 
 /** "Good morning" / "Good afternoon" / "Good evening", from the local hour. */

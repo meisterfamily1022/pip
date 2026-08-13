@@ -25,6 +25,7 @@ export type PlaySessionRow = {
 };
 export type SettingsRow = {
   onboarding_completed: number; child_nickname: string | null;
+  child_mode_used: number;
   active_child_id: number | null;
   choice_limit: number; cleanup_required: number; created_at: string; updated_at: string;
 };

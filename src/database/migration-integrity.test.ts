@@ -78,6 +78,18 @@ describe("migration to the household schema", () => {
     expect(households).toEqual([{ id: LOCAL_HOUSEHOLD_ID }]);
   });
 
+  it('persists Child Mode progress and backfills it from existing play records', async () => {
+    const upgrading = new RealSqliteConnection();
+    await runMigrations(upgrading, 11);
+    await upgrading.runAsync("INSERT INTO settings (id, created_at, updated_at) VALUES (1, '2026-01-01', '2026-01-01');");
+    const { toyId, childId } = await seedLegacyLibrary(upgrading);
+    await startSession(upgrading, toyId, childId);
+    await runMigrations(upgrading);
+    const row = await upgrading.getFirstAsync<{ child_mode_used: number }>('SELECT child_mode_used FROM settings WHERE id = 1;');
+    expect(row?.child_mode_used).toBe(1);
+    upgrading.close();
+  });
+
   it("is safe to rerun and does not create a second household", async () => {
     await runMigrations(database);
     await runMigrations(database);

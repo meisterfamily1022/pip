@@ -8,7 +8,7 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@/database/client', () => ({ initializeDatabase: jest.fn(async () => ({})) }));
 jest.mock('@/repositories/child-profiles-repository', () => ({ listChildProfiles: jest.fn(async () => mockProfiles) }));
-jest.mock('@/repositories/settings-repository', () => ({ setActiveChild: jest.fn(async () => undefined) }));
+jest.mock('@/repositories/settings-repository', () => ({ markChildModeUsed: jest.fn(async () => undefined), setActiveChild: jest.fn(async () => undefined) }));
 jest.mock('@/startup/route-access', () => ({ enterChildMode: jest.fn(async () => undefined) }));
 
 import { createElement } from 'react';

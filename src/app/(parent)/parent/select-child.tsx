@@ -14,7 +14,7 @@ import {
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
 import { listChildProfiles } from '@/repositories/child-profiles-repository';
-import { clearActiveChild, setActiveChild } from '@/repositories/settings-repository';
+import { clearActiveChild, markChildModeUsed, setActiveChild } from '@/repositories/settings-repository';
 import { enterChildMode } from '@/startup/route-access';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
@@ -56,6 +56,7 @@ export default function SelectChildRoute() {
       // permanent data behind and is offered only toys shared with everyone.
       if (choice === GUEST) await clearActiveChild(database);
       else await setActiveChild(database, choice);
+      await markChildModeUsed(database);
       router.replace('/child/home');
       await enterChildMode();
     } catch (caught: unknown) {

@@ -58,7 +58,7 @@ describe('Parent Home overview', () => {
     expect(buildHomeOverview(complete).setup).toBeNull();
   });
 
-  it('lists only the steps a new household still owes, and where each one leads', () => {
+  it('keeps the five-toy recommendation separate from required setup', () => {
     const overview = buildHomeOverview({
       children: [child(1, 'Ada')],
       sessions: [],
@@ -67,27 +67,15 @@ describe('Parent Home overview', () => {
       spotCount: 2,
       childModeUsed: false,
     });
-    expect(overview.setup?.remaining).toBe(2);
-    const outstanding = overview.setup?.steps.filter((step) => !step.done) ?? [];
-    expect(outstanding.map((step) => step.id)).toEqual(['toys', 'child-mode']);
-    expect(outstanding.map((step) => step.href)).toEqual(['/parent/first-toy', '/parent/select-child']);
+    expect(overview.setup).toBeNull();
+    expect(overview.libraryMilestone).toEqual({ count: 0, target: 5, childModeUsed: false });
   });
 
-  it('names the first child in the Child Mode step so the invitation is concrete', () => {
-    const overview = buildHomeOverview({ ...complete, childModeUsed: false });
-    expect(overview.setup?.steps.find((step) => step.id === 'child-mode')?.label).toBe('Try Child Mode with Ada');
-  });
-
-  it('still offers the Child Mode step before any child exists', () => {
-    const overview = buildHomeOverview({ ...complete, children: [], childModeUsed: false });
-    expect(overview.setup?.steps.find((step) => step.id === 'child-mode')?.label).toBe('Try Child Mode');
-  });
-
-  it('counts photographing toys as done only at the starter target', () => {
+  it('represents starter-library progress continuously instead of as a binary setup step', () => {
     const short = buildHomeOverview({ ...complete, childModeUsed: false, toyCount: STARTER_TOY_TARGET - 1 });
-    expect(short.setup?.steps.find((step) => step.id === 'toys')?.done).toBe(false);
+    expect(short.libraryMilestone).toEqual({ count: 4, target: 5, childModeUsed: false });
     const met = buildHomeOverview({ ...complete, childModeUsed: false, toyCount: STARTER_TOY_TARGET });
-    expect(met.setup?.steps.find((step) => step.id === 'toys')?.done).toBe(true);
+    expect(met.libraryMilestone).toBeNull();
   });
 
   it('marks a child as playing only while they hold an active checkout', () => {
@@ -137,9 +125,9 @@ describe('elapsed play time', () => {
 
 describe('supporting copy', () => {
   it.each([
-    [1, 'Ada', 'One thing left before Ada can choose a toy.'],
-    [2, 'Ada', 'Two things left before Ada can choose a toy.'],
-    [3, undefined, '3 things left before your child can choose a toy.'],
+    [1, 'Ada', 'One thing left to set up for Ada.'],
+    [2, 'Ada', 'Two things left to set up for Ada.'],
+    [3, undefined, '3 things left to set up for your family.'],
   ])('describes %p remaining steps', (remaining, name, expected) => {
     expect(describeRemainingSetup(remaining, name)).toBe(expected);
   });

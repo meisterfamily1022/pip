@@ -268,6 +268,17 @@ async function ensureSyncOperations(database: DatabaseConnection): Promise<void>
   `);
 }
 
+async function ensureChildModeProgress(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'settings', 'child_mode_used', 'INTEGER NOT NULL DEFAULT 0 CHECK (child_mode_used IN (0, 1))');
+  // Existing play records prove that Child Mode has already been used.
+  await database.execAsync(`
+    UPDATE settings
+       SET child_mode_used = 1
+     WHERE id = 1
+       AND EXISTS (SELECT 1 FROM play_sessions);
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -404,6 +415,10 @@ const migrations: readonly Migration[] = [
   {
     version: 11,
     apply: ensureSyncOperations,
+  },
+  {
+    version: 12,
+    apply: ensureChildModeProgress,
   },
 ];
 
