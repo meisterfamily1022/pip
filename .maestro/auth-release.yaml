@@ -1,0 +1,61 @@
+appId: com.meister23.playmapmobile
+name: Release auth interaction regression
+---
+- launchApp:
+    clearState: true
+- runFlow:
+    when:
+      visible: "Confirm your email"
+    commands:
+      - tapOn: "Use a different email"
+      - extendedWaitUntil:
+          visible: "Create your Pip account"
+          timeout: 10000
+      - tapOn: "Already have an account? Sign in"
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 30000
+- assertVisible:
+    text: "Email me a code"
+    enabled: false
+- tapOn:
+    id: "sign-in-email"
+- assertVisible: "Sign in"
+- inputText: "invalid"
+- assertVisible: "Sign in"
+- assertVisible:
+    text: "Email me a code"
+    enabled: false
+- eraseText
+- tapOn:
+    id: "sign-in-email"
+- inputText: "parent@example.com"
+- assertVisible:
+    text: "Email me a code"
+    enabled: true
+- tapOn: "Create an account instead"
+- extendedWaitUntil:
+    visible: "Create your Pip account"
+    timeout: 10000
+- assertNotVisible: "Sign in"
+- tapOn: "Already have an account? Sign in"
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 10000
+- tapOn:
+    id: "sign-in-email"
+- inputText: "parent@example.com"
+- assertVisible:
+    text: "Email me a code"
+    enabled: true
+- tapOn: "Email me a code"
+- extendedWaitUntil:
+    visible: "Confirm your email"
+    timeout: 10000
+- assertVisible: "Six-digit code"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Confirm your email"
+    timeout: 30000
+- assertNotVisible: "Sign in"

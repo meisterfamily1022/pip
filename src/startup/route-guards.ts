@@ -37,13 +37,14 @@ export type GuardInput = {
   onboardingComplete: boolean;
   childModeLocked: boolean;
   sessionStatus: SessionStatus;
+  pendingVerificationStatus: 'restoring' | 'none' | 'pending';
 };
 
 /**
  * Every destination a guard may send someone to. Kept as a literal union so it
  * satisfies Expo Router's typed routes and so a typo cannot become a dead link.
  */
-export type GuardRedirect = '/sign-in' | '/onboarding' | '/parent/home' | '/child/home' | '/child/parent-return';
+export type GuardRedirect = '/sign-in' | '/sign-up' | '/verify-email' | '/onboarding' | '/parent/home' | '/child/home' | '/child/parent-return';
 
 export type GuardDecision =
   | { kind: 'render' }
@@ -68,7 +69,21 @@ export function resolveRouteGuard(input: GuardInput): GuardDecision {
   if (input.initializationError) return { kind: 'error', message: input.initializationError };
 
   // Never render household data until the encrypted session has been restored.
-  if (input.sessionStatus === 'restoring') return { kind: 'launching' };
+  if (input.sessionStatus === 'restoring' || input.pendingVerificationStatus === 'restoring') return { kind: 'launching' };
+
+  // The native root route is only a launch waypoint. Resolving it here keeps
+  // startup under this single state machine instead of mounting a second
+  // component that independently initializes and replaces the navigator.
+  if (input.group === undefined) {
+    if (input.sessionStatus === 'signedIn') {
+      if (!input.onboardingComplete) return { kind: 'redirect', href: '/onboarding' };
+      return { kind: 'redirect', href: input.childModeLocked ? '/child/home' : '/parent/home' };
+    }
+    return {
+      kind: 'redirect',
+      href: input.pendingVerificationStatus === 'pending' ? '/verify-email' : '/sign-in',
+    };
+  }
 
   // Signing in is meaningless when a session already exists.
   if (input.sessionStatus === 'signedIn' && input.group === '(auth)') {
@@ -103,6 +118,6 @@ export function groupForHref(href: string): RouteGroup {
   if (href.startsWith('/parent')) return '(parent)';
   if (href.startsWith('/child')) return '(child)';
   if (href.startsWith('/onboarding')) return '(onboarding)';
-  if (href.startsWith('/sign-in') || href.startsWith('/sign-up')) return '(auth)';
+  if (href.startsWith('/sign-in') || href.startsWith('/sign-up') || href.startsWith('/verify-email')) return '(auth)';
   return '(public)';
 }

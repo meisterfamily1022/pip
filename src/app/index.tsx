@@ -1,13 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Button, Platform, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { Platform, StyleSheet, View } from 'react-native';
 
-import { initializeApp } from '@/startup/initialize-app';
 import { PipLaunchState } from '@/components/pip-brand-mark';
 import { LandingPage } from '@/features/landing/landing-page';
-import { playmapTheme as theme } from '@/theme/playmap-theme';
-
-type StartupState = 'loading' | 'error';
 
 /**
  * The root route serves two audiences.
@@ -22,29 +16,9 @@ export default function RootRoute() {
 }
 
 function StartupScreen() {
-  const [state, setState] = useState<StartupState>('loading');
-  const [error, setError] = useState<Error | null>(null);
-
-  const start = useCallback((): void => {
-    setState('loading');
-    setError(null);
-    initializeApp().then((destination) => router.replace(destination)).catch((caught: unknown) => {
-      const startupError = caught instanceof Error ? caught : new Error('App startup failed.');
-      setError(startupError);
-      setState('error');
-    });
-  }, []);
-
-  useEffect(() => {
-    initializeApp().then((destination) => router.replace(destination)).catch((caught: unknown) => {
-      const startupError = caught instanceof Error ? caught : new Error('App startup failed.');
-      setError(startupError);
-      setState('error');
-    });
-  }, [start]);
-
-  if (state === 'loading') return <View style={styles.container}><PipLaunchState /></View>;
-  return <View style={styles.container}><Text style={styles.errorTitle}>Pip could not start.</Text><Text>{error?.message}</Text><Button title="Try again" onPress={start} /></View>;
+  // RootLayout owns the sole startup decision and replaces this waypoint once
+  // route access, session restoration, and pending verification are resolved.
+  return <View style={styles.container}><PipLaunchState /></View>;
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }, errorTitle: { color: theme.colors.primaryText, ...theme.typography.sectionTitle } });
+const styles = StyleSheet.create({ container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 } });

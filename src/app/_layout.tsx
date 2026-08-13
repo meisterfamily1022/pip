@@ -1,7 +1,7 @@
 import { useFonts } from 'expo-font';
-import { Redirect, Stack, useSegments } from 'expo-router';
+import { router, Stack, useSegments } from 'expo-router';
 import Head from 'expo-router/head';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -12,6 +12,11 @@ import { pipBrand } from '@/brand/pip-brand';
 import { pipFontAssets } from '@/theme/fonts';
 import { createSessionRestorer } from '@/features/auth/auth-client';
 import { getSessionSnapshot, restoreSession, subscribeSession } from '@/features/auth/session-state';
+import {
+  getPendingVerificationSnapshot,
+  restorePendingVerification,
+  subscribePendingVerification,
+} from '@/features/auth/sign-up-form';
 import { getRouteAccessSnapshot, initializeRouteAccess, subscribeRouteAccess } from '@/startup/route-access';
 import { isPublicGroup, resolveRouteGuard, type RouteGroup } from '@/startup/route-guards';
 
@@ -53,6 +58,12 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(pipFontAssets);
   const access = useSyncExternalStore(subscribeRouteAccess, getRouteAccessSnapshot, getRouteAccessSnapshot);
   const session = useSyncExternalStore(subscribeSession, getSessionSnapshot, getSessionSnapshot);
+  const pendingVerification = useSyncExternalStore(
+    subscribePendingVerification,
+    getPendingVerificationSnapshot,
+    getPendingVerificationSnapshot,
+  );
+  const lastRedirect = useRef<string | null>(null);
   const group = segments[0] as RouteGroup;
   // On web the root path is the public landing page; on native it is app
   // startup, which must wait for the local database.
@@ -67,7 +78,10 @@ export default function RootLayout() {
   // Public pages render without local startup, so the marketing surface never
   // waits on SQLite. Every other surface needs the database open first.
   useEffect(() => {
-    if (!isPublic) void initializeRouteAccess();
+    if (!isPublic) {
+      void initializeRouteAccess();
+      void restorePendingVerification();
+    }
   }, [isPublic]);
 
   const decision = resolveRouteGuard({
@@ -78,7 +92,24 @@ export default function RootLayout() {
     onboardingComplete: access.onboardingComplete,
     childModeLocked: access.childModeLocked,
     sessionStatus: session.status,
+    pendingVerificationStatus: pendingVerification.status === 'restoring'
+      ? 'restoring'
+      : pendingVerification.email
+        ? 'pending'
+        : 'none',
   });
+  const redirectHref = decision.kind === 'redirect' ? decision.href : null;
+
+  useEffect(() => {
+    if (!redirectHref) {
+      lastRedirect.current = null;
+      return;
+    }
+    const redirectKey = `${String(group)}:${redirectHref}`;
+    if (lastRedirect.current === redirectKey) return;
+    lastRedirect.current = redirectKey;
+    router.replace(redirectHref);
+  }, [group, redirectHref]);
 
   if (!fontsLoaded && !fontError) {
     return (
@@ -117,15 +148,6 @@ export default function RootLayout() {
           />
         </PageShell>
       </Frame>
-    );
-  }
-
-  if (decision.kind === 'redirect') {
-    return (
-      <>
-        <PipWebHead />
-        <Redirect href={decision.href} />
-      </>
     );
   }
 

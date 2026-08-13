@@ -35,7 +35,7 @@ export function VerifyEmailScreen() {
       <ErrorSummary errors={error ? [error] : []} />
       {notice ? <NoticeBanner message={notice} tone="info" /> : null}
       <RoundedTextInput autoComplete="one-time-code" inputMode="numeric" keyboardType="number-pad" label="Six-digit code" maxLength={6} onChangeText={(value) => setCode(value.replace(/\D/g, ''))} textContentType="oneTimeCode" value={code} />
-      <View style={styles.actions}><QuietButton label="Send another code" onPress={() => void resend()} /><QuietButton label="Use a different email" onPress={() => router.replace('/sign-up')} /></View>
+      <View style={styles.actions}><QuietButton label="Send another code" onPress={() => void resend()} /><QuietButton label="Use a different email" onPress={() => { void pendingVerification.clear().then(() => router.replace('/sign-up')); }} /></View>
       <Text style={styles.note}>Codes expire after a day. You can ask for a new one at any time.</Text>
     </OnboardingScreen>
   );

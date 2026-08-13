@@ -80,6 +80,28 @@ export function validateHouseholdName(name: string): string | null {
 const PENDING_KEY = 'pip.pending-verification-email';
 
 let inMemoryPending: string | null = null;
+let pendingRestore: Promise<void> | null = null;
+let pendingSnapshot: PendingVerificationSnapshot = { status: 'restoring', email: null };
+const pendingListeners = new Set<() => void>();
+
+export type PendingVerificationSnapshot = {
+  status: 'restoring' | 'ready';
+  email: string | null;
+};
+
+function publishPending(email: string | null): void {
+  pendingSnapshot = { status: 'ready', email };
+  pendingListeners.forEach((listener) => listener());
+}
+
+export function subscribePendingVerification(listener: () => void): () => void {
+  pendingListeners.add(listener);
+  return () => pendingListeners.delete(listener);
+}
+
+export function getPendingVerificationSnapshot(): PendingVerificationSnapshot {
+  return pendingSnapshot;
+}
 
 /**
  * The address awaiting confirmation.
@@ -92,25 +114,43 @@ export const pendingVerification = {
   async set(email: string): Promise<void> {
     if (Platform.OS === 'web') {
       inMemoryPending = email;
-      return;
+    } else {
+      await SecureStore.setItemAsync(PENDING_KEY, email);
     }
-    await SecureStore.setItemAsync(PENDING_KEY, email);
+    publishPending(email);
   },
 
   async get(): Promise<string | null> {
-    if (Platform.OS === 'web') return inMemoryPending;
-    return SecureStore.getItemAsync(PENDING_KEY);
+    if (pendingSnapshot.status === 'ready') return pendingSnapshot.email;
+    await restorePendingVerification();
+    return pendingSnapshot.email;
   },
 
   async clear(): Promise<void> {
     if (Platform.OS === 'web') {
       inMemoryPending = null;
-      return;
+    } else {
+      await SecureStore.deleteItemAsync(PENDING_KEY);
     }
-    await SecureStore.deleteItemAsync(PENDING_KEY);
+    publishPending(null);
   },
 };
 
+/** Restores the interrupted OTP destination once per app launch. */
+export function restorePendingVerification(): Promise<void> {
+  if (!pendingRestore) {
+    pendingRestore = (Platform.OS === 'web'
+      ? Promise.resolve(inMemoryPending)
+      : SecureStore.getItemAsync(PENDING_KEY))
+      .then(publishPending)
+      .catch(() => publishPending(null));
+  }
+  return pendingRestore;
+}
+
 export function resetPendingVerificationForTests(): void {
   inMemoryPending = null;
+  pendingRestore = null;
+  pendingSnapshot = { status: 'restoring', email: null };
+  pendingListeners.clear();
 }

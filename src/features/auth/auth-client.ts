@@ -1,4 +1,6 @@
 import type { User } from '@supabase/supabase-js';
+import { isDevice } from 'expo-device';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import { clearSession, setAuthenticatedSession, type AuthenticatedAccount, type SessionRestorer } from './session-state';
@@ -23,8 +25,24 @@ function toAccount(user: User): AuthenticatedAccount {
   return { accountId: user.id, email: user.email ?? '', emailVerified: Boolean(user.email_confirmed_at) };
 }
 
+export function shouldBypassSimulatorAuth(input: {
+  enabled: boolean;
+  platform: string;
+  isPhysicalDevice: boolean;
+}): boolean {
+  return input.enabled && input.platform === 'ios' && !input.isPhysicalDevice;
+}
+
 /** Sends the same passwordless email OTP for both new and returning parents. */
 export async function sendEmailOtp(email: string): Promise<void> {
+  // Release-mode UI automation needs a deterministic success path without
+  // weakening a device build. Expo only inlines this opt-in at bundle time,
+  // and a physical iPhone can never take the bypass even if misconfigured.
+  if (shouldBypassSimulatorAuth({
+    enabled: process.env.EXPO_PUBLIC_PIP_SIMULATOR_AUTH === 'true',
+    platform: Platform.OS,
+    isPhysicalDevice: isDevice,
+  })) return;
   const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
   if (error) throw authError(error);
 }

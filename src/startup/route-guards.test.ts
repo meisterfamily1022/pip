@@ -14,6 +14,7 @@ const ready: Omit<GuardInput, "group"> = {
   onboardingComplete: true,
   childModeLocked: false,
   sessionStatus: "signedIn",
+  pendingVerificationStatus: "none",
 };
 
 const GROUPS: RouteGroup[] = ["(public)", "(auth)", "(onboarding)", "(parent)", "(child)", undefined];
@@ -47,6 +48,7 @@ describe("public routes", () => {
             onboardingComplete,
             childModeLocked,
             sessionStatus,
+            pendingVerificationStatus: "none",
           });
           expect(decision.kind).toBe("render");
         }
@@ -69,6 +71,29 @@ describe("startup gating", () => {
     expect(
       resolveRouteGuard({ ...ready, group: "(parent)", initializationError: "Database is unavailable." }),
     ).toEqual({ kind: "error", message: "Database is unavailable." });
+  });
+
+  it("waits for pending-verification restoration before choosing a native root", () => {
+    expect(resolveRouteGuard({ ...ready, group: undefined, pendingVerificationStatus: "restoring" })).toEqual({ kind: "launching" });
+  });
+
+  it("sends a cold signed-out launch to stable sign-in", () => {
+    expect(resolveRouteGuard({ ...ready, group: undefined, sessionStatus: "signedOut" })).toEqual({ kind: "redirect", href: "/sign-in" });
+    expect(resolveRouteGuard({ ...ready, group: "(auth)", sessionStatus: "signedOut" })).toEqual({ kind: "render" });
+  });
+
+  it("resumes a pending email only at verification", () => {
+    expect(resolveRouteGuard({ ...ready, group: undefined, sessionStatus: "signedOut", pendingVerificationStatus: "pending" })).toEqual({
+      kind: "redirect",
+      href: "/verify-email",
+    });
+    expect(resolveRouteGuard({ ...ready, group: "(auth)", sessionStatus: "signedOut", pendingVerificationStatus: "pending" })).toEqual({ kind: "render" });
+  });
+
+  it("sends a restored session to exactly one valid app destination", () => {
+    expect(resolveRouteGuard({ ...ready, group: undefined })).toEqual({ kind: "redirect", href: "/parent/home" });
+    expect(resolveRouteGuard({ ...ready, group: undefined, childModeLocked: true })).toEqual({ kind: "redirect", href: "/child/home" });
+    expect(resolveRouteGuard({ ...ready, group: undefined, onboardingComplete: false })).toEqual({ kind: "redirect", href: "/onboarding" });
   });
 });
 
@@ -159,6 +184,7 @@ describe("redirect loops", () => {
                 onboardingComplete,
                 childModeLocked,
                 sessionStatus,
+                pendingVerificationStatus: "none",
               });
               if (decision.kind !== "redirect") break;
 
@@ -180,6 +206,7 @@ describe("redirect loops", () => {
     expect(groupForHref("/child/parent-return")).toBe("(child)");
     expect(groupForHref("/onboarding")).toBe("(onboarding)");
     expect(groupForHref("/sign-in")).toBe("(auth)");
+    expect(groupForHref("/verify-email")).toBe("(auth)");
     expect(groupForHref("/")).toBe("(public)");
   });
 });

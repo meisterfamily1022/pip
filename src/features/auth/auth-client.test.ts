@@ -4,7 +4,7 @@ jest.mock('@/lib/supabase', () => ({
   supabase: { auth: { signInWithOtp: jest.fn(), verifyOtp: jest.fn(), getSession: jest.fn(), signOut: jest.fn() } },
 }));
 
-import { resendVerification, sendEmailOtp, verifyEmail } from './auth-client';
+import { resendVerification, sendEmailOtp, shouldBypassSimulatorAuth, verifyEmail } from './auth-client';
 import { getSessionSnapshot, resetSessionStateForTests } from './session-state';
 import { supabase } from '@/lib/supabase';
 
@@ -32,6 +32,13 @@ describe('Supabase email OTP authentication', () => {
       options: { shouldCreateUser: true },
     });
     expect(mockAuth.signInWithOtp).toHaveBeenCalledTimes(2);
+  });
+
+  it('allows the controlled OTP path only in an opted-in iOS simulator bundle', () => {
+    expect(shouldBypassSimulatorAuth({ enabled: true, platform: 'ios', isPhysicalDevice: false })).toBe(true);
+    expect(shouldBypassSimulatorAuth({ enabled: false, platform: 'ios', isPhysicalDevice: false })).toBe(false);
+    expect(shouldBypassSimulatorAuth({ enabled: true, platform: 'ios', isPhysicalDevice: true })).toBe(false);
+    expect(shouldBypassSimulatorAuth({ enabled: true, platform: 'android', isPhysicalDevice: false })).toBe(false);
   });
 
   it('verifies the six-digit email OTP and publishes the authenticated user', async () => {

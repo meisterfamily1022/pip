@@ -77,6 +77,22 @@ describe('native sign-in interactions', () => {
 
     expect(signIn).toHaveBeenCalledWith('parent@example.com');
     expect(pendingVerification.set).toHaveBeenCalledWith('parent@example.com');
-    expect(router.push).toHaveBeenCalledWith('/verify-email');
+    expect(router.replace).toHaveBeenCalledWith('/verify-email');
+  });
+
+  it('handles a double OTP tap only once', async () => {
+    let complete!: () => void;
+    (signIn as jest.Mock).mockImplementation(() => new Promise<void>((resolve) => { complete = resolve; }));
+    const renderer = renderScreen();
+    act(() => control(renderer, 'Email').props.onChangeText('parent@example.com'));
+
+    await act(async () => {
+      control(renderer, 'Email me a code').props.onPress();
+      control(renderer, 'Email me a code').props.onPress();
+      complete();
+    });
+
+    expect(signIn).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledTimes(1);
   });
 });

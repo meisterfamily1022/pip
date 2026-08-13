@@ -13,7 +13,6 @@
     "ios": {
       "icon": "./assets/brand/generated/pip-app-icon.png",
       "bundleIdentifier": "com.meister23.playmapmobile",
-      "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
