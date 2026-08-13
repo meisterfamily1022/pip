@@ -1,6 +1,7 @@
 # Pip UI polish — native QA record
 
-Date: 2026-08-13  
+Date: 2026-08-13
+
 Branch: `codex/pip-ui-polish`
 
 ## Release-like execution
