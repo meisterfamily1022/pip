@@ -42,6 +42,10 @@ const ink = {
 
 /** Clear space equals the height of the p bowl — one x-height, 525 units. */
 const clearSpace = 525;
+// Keep a small transparent margin around any intentionally tight export.
+// Rasterising directly on the ink edge can cut antialiased pixels on native
+// splash screens and browser image decoders.
+const edgePadding = 64;
 
 const canvas = '#FFFFFF';
 
@@ -88,18 +92,18 @@ const wordmarkAspect = ink.wordmark.width / ink.wordmark.height;
 const markAspect = ink.mark.width / ink.mark.height;
 
 const outputs = [
-  // In-app wordmark, cropped to the ink so screens control their own spacing.
-  { name: 'pip-wordmark.png', group: wordmarkGroup, viewBox: pad(ink.wordmark, 0), width: 1200, height: Math.round(1200 / wordmarkAspect) },
+  // In-app wordmark with enough room to preserve antialiased outer edges.
+  { name: 'pip-wordmark.png', group: wordmarkGroup, viewBox: pad(ink.wordmark, edgePadding), width: 1200, height: Math.round(1200 * ((ink.wordmark.height + (edgePadding * 2)) / (ink.wordmark.width + (edgePadding * 2)))) },
   // Wordmark with the documented clear space, for placement outside the app.
   { name: 'pip-lockup.png', group: wordmarkGroup, viewBox: pad(ink.wordmark, clearSpace), width: 1200, height: Math.round(1200 * ((ink.wordmark.height + (clearSpace * 2)) / (ink.wordmark.width + (clearSpace * 2)))) },
-  // Compact mark, cropped to the ink.
-  { name: 'pip-symbol.png', group: markGroup, viewBox: pad(ink.mark, 0), width: 512, height: Math.round(512 / markAspect) },
+  // Compact mark with enough room to preserve antialiased outer edges.
+  { name: 'pip-symbol.png', group: markGroup, viewBox: pad(ink.mark, edgePadding), width: 512, height: Math.round(512 * ((ink.mark.height + (edgePadding * 2)) / (ink.mark.width + (edgePadding * 2)))) },
   // iOS app icon: flat white ground, no text, mark optically centred.
   { name: 'pip-app-icon.png', group: markGroup, viewBox: frame(ink.mark, { aspect: 1, heightRatio: 0.74, opticalShift: 0.02 }), width: 1024, height: 1024, background: canvas, flatten: true },
   // Android adaptive foreground: transparent, ink kept inside the 66% safe zone.
   { name: 'pip-android-foreground.png', group: markGroup, viewBox: frame(ink.mark, { aspect: 1, heightRatio: 0.58, opticalShift: 0.02 }), width: 432, height: 432 },
   // Splash: the wordmark, drawn over the splash background Expo supplies.
-  { name: 'pip-splash.png', group: wordmarkGroup, viewBox: pad(ink.wordmark, 0), width: 720, height: Math.round(720 / wordmarkAspect) },
+  { name: 'pip-splash.png', group: wordmarkGroup, viewBox: pad(ink.wordmark, edgePadding), width: 720, height: Math.round(720 * ((ink.wordmark.height + (edgePadding * 2)) / (ink.wordmark.width + (edgePadding * 2)))) },
   { name: 'pip-favicon.png', group: markGroup, viewBox: frame(ink.mark, { aspect: 1, heightRatio: 0.82 }), width: 64, height: 64 },
   // Social preview.
   { name: 'pip-preview.png', group: wordmarkGroup, viewBox: frame(ink.wordmark, { aspect: 1200 / 630, heightRatio: 0.6 }), width: 1200, height: 630, background: canvas, flatten: true },

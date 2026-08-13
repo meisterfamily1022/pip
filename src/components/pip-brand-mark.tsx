@@ -17,10 +17,14 @@ import { pipLogoColors, playmapTheme as theme } from '@/theme/playmap-theme';
 const P_PATH = 'M329-525Q397-525 451-491Q505-457 536.500-397Q568-337 568-259Q568-182 536.500-121.500Q505-61 451.500-26.500Q398 8 331 8Q294 8 261.500-3.500Q229-15 202.500-33.500Q176-52 158-75.500Q140-99 132-122L154-136L154 159Q154 176 143 188Q132 200 114 200Q97 200 85.500 188.500Q74 177 74 159L74-480Q74-497 85.500-508.500Q97-520 114-520Q132-520 143-508.500Q154-497 154-480L154-391L139-399Q146-424 163.500-447Q181-470 206.500-487.500Q232-505 263.500-515Q295-525 329-525M320-451Q270-451 231.500-426Q193-401 171.500-358Q150-315 150-259Q150-204 171.500-160Q193-116 231.500-91Q270-66 320-66Q370-66 408-91Q446-116 468-160Q490-204 490-259Q490-315 468-358Q446-401 408-426Q370-451 320-451';
 const DOTLESS_I_PATH = 'M151-485L151-41Q151-24 139.500-12Q128 0 111 0Q93 0 82-12Q71-24 71-41L71-485Q71-502 82.500-513.500Q94-525 111-525Q128-525 139.500-513.500Q151-502 151-485';
 
-/** Ink bounds of each composition, matching the artwork exactly. */
+/**
+ * The native SVG renderer antialiases at a viewBox edge. Give the artwork a
+ * little breathing room instead of cropping exactly to its ink bounds, so no
+ * letter edge can lose a pixel on iOS (or Android) at any rendered size.
+ */
 const geometry = {
-  wordmark: { viewBox: '134 57 1329 1243', aspectRatio: 1329 / 1243 },
-  mark: { viewBox: '74 57 494 1243', aspectRatio: 494 / 1243 },
+  wordmark: { viewBox: '70 25 1457 1307', aspectRatio: 1457 / 1307 },
+  mark: { viewBox: '10 25 622 1307', aspectRatio: 622 / 1307 },
 } as const;
 
 export type PipBrandMarkVariant = 'wordmark' | 'mark';
@@ -61,6 +65,9 @@ export function PipBrandMark({
 }) {
   const { viewBox, aspectRatio } = geometry[variant];
   const letterFill = monochrome ? pipLogoColors.monochrome : pipLogoColors.wordmark;
+  // The wordmark artwork has a 60-unit local offset before its ink begins.
+  // Retain the approved SVG's exact placement within the safely padded viewBox.
+  const artworkTransform = variant === 'wordmark' ? 'translate(60 1100)' : 'translate(0 1100)';
   return (
     <View
       accessibilityLabel={pipBrand.name}
@@ -68,7 +75,7 @@ export function PipBrandMark({
       style={[styles.frame, width === undefined ? styles.fluid : { width }, { aspectRatio }, style]}
     >
       <Svg height="100%" viewBox={viewBox} width="100%">
-        <G y={1100} fill={letterFill}>
+        <G fill={letterFill} transform={artworkTransform}>
           <Path d={P_PATH} />
           {variant === 'wordmark' ? (
             <>
