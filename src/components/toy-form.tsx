@@ -345,6 +345,9 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, 
 
           <View style={styles.section}>
             <Text style={styles.fieldLabel}>Kind of play</Text>
+            <Text accessibilityLabel="Why Pip asks for kinds of play" style={styles.helperText}>
+              These help Pip offer choices that fit the moment.
+            </Text>
             <View style={styles.chips}>
               {PLAY_CATEGORIES.map((category) => (
                 <FilterChip
@@ -417,6 +420,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   section: { gap: 6 },
   fieldLabel: { color: theme.colors.primaryText, ...theme.typography.fieldLabel },
+  helperText: { color: theme.colors.secondaryText, ...theme.typography.meta },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[8] },
   actions: { flexDirection: 'row', gap: theme.spacing[8] },
   action: { flex: 1, minHeight: theme.measurements.minimumTouchTarget, paddingHorizontal: theme.spacing[8] },

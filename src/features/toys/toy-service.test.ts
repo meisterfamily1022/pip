@@ -233,6 +233,32 @@ describe('bulk parent toy intake', () => {
 });
 
 describe('parent toy repository filters', () => {
+  it('keeps a realistic medium library persistent, sorted, and searchable', async () => {
+    const database = new ToyTestDatabase();
+    for (let index = 0; index < 120; index += 1) {
+      await createToy(database, {
+        name: `Toy ${String(index).padStart(3, '0')}`,
+        imageUri: `file:///managed/toy-${index}.jpg`,
+        roomId: index % 2 === 0 ? 1 : 4,
+        storageSpotId: index % 2 === 0 ? 2 : 5,
+        cleanupDifficulty: 'easy',
+        adultHelpRequired: false,
+        isAvailable: true,
+        isArchived: false,
+        categories: [index % 2 === 0 ? 'building' : 'quiet'],
+      });
+    }
+
+    const afterRelaunch = await listParentToys(database);
+    expect(afterRelaunch).toHaveLength(120);
+    expect(afterRelaunch[0]).toMatchObject({ name: 'Toy 000', imageUri: 'file:///managed/toy-0.jpg' });
+    expect(afterRelaunch[119]).toMatchObject({ name: 'Toy 119' });
+    await expect(listParentToys(database, { search: 'Toy 087' })).resolves.toMatchObject([
+      { name: 'Toy 087', imageUri: 'file:///managed/toy-87.jpg' },
+    ]);
+    await expect(listParentToys(database, { category: 'building' })).resolves.toHaveLength(60);
+  });
+
   it('lists with location names, sorts alphabetically, and filters search, room, category, hidden, and archived', async () => {
     const database = new ToyTestDatabase();
     await createToy(database, { name: 'zebra', imageUri: 'file:///z.jpg', roomId: 1, storageSpotId: 2, cleanupDifficulty: 'easy', adultHelpRequired: false, isAvailable: true, isArchived: false, categories: ['active'] });
