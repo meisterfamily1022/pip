@@ -36,7 +36,10 @@ class TestDatabase implements DatabaseConnection {
   private readonly toys = new Map<number, RecordRow>();
   private readonly categories = new Map<number, string[]>();
   private readonly sessions = new Map<number, RecordRow>();
-  private readonly children = new Map<number, RecordRow>([[1, { id: 1, name: 'Ari', created_at: '', updated_at: '' }]]);
+  private readonly children = new Map<number, RecordRow>([[1, {
+    id: 1, name: 'Ari', household_id: 'local', avatar_id: 'circle-dot', accent_color_id: 'mint', age_range: null,
+    choice_limit: 3, reading_support: 'pictures-words', display_order: 1, hidden_at: null, created_at: '', updated_at: '',
+  }]]);
   private settings: RecordRow | null = null;
 
   async execAsync(source: string): Promise<void> {
@@ -52,7 +55,7 @@ class TestDatabase implements DatabaseConnection {
     if (source.startsWith('UPDATE toys SET original_image_uri') || source.startsWith('UPDATE toys SET preferred_image_variant') || source.startsWith('UPDATE toys SET ai_metadata_status')) return { lastInsertRowId: 0, changes: 0 };
     if (source.startsWith('INSERT OR IGNORE INTO settings')) { if (!this.settings) this.settings = { id: 1, onboarding_completed: 0, parent_pin: null, child_nickname: null, active_child_id: null, choice_limit: 3, cleanup_required: 1, created_at: params[1]!, updated_at: params[2]! }; return { lastInsertRowId: 1, changes: 1 }; }
     if (source.startsWith('UPDATE settings')) { if (!this.settings) throw new Error('Missing settings'); [this.settings.onboarding_completed, this.settings.child_nickname, this.settings.active_child_id, this.settings.choice_limit, this.settings.cleanup_required, this.settings.updated_at] = params; return { lastInsertRowId: 1, changes: 1 }; }
-    if (source.startsWith('INSERT INTO child_profiles')) { const rowId = id(); this.children.set(rowId, { id: rowId, name: params[0]!, created_at: params[1]!, updated_at: params[2]! }); return { lastInsertRowId: rowId, changes: 1 }; }
+    if (source.startsWith('INSERT INTO child_profiles')) { const rowId = id(); this.children.set(rowId, { id: rowId, name: params[0]!, household_id: params[1]!, avatar_id: params[2]!, accent_color_id: params[3]!, age_range: params[4]!, choice_limit: params[5]!, reading_support: params[6]!, display_order: params[7]!, hidden_at: null, created_at: params[8]!, updated_at: params[9]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO rooms')) { const rowId = id(); this.rooms.set(rowId, { id: rowId, name: params[0]!, created_at: params[1]!, updated_at: params[2]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO storage_spots')) { if (this.failStorageSpotCreation) throw new Error('Storage spot creation failed.'); const rowId = id(); this.spots.set(rowId, { id: rowId, room_id: params[0]!, name: params[1]!, created_at: params[2]!, updated_at: params[3]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('UPDATE rooms')) { const row = this.rooms.get(params[2] as number); if (!row) return { lastInsertRowId: 0, changes: 0 }; row.name = params[0]!; row.updated_at = params[1]!; return { lastInsertRowId: 0, changes: 1 }; }
@@ -103,6 +106,7 @@ class TestDatabase implements DatabaseConnection {
     if (source.includes('PRAGMA table_info("toy_setup_drafts")')) return ['is_available_draft', 'saved_toy_id', 'save_error'].map((name) => ({ name }) as T);
     if (source.includes('FROM rooms')) return [...this.rooms.values()].sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
     if (source.includes('FROM storage_spots')) return [...this.spots.values()].filter((row) => row.room_id === params[0]).sort((left, right) => String(left.name).localeCompare(String(right.name))).map((row) => row as T);
+    if (source.includes('FROM child_profiles')) return [...this.children.values()].map((row) => row as T);
     if (source.includes('FROM toy_categories')) return (this.categories.get(params[0] as number) ?? []).map((category) => ({ category }) as T);
     // This fake models records, not schema. Reporting no columns lets the
     // migration's add-column-if-missing helper run without needing a schema

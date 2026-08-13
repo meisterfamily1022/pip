@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Field, PrimaryButton } from '@/components/onboarding-controls';
 import { OnboardingScreen } from '@/components/onboarding-screen';
 import { AccentColorPicker, AvatarPicker, ProfileAvatar } from '@/components/profile-ui';
-import { QuietButton, SegmentedControl } from '@/components/playmap-ui';
+import { SegmentedControl } from '@/components/playmap-ui';
 import { READING_SUPPORT_LABELS, type ReadingSupport } from '@/domain/child-avatars';
 import type { ChoiceLimit } from '@/domain/models';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
@@ -19,9 +19,9 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * to be. Reading support and tidy-up rules are the second half, so neither
  * screen is a wall.
  *
- * Optional by design: a parent can skip and add profiles later from Settings,
- * because Pip works without any. Nothing here asks for a birthday, a legal
- * name, a school, or anything diagnostic.
+ * Nothing here asks for a birthday, a legal name, a school, or anything
+ * diagnostic. A recognizable name is required so Child Mode never invents a
+ * profile identity or mistakes sample/browser state for family data.
  */
 export default function ChildProfileSetupRoute() {
   const { draft, updateDraft } = useOnboarding();
@@ -41,13 +41,6 @@ export default function ChildProfileSetupRoute() {
     router.push('/child-profile-preferences');
   };
 
-  const skip = (): void => {
-    // A placeholder profile keeps Child Mode usable straight away; the parent
-    // can rename it, or add more, from Settings.
-    updateDraft({ childNickname: 'My child' });
-    router.push('/first-location-setup');
-  };
-
   const previewName = draft.childNickname.trim() || 'This profile';
   const readingLabel = READING_SUPPORT_LABELS[draft.childReadingSupport as ReadingSupport] ?? READING_SUPPORT_LABELS['pictures-words'];
 
@@ -55,10 +48,7 @@ export default function ChildProfileSetupRoute() {
     <OnboardingScreen
       description="A name and a badge so your child recognises their own space."
       footer={
-        <>
-          <PrimaryButton label="Next: reading &amp; cleanup" onPress={continueToPreferences} />
-          <QuietButton label="Set this up later" onPress={skip} />
-        </>
+        <PrimaryButton label="Next: reading & cleanup" onPress={continueToPreferences} />
       }
       onBack={goBack}
       step={2}
@@ -89,6 +79,7 @@ export default function ChildProfileSetupRoute() {
         }}
         placeholder="For example, Ada"
         returnKeyType="done"
+        onSubmitEditing={continueToPreferences}
         value={draft.childNickname}
       />
 

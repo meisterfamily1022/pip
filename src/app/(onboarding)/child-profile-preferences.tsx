@@ -1,16 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/onboarding-controls';
 import { OnboardingScreen } from '@/components/onboarding-screen';
-import { OptionCard, ToggleRow } from '@/components/playmap-ui';
+import { Banner, OptionCard, ToggleRow } from '@/components/playmap-ui';
 import { READING_SUPPORTS, type ReadingSupport } from '@/domain/child-avatars';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { initializeDatabase } from '@/database/client';
-import { createChildProfile } from '@/repositories/child-profiles-repository';
-import { updateSettings } from '@/repositories/settings-repository';
+import { saveFirstChildProfile } from '@/features/onboarding/onboarding-progress';
 
 /**
  * Step 2, second half: how this child reads, and whether tidying comes first.
@@ -28,6 +27,8 @@ const readingDescriptions: Record<ReadingSupport, { title: string; description: 
 export default function ChildProfilePreferencesRoute() {
   const { draft, updateDraft } = useOnboarding();
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const savingRef = useRef(false);
   const name = draft.childNickname.trim() || 'your child';
 
   const goBack = (): void => {
@@ -49,6 +50,7 @@ export default function ChildProfilePreferencesRoute() {
       step={2}
       title={`How ${name} sees toys`}
     >
+      {saveError ? <Banner message={saveError} tone="alert" /> : null}
       <View accessibilityRole="radiogroup" style={styles.options}>
         {READING_SUPPORTS.map((support) => (
           <OptionCard
@@ -73,15 +75,27 @@ export default function ChildProfilePreferencesRoute() {
   );
 
   async function saveProfile(): Promise<void> {
-    if (saving) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
+    setSaveError(null);
     try {
       const database = await initializeDatabase();
-      const existing = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE hidden_at IS NULL LIMIT 1;');
-      const child = existing ?? await createChildProfile(database, { name: draft.childNickname, avatarId: draft.childAvatarId, accentColorId: draft.childAccentColorId, choiceLimit: draft.choiceLimit, readingSupport: draft.childReadingSupport });
-      await updateSettings(database, { childNickname: draft.childNickname.trim(), activeChildId: child.id, choiceLimit: draft.choiceLimit, cleanupRequired: draft.cleanupRequired });
+      await saveFirstChildProfile(database, {
+        name: draft.childNickname,
+        avatarId: draft.childAvatarId,
+        accentColorId: draft.childAccentColorId,
+        choiceLimit: draft.choiceLimit,
+        readingSupport: draft.childReadingSupport,
+        cleanupRequired: draft.cleanupRequired,
+      });
       router.replace('/first-location-setup');
-    } finally { setSaving(false); }
+    } catch (caught: unknown) {
+      setSaveError(caught instanceof Error ? caught.message : 'This profile could not be saved. Try again.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }
 }
 

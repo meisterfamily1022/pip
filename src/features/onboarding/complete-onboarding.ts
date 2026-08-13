@@ -1,8 +1,8 @@
 import type { DatabaseConnection } from '@/database/types';
 import type { ChoiceLimit } from '@/domain/models';
 import { createRoom, createStorageSpot } from '@/repositories/rooms-repository';
-import { updateSettings } from '@/repositories/settings-repository';
-import { createChildProfile } from '@/repositories/child-profiles-repository';
+import { getSettings, updateSettings } from '@/repositories/settings-repository';
+import { createChildProfile, getChildProfile } from '@/repositories/child-profiles-repository';
 import { telemetry } from '@/features/analytics/telemetry-client';
 
 export type CompleteOnboardingInput = {
@@ -22,7 +22,8 @@ export async function completeOnboarding(database: DatabaseConnection, input: Co
     const room = existingRoom ?? await createRoom(database, input.roomName);
     const existingSpot = await database.getFirstAsync<{ id: number }>('SELECT id FROM storage_spots WHERE room_id = ? AND name = ? COLLATE NOCASE LIMIT 1;', room.id, input.storageSpotName.trim());
     if (!existingSpot) await createStorageSpot(database, room.id, input.storageSpotName);
-    const existingChild = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE hidden_at IS NULL LIMIT 1;');
+    const settings = await getSettings(database);
+    const existingChild = settings.activeChildId ? await getChildProfile(database, settings.activeChildId) : null;
     const child = existingChild ?? await createChildProfile(database, {
       name: input.childNickname,
       avatarId: input.childAvatarId,
@@ -31,10 +32,10 @@ export async function completeOnboarding(database: DatabaseConnection, input: Co
       choiceLimit: input.choiceLimit,
     });
     await updateSettings(database, {
-      childNickname: input.childNickname.trim(),
+      childNickname: child.name,
       activeChildId: child.id,
-      choiceLimit: input.choiceLimit,
-      cleanupRequired: input.cleanupRequired,
+      choiceLimit: child.choiceLimit,
+      cleanupRequired: existingChild ? settings.cleanupRequired : input.cleanupRequired,
       onboardingCompleted: true,
     });
   });
