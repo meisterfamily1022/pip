@@ -4,13 +4,13 @@ import { changeParentPin, saveParentSettings, SettingsValidationError } from './
 import { getSettings } from '@/repositories/settings-repository';
 
 class SettingsTestDatabase implements DatabaseConnection {
-  public settings = { onboarding_completed: 1, child_nickname: 'Ari', active_child_id: 1, choice_limit: 3, cleanup_required: 1, created_at: '', updated_at: '' };
+  public settings = { onboarding_completed: 1, child_mode_used: 0, child_nickname: 'Ari', active_child_id: 1, choice_limit: 3, cleanup_required: 1, created_at: '', updated_at: '' };
   public child = { id: 1, name: 'Ari', created_at: '', updated_at: '' };
   async execAsync(): Promise<void> {}
   async withTransactionAsync(task: () => Promise<void>): Promise<void> { await task(); }
   async runAsync(source: string, ...params: SqlParameters): Promise<SqlRunResult> {
     if (source.startsWith('UPDATE settings')) {
-      this.settings = { onboarding_completed: params[0] as number, child_nickname: params[1] as string, active_child_id: params[2] as number, choice_limit: params[3] as number, cleanup_required: params[4] as number, created_at: '', updated_at: params[5] as string };
+      this.settings = { onboarding_completed: params[0] as number, child_mode_used: params[1] as number, child_nickname: params[2] as string, active_child_id: params[3] as number, choice_limit: params[4] as number, cleanup_required: params[5] as number, created_at: '', updated_at: params[6] as string };
       return { lastInsertRowId: 1, changes: 1 };
     }
     if (source.startsWith('UPDATE child_profiles')) { this.child.name = params[0] as string; this.child.updated_at = params[1] as string; return { lastInsertRowId: 0, changes: 1 }; }

@@ -6,6 +6,7 @@ import { ChildButton, ChildModeHeader, ChildPage, ToyCard } from '@/components/c
 import { Banner, SkeletonGrid } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import { PLAY_CATEGORIES, type PlayCategory } from '@/domain/play-category';
+import { displayChildName, displayToyName } from '@/domain/presentation';
 import { recommendToys, safeChoiceLimit, type PlayType } from '@/features/child/recommendation-service';
 import { offersSpokenLabels, readingSupportOf, showsToyNames, speakToyName } from '@/features/child/spoken-labels';
 import { getActiveChildProfile } from '@/repositories/child-profiles-repository';
@@ -189,7 +190,7 @@ export default function ChildToySuggestionsRoute() {
               pathname: '/child/toy-detail',
               params: { id: String(toy.id), category, ...(surprise ? { surprise: '1' } : {}) },
             })}
-            onSpeak={speak ? () => speakToyName(toy.name) : undefined}
+            onSpeak={speak ? () => speakToyName(displayToyName(toy.name)) : undefined}
             showName={showNames}
             toy={toy}
           />
@@ -202,15 +203,13 @@ export default function ChildToySuggestionsRoute() {
       </View>
 
       <Pressable
-        accessibilityLabel={`Show me ${toys.length === 1 ? 'a different toy' : `${toys.length} different toys`}`}
+        accessibilityLabel="Show me another toy"
         accessibilityRole="button"
         onPress={() => reshuffle(state?.shown ?? [])}
         style={({ pressed }) => [styles.reshuffle, pressed && styles.pressed]}
       >
-        <Text style={styles.reshuffleTitle}>Nothing here feels right?</Text>
-        <Text style={styles.reshuffleAction}>
-          {toys.length === 1 ? 'Show me a different toy' : `Show me ${toys.length} different toys`}
-        </Text>
+        <Text style={styles.reshuffleTitle}>Want a different choice?</Text>
+        <Text style={styles.reshuffleAction}>Show me another toy</Text>
       </Pressable>
     </ChildPage>
   );
@@ -234,7 +233,10 @@ function verbFor(category: PlayType): string {
 
 function describeHolders(held: readonly HeldToy[]): string {
   const byHolder = new Map<string, string[]>();
-  for (const { toy, holder } of held) byHolder.set(holder, [...(byHolder.get(holder) ?? []), toy.name]);
+  for (const { toy, holder } of held) {
+    const displayHolder = displayChildName(holder);
+    byHolder.set(displayHolder, [...(byHolder.get(displayHolder) ?? []), displayToyName(toy.name)]);
+  }
   return [...byHolder.entries()]
     .map(([holder, names]) => `${holder} has ${listNames(names)}.`)
     .join(' ');

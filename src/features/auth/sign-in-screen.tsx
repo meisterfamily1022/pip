@@ -34,7 +34,7 @@ export function SignInScreen() {
 
   return (
     <OnboardingScreen
-      description={`Your library stays on this device either way. An account is for backup and using ${pipBrand.name} elsewhere.`}
+      description={`Sign in to your ${pipBrand.name} account. Your library stays on this device; backup and syncing are not available yet.`}
       footer={<PrimaryButton accessibilityLabel="Email me a code" disabled={submitting || !isValidEmail(email)} label={submitting ? 'Sending code…' : 'Email me a code'} onPress={() => void submit()} />}
       title="Sign in"
     >
@@ -51,7 +51,7 @@ export function SignInScreen() {
         testID="sign-in-email"
         value={email}
       />
-      <QuietButton label={`Set up ${pipBrand.name} on this device`} onPress={() => router.replace('/onboarding')} />
+      <QuietButton label="Back to get started" onPress={() => router.replace('/onboarding')} />
       <QuietButton label="Create an account instead" onPress={() => router.replace('/sign-up')} />
     </OnboardingScreen>
   );

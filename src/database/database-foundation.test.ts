@@ -53,8 +53,8 @@ class TestDatabase implements DatabaseConnection {
   async runAsync(source: string, ...params: SqlParameters): Promise<SqlRunResult> {
     const id = (): number => { this.identifier += 1; return this.identifier; };
     if (source.startsWith('UPDATE toys SET original_image_uri') || source.startsWith('UPDATE toys SET preferred_image_variant') || source.startsWith('UPDATE toys SET ai_metadata_status')) return { lastInsertRowId: 0, changes: 0 };
-    if (source.startsWith('INSERT OR IGNORE INTO settings')) { if (!this.settings) this.settings = { id: 1, onboarding_completed: 0, parent_pin: null, child_nickname: null, active_child_id: null, choice_limit: 3, cleanup_required: 1, created_at: params[1]!, updated_at: params[2]! }; return { lastInsertRowId: 1, changes: 1 }; }
-    if (source.startsWith('UPDATE settings')) { if (!this.settings) throw new Error('Missing settings'); [this.settings.onboarding_completed, this.settings.child_nickname, this.settings.active_child_id, this.settings.choice_limit, this.settings.cleanup_required, this.settings.updated_at] = params; return { lastInsertRowId: 1, changes: 1 }; }
+    if (source.startsWith('INSERT OR IGNORE INTO settings')) { if (!this.settings) this.settings = { id: 1, onboarding_completed: 0, child_mode_used: 0, parent_pin: null, child_nickname: null, active_child_id: null, choice_limit: 3, cleanup_required: 1, created_at: params[1]!, updated_at: params[2]! }; return { lastInsertRowId: 1, changes: 1 }; }
+    if (source.startsWith('UPDATE settings')) { if (!this.settings) throw new Error('Missing settings'); [this.settings.onboarding_completed, this.settings.child_mode_used, this.settings.child_nickname, this.settings.active_child_id, this.settings.choice_limit, this.settings.cleanup_required, this.settings.updated_at] = params; return { lastInsertRowId: 1, changes: 1 }; }
     if (source.startsWith('INSERT INTO child_profiles')) { const rowId = id(); this.children.set(rowId, { id: rowId, name: params[0]!, household_id: params[1]!, avatar_id: params[2]!, accent_color_id: params[3]!, age_range: params[4]!, choice_limit: params[5]!, reading_support: params[6]!, display_order: params[7]!, hidden_at: null, created_at: params[8]!, updated_at: params[9]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO rooms')) { const rowId = id(); this.rooms.set(rowId, { id: rowId, name: params[0]!, created_at: params[1]!, updated_at: params[2]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO storage_spots')) { if (this.failStorageSpotCreation) throw new Error('Storage spot creation failed.'); const rowId = id(); this.spots.set(rowId, { id: rowId, room_id: params[0]!, name: params[1]!, created_at: params[2]!, updated_at: params[3]! }); return { lastInsertRowId: rowId, changes: 1 }; }
@@ -205,7 +205,7 @@ describe('database foundation', () => {
   });
 
   it('chooses startup destinations from onboarding state', () => {
-    const settings = { onboardingCompleted: false, childNickname: null, activeChildId: null, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+    const settings = { onboardingCompleted: false, childModeUsed: false, childNickname: null, activeChildId: null, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
     expect(getStartupDestination(settings, false)).toBe('/onboarding');
     expect(getStartupDestination({ ...settings, onboardingCompleted: true }, true)).toBe('/parent/home');
     expect(getStartupDestination({ ...settings, onboardingCompleted: true }, false)).toBe('/onboarding');
@@ -224,8 +224,8 @@ describe('onboarding validation', () => {
   });
 
   it('validates child and location names', () => {
-    expect(validateChildNickname('  ')).toBe('Child nickname is required.');
-    expect(validateChildNickname('b')).toBe('Child nickname must be at least 2 characters.');
+    expect(validateChildNickname('  ')).toBe("Child's name is required.");
+    expect(validateChildNickname('b')).toBe("Child's name must be at least 2 characters.");
     expect(validateChildNickname('Bea')).toBeNull();
     expect(validateRequiredName('Room', 'Room name')).toBeNull();
     expect(validateRequiredName('   ', 'Storage spot name')).toBe('Storage spot name is required.');
@@ -284,7 +284,7 @@ describe('PIN and onboarding completion consistency', () => {
   });
 
   it('never treats completed SQLite data without a PIN as a parent-ready state', () => {
-    const settings = { onboardingCompleted: true, childNickname: 'Ari', activeChildId: 1, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+    const settings = { onboardingCompleted: true, childModeUsed: false, childNickname: 'Ari', activeChildId: 1, choiceLimit: 3 as const, cleanupRequired: true, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
     expect(getStartupDestination(settings, false)).toBe('/onboarding');
   });
 });

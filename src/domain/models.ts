@@ -77,6 +77,7 @@ export type PlaySession = {
   startedAt: Timestamp;
   completedAt: Timestamp | null;
   cleanupStartedAt: Timestamp | null;
+  cleanupStep: number;
   helpRequested: boolean;
   parentOverrideUsed: boolean;
   createdAt: Timestamp;
@@ -120,6 +121,7 @@ export type ChoiceLimit = 1 | 3 | 5;
 
 export type AppSettings = {
   onboardingCompleted: boolean;
+  childModeUsed: boolean;
   childNickname: string | null;
   activeChildId: number | null;
   choiceLimit: ChoiceLimit;

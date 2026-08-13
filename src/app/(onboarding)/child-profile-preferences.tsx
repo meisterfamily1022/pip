@@ -6,6 +6,7 @@ import { PrimaryButton } from '@/components/onboarding-controls';
 import { OnboardingScreen } from '@/components/onboarding-screen';
 import { Banner, OptionCard, ToggleRow } from '@/components/playmap-ui';
 import { READING_SUPPORTS, type ReadingSupport } from '@/domain/child-avatars';
+import { displayChildName } from '@/domain/presentation';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { initializeDatabase } from '@/database/client';
@@ -19,8 +20,8 @@ import { saveFirstChildProfile } from '@/features/onboarding/onboarding-progress
  * lesser setting.
  */
 const readingDescriptions: Record<ReadingSupport, { title: string; description: string }> = {
-  pictures: { title: 'Pictures only', description: 'For children who don’t read yet' },
-  'pictures-words': { title: 'Pictures and words', description: 'Toy names appear under each photo' },
+  pictures: { title: 'Pictures only', description: "Best for children who don't read yet" },
+  'pictures-words': { title: 'Pictures and words', description: "Show the toy's picture and name" },
   'pictures-words-audio': { title: 'Pictures, words and speech', description: 'A speaker button reads each name aloud' },
 };
 
@@ -29,7 +30,7 @@ export default function ChildProfilePreferencesRoute() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const savingRef = useRef(false);
-  const name = draft.childNickname.trim() || 'your child';
+  const name = displayChildName(draft.childNickname, 'your child');
 
   const goBack = (): void => {
     if (router.canGoBack()) router.back();
@@ -42,17 +43,17 @@ export default function ChildProfilePreferencesRoute() {
       footer={
         <PrimaryButton
           busy={saving}
-          label={saving ? 'Saving profile…' : `Save ${draft.childNickname.trim() ? `${draft.childNickname.trim()}’s` : 'this'} profile`}
+          label={saving ? 'Adding child…' : 'Add child'}
           onPress={() => void saveProfile()}
         />
       }
       onBack={goBack}
       step={2}
-      title={`How ${name} sees toys`}
+      title="How should toys appear?"
     >
       {saveError ? <Banner message={saveError} tone="alert" /> : null}
       <View accessibilityRole="radiogroup" style={styles.options}>
-        {READING_SUPPORTS.map((support) => (
+        {READING_SUPPORTS.filter((support) => support !== 'pictures-words-audio').map((support) => (
           <OptionCard
             description={readingDescriptions[support].description}
             key={support}
@@ -70,7 +71,7 @@ export default function ChildProfilePreferencesRoute() {
         value={draft.cleanupRequired}
       />
 
-      <Text style={styles.note}>Both of these can change at any time in Settings.</Text>
+      <Text style={styles.note}>{`You can change ${name}’s choices later in Settings.`}</Text>
     </OnboardingScreen>
   );
 

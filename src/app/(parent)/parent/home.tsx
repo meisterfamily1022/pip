@@ -16,6 +16,7 @@ import {
 } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
+import { displayChildName, displayToyName, presentLocation } from '@/domain/presentation';
 import {
   buildHomeOverview,
   describeRemainingSetup,
@@ -27,12 +28,11 @@ import {
 import { listChildProfiles } from '@/repositories/child-profiles-repository';
 import {
   completePlaySession,
-  hasEverPlayed,
   listActivePlaySessions,
   type ActivePlaySession,
 } from '@/repositories/play-sessions-repository';
 import { countStorageSpots, listRooms } from '@/repositories/rooms-repository';
-import { setActiveChild } from '@/repositories/settings-repository';
+import { getSettings, markChildModeUsed, setActiveChild } from '@/repositories/settings-repository';
 import { countToys } from '@/repositories/toys-repository';
 import { enterChildMode } from '@/startup/route-access';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
@@ -56,12 +56,12 @@ export default function ParentHomeRoute() {
   const load = useCallback(async () => {
     try {
       const database = await initializeDatabase();
-      const [children, sessions, toyCount, rooms, childModeUsed] = await Promise.all([
+      const [children, sessions, toyCount, rooms, settings] = await Promise.all([
         listChildProfiles(database),
         listActivePlaySessions(database),
         countToys(database),
         listRooms(database),
-        hasEverPlayed(database),
+        getSettings(database),
       ]);
       const spotCounts = await Promise.all(rooms.map((room) => countStorageSpots(database, room.id)));
       setOverview(buildHomeOverview({
@@ -70,7 +70,7 @@ export default function ParentHomeRoute() {
         toyCount,
         roomCount: rooms.length,
         spotCount: spotCounts.reduce((total, count) => total + count, 0),
-        childModeUsed,
+        childModeUsed: settings.childModeUsed,
       }));
       setNow(Date.now());
       setError(null);
@@ -88,10 +88,11 @@ export default function ParentHomeRoute() {
     try {
       const database = await initializeDatabase();
       await setActiveChild(database, child.id);
+      await markChildModeUsed(database);
       router.replace('/child/home');
       await enterChildMode();
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'Child Mode could not open.');
+      setError(caught instanceof Error ? caught.message : 'Child mode could not open.');
     }
   };
 
@@ -146,7 +147,7 @@ export default function ParentHomeRoute() {
             />
             {overview.checkouts.length === 0 ? (
               <View style={styles.emptyCheckouts}>
-                <Text style={styles.emptyTitle}>Nothing is out right now</Text>
+                <Text style={styles.emptyTitle}>No toys are out right now</Text>
                 <Text style={styles.meta}>When a child picks a toy, it appears here with their name.</Text>
               </View>
             ) : (
@@ -154,10 +155,10 @@ export default function ParentHomeRoute() {
                 <View key={session.id} style={styles.checkout}>
                   <ImageTile label={`${session.toy?.name ?? 'Toy'} photo`} size={56} uri={session.toy?.imageUri} />
                   <View style={styles.checkoutCopy}>
-                    <Text style={styles.checkoutWho}>{`${session.childName} · ${formatElapsed(session.startedAt, now)}`}</Text>
-                    <Text numberOfLines={2} style={styles.checkoutToy}>{session.toy?.name ?? 'This toy is no longer in the library'}</Text>
-                    <Text numberOfLines={1} style={styles.meta}>
-                      {session.toy ? `${session.toy.roomName} · ${session.toy.storageSpotName}` : 'The checkout can still be closed safely.'}
+                    <Text style={styles.checkoutWho}>{`${displayChildName(session.childName)} · ${formatElapsed(session.startedAt, now)}`}</Text>
+                    <Text numberOfLines={2} style={styles.checkoutToy}>{session.toy ? displayToyName(session.toy.name) : 'This toy is no longer in the library'}</Text>
+                    <Text style={styles.meta}>
+                      {session.toy ? presentLocation(session.toy.roomName, session.toy.storageSpotName).compact ?? 'Location not added' : 'The checkout can still be closed safely.'}
                     </Text>
                   </View>
                   <Pressable
@@ -174,8 +175,25 @@ export default function ParentHomeRoute() {
             )}
           </View>
 
+          {overview.libraryMilestone ? (
+            <Card tone="warm">
+              <Text accessibilityRole="header" style={styles.cardTitle}>{`Build ${displayChildName(firstChildName, 'your child')}’s toy library`}</Text>
+              <Text style={styles.meta}>Add a few more toys to give them more choices.</Text>
+              <Text style={styles.milestoneProgress}>{`${overview.libraryMilestone.count} of ${overview.libraryMilestone.target} ${overview.libraryMilestone.count === 1 ? 'toy' : 'toys'} added`}</Text>
+              <Pressable
+                accessibilityLabel={overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}
+                accessibilityRole="button"
+                onPress={() => router.replace(overview.libraryMilestone!.count === 0 ? '/parent/first-toy' : '/parent/add-toy')}
+                style={({ pressed }) => [styles.milestoneAction, pressed && styles.pressed]}
+              >
+                <Text style={styles.stepAction}>{overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}</Text>
+                <PipIcon color={theme.colors.brandInk} name="chevron-right" size={16} />
+              </Pressable>
+            </Card>
+          ) : null}
+
           <View style={styles.stats}>
-            <StatCard label={overview.toyCount === 1 ? 'toy catalogued' : 'toys catalogued'} value={overview.toyCount} />
+            <StatCard label={overview.toyCount === 1 ? 'toy added' : 'toys added'} value={overview.toyCount} />
             <StatCard
               label={`${overview.roomCount === 1 ? 'room' : 'rooms'} · ${overview.spotCount} ${overview.spotCount === 1 ? 'spot' : 'spots'}`}
               value={overview.roomCount}
@@ -183,17 +201,17 @@ export default function ParentHomeRoute() {
           </View>
 
           <View style={styles.section}>
-            <SectionHeading title="Hand the phone over" />
+            <SectionHeading title="Ready to play?" />
             {overview.handoff.length === 0 ? (
               <Pressable
                 accessibilityHint="Guest play works without a profile"
-                accessibilityLabel="Start Child Mode"
+                accessibilityLabel="Start Child mode"
                 accessibilityRole="button"
                 onPress={() => router.replace('/parent/select-child')}
                 style={({ pressed }) => [styles.startChildMode, pressed && styles.pressed]}
               >
                 <View style={styles.rowCopy}>
-                  <Text style={styles.cardTitle}>Start Child Mode</Text>
+                  <Text style={styles.cardTitle}>Start Child mode</Text>
                   <Text style={styles.meta}>Choose who is playing</Text>
                 </View>
                 <PipIcon color={theme.colors.brandInk} name="chevron-right" size={18} />
@@ -202,8 +220,8 @@ export default function ParentHomeRoute() {
               <View style={styles.handoff}>
                 {overview.handoff.map(({ child, playing }) => (
                   <Pressable
-                    accessibilityHint={playing ? 'Already has a toy out' : 'Opens Child Mode for this child'}
-                    accessibilityLabel={`${child.name}. ${playing ? 'Playing' : 'Free'}`}
+                    accessibilityHint={playing ? 'Already has a toy out' : 'Opens Child mode for this child'}
+                    accessibilityLabel={`${displayChildName(child.name)}. ${playing ? 'Playing now' : 'Ready to play'}`}
                     accessibilityRole="button"
                     key={child.id}
                     onPress={() => {
@@ -212,8 +230,8 @@ export default function ParentHomeRoute() {
                     style={({ pressed }) => [styles.handoffCard, pressed && styles.pressed]}
                   >
                     <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={48} />
-                    <Text numberOfLines={1} style={styles.handoffName}>{child.name}</Text>
-                    <Text style={[styles.handoffState, playing && styles.handoffPlaying]}>{playing ? 'Playing' : 'Free'}</Text>
+                    <Text style={styles.handoffName}>{displayChildName(child.name)}</Text>
+                    <Text style={[styles.handoffState, playing && styles.handoffPlaying]}>{playing ? 'Playing now' : 'Ready'}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -274,6 +292,8 @@ const styles = StyleSheet.create({
   rowCopy: { flex: 1, gap: 2 },
   cardTitle: { color: theme.colors.primaryText, ...theme.typography.rowTitle },
   meta: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  milestoneProgress: { color: theme.colors.primaryText, ...theme.typography.label },
+  milestoneAction: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: theme.measurements.minimumTouchTarget },
 
   steps: { gap: theme.spacing[4], marginTop: theme.spacing[4] },
   step: { alignItems: 'center', flexDirection: 'row', gap: theme.spacing[12], minHeight: theme.measurements.minimumTouchTarget },
@@ -344,7 +364,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: theme.radii.card,
     borderWidth: 1,
-    flexBasis: '30%',
+    flexBasis: '46%',
     flexGrow: 1,
     gap: 5,
     paddingHorizontal: theme.spacing[8],

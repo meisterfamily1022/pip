@@ -19,6 +19,6 @@ export function validateRequiredName(value: string, label: string): string | nul
 
 export function validateChildNickname(value: string): string | null {
   const nickname = value.trim();
-  if (!nickname) return 'Child nickname is required.';
-  return nickname.length >= 2 ? null : 'Child nickname must be at least 2 characters.';
+  if (!nickname) return "Child's name is required.";
+  return nickname.length >= 2 ? null : "Child's name must be at least 2 characters.";
 }

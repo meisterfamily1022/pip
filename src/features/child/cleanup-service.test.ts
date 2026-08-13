@@ -1,5 +1,5 @@
 import type { DatabaseConnection, SqlParameters, SqlRunResult } from '@/database/types';
-import { completeCleanup, completeCleanupWithParentOverride, requestCleanupHelp } from './cleanup-service';
+import { completeCleanup, completeCleanupWithParentOverride, requestCleanupHelp, saveCleanupStep } from './cleanup-service';
 import { completePlaySession, createPlaySession, getActivePlaySession, listActivePlaySessions, markCleanupStarted, startPlaySessionIfNoneActive } from '@/repositories/play-sessions-repository';
 
 type Row = Record<string, string | number | null>;
@@ -35,6 +35,13 @@ class CleanupTestDatabase implements DatabaseConnection {
       const session = this.sessions.get(params[2] as number);
       if (!session || session.child_id !== params[3] || session.status !== params[4]) return { lastInsertRowId: 0, changes: 0 };
       session.help_requested = params[0]!;
+      session.updated_at = params[1]!;
+      return { lastInsertRowId: 0, changes: 1 };
+    }
+    if (source.startsWith('UPDATE play_sessions SET cleanup_step')) {
+      const session = this.sessions.get(params[2] as number);
+      if (!session || session.child_id !== params[3] || session.status !== params[4]) return { lastInsertRowId: 0, changes: 0 };
+      session.cleanup_step = params[0]!;
       session.updated_at = params[1]!;
       return { lastInsertRowId: 0, changes: 1 };
     }
@@ -88,6 +95,13 @@ describe('cleanup service transitions', () => {
     expect(started.cleanupStartedAt).toEqual(expect.any(String));
     expect(restarted.cleanupStartedAt).toBe(started.cleanupStartedAt);
     await expect(getActivePlaySession(database, 1)).resolves.toMatchObject({ toy: { name: 'Blocks', roomName: 'Playroom', storageSpotName: 'Blue Bin' } });
+  });
+
+  it('persists the current cleanup step for relaunch recovery', async () => {
+    const database = new CleanupTestDatabase();
+    await createPlaySession(database, 1, 1);
+    await expect(saveCleanupStep(database, 1, 1)).resolves.toMatchObject({ cleanupStep: 1 });
+    await expect(getActivePlaySession(database, 1)).resolves.toMatchObject({ cleanupStep: 1 });
   });
 
   it('requests help, preserves it through parent override, and records override', async () => {

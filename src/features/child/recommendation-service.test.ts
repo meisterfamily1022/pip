@@ -10,6 +10,11 @@ describe('child recommendation service', () => {
     expect(recommendToys(toys, { category: 'anything', choiceLimit: 5 }).map((item) => item.id).sort()).toEqual([1, 2, 3]);
   });
 
+  it('keeps toys with partial location metadata eligible', () => {
+    const partial = { ...toy(8, ['quiet']), roomName: '', storageSpotName: 'Shelf' };
+    expect(recommendToys([partial], { category: 'quiet', choiceLimit: 1 })).toEqual([partial]);
+  });
+
   it.each([1, 3, 5] as const)('honors choice limit %i', (limit) => {
     expect(recommendToys([1, 2, 3, 4, 5].map((id) => toy(id, ['quiet'])), { category: 'quiet', choiceLimit: limit })).toHaveLength(limit);
   });

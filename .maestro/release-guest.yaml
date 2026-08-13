@@ -4,9 +4,9 @@ name: Embedded Release guest onboarding and resume
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: "Set up Pip on this device"
+    visible: "Get started"
     timeout: 30000
-- tapOn: "Set up Pip on this device"
+- tapOn: "Get started"
 - assertVisible: "Choose a parent PIN"
 - tapOn: "Parent PIN"
 - inputText: "2468"
@@ -15,12 +15,12 @@ name: Embedded Release guest onboarding and resume
 - tapOn: "Confirm parent PIN"
 - inputText: "2468"
 - tapOn: "Continue"
-- assertVisible: "Who will be playing?"
+- assertVisible: "Add a child"
 - tapOn: "For example, Ada"
 - inputText: "Juniper"
 - tapOn: "Next: reading & cleanup"
-- assertVisible: "How Juniper sees toys"
-- tapOn: "Save Juniper’s profile"
+- assertVisible: "How should toys appear?"
+- tapOn: "Add child"
 - extendedWaitUntil:
     visible: "Where do toys live?"
     timeout: 10000

@@ -36,7 +36,7 @@ export default function ParentPinSetupRoute() {
 
   return (
     <OnboardingScreen
-      description="Four digits, so Child Mode stays child-only. You can change it later in Settings."
+      description="Four digits, so Child mode stays child-only. You can change it later in Settings."
       footer={<PrimaryButton disabled={!complete} label="Continue" onPress={continueToConfirm} />}
       progressLabel="Parent PIN"
       title="Choose a parent PIN"

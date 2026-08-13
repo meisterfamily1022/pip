@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -32,6 +32,7 @@ export default function ParentReturnRoute() {
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const coolingDown = isPinGateCoolingDown(gate, now);
 
@@ -44,7 +45,8 @@ export default function ParentReturnRoute() {
   }, [gate]);
 
   const submit = async (): Promise<void> => {
-    if (submitting || coolingDown) return;
+    if (submittingRef.current || coolingDown) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -62,6 +64,7 @@ export default function ParentReturnRoute() {
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'Pip could not check that PIN.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -100,8 +103,8 @@ export default function ParentReturnRoute() {
       </View>
 
       <View style={styles.copy}>
-        <Text accessibilityRole="header" style={styles.title}>Grown-ups only</Text>
-        <Text style={styles.subtitle}>Enter the four-digit PIN to get back to the parent side of Pip.</Text>
+        <Text accessibilityRole="header" style={styles.title}>Parent mode</Text>
+        <Text style={styles.subtitle}>Enter your 4-digit PIN.</Text>
       </View>
 
       {error ? <Banner message={error} tone="alert" /> : null}

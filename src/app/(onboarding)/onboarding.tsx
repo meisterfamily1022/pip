@@ -16,10 +16,10 @@ import { onboardingProgressStorage } from '@/services/onboarding-progress-storag
  * The logo is deliberately small: it introduces the product, it is not the
  * product. Nothing here asks for anything.
  */
-const promises: { icon: PipIconName; copy: string }[] = [
-  { icon: 'camera', copy: 'Take a photo of each toy. Work through a whole shelf in one go.' },
-  { icon: 'spaces', copy: 'Say where each toy belongs — a room, and a spot inside it.' },
-  { icon: 'together', copy: 'Hand the phone to your child. They see a few toys, not the whole room.' },
+const promises: { icon: PipIconName; title: string; body: string }[] = [
+  { icon: 'camera', title: 'Photograph their toys', body: 'Add one toy or a whole shelf.' },
+  { icon: 'spaces', title: 'Tell Pip where they belong', body: 'Choose the room and storage spot.' },
+  { icon: 'together', title: 'Hand over the phone', body: 'Your child chooses from a few toys at a time.' },
 ];
 
 export default function OnboardingHomeRoute() {
@@ -27,9 +27,8 @@ export default function OnboardingHomeRoute() {
     <PageShell
       footer={
         <>
-          <PrimaryButton label={`Set up ${pipBrand.name} on this device`} onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
+          <PrimaryButton label="Get started" onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
           <QuietButton label="Sign in" onPress={() => router.push('/sign-in')} />
-          <Text style={styles.footnote}>Takes about two minutes. Nothing leaves this device.</Text>
         </>
       }
     >
@@ -39,22 +38,26 @@ export default function OnboardingHomeRoute() {
       </View>
 
       <View style={styles.promises}>
-        {promises.map(({ icon, copy }) => (
+        {promises.map(({ icon, title, body }) => (
           <View key={icon} style={styles.promise}>
             <View style={styles.promiseIcon}>
               <PipIcon color={theme.colors.brandInk} name={icon} size={20} />
             </View>
-            <Text style={styles.promiseCopy}>{copy}</Text>
+            <View style={styles.promiseCopy}>
+              <Text style={styles.promiseTitle}>{title}</Text>
+              <Text style={styles.promiseBody}>{body}</Text>
+            </View>
           </View>
         ))}
       </View>
 
       <View style={styles.account}>
         <Text style={styles.accountText}>
-          {`${pipBrand.name} works privately on this device without an account. Create one only for future backup or use on another device.`}
+          {`${pipBrand.name} works without an account. Your library and toy photos stay on this device.`}
         </Text>
         <QuietButton label="Create an account" onPress={() => router.push('/sign-up')} />
       </View>
+      <Text style={styles.footnote}>Takes about two minutes. Nothing leaves this device.</Text>
     </PageShell>
   );
 }
@@ -72,7 +75,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  promiseCopy: { color: theme.colors.primaryText, flex: 1, ...theme.typography.body },
+  promiseCopy: { flex: 1, gap: 2 },
+  promiseTitle: { color: theme.colors.primaryText, ...theme.typography.label },
+  promiseBody: { color: theme.colors.secondaryText, ...theme.typography.meta },
   account: {
     backgroundColor: theme.colors.cardSurface,
     borderColor: theme.colors.border,

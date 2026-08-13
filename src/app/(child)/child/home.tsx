@@ -8,6 +8,7 @@ import { ProfileAvatar } from '@/components/profile-ui';
 import { Banner, SkeletonRows } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
+import { displayChildName, displayToyName } from '@/domain/presentation';
 import { getActiveChildProfile } from '@/repositories/child-profiles-repository';
 import { getActivePlaySession, type ActivePlaySession } from '@/repositories/play-sessions-repository';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
@@ -51,7 +52,7 @@ export default function ChildHomeRoute() {
     );
   }
 
-  const name = child?.name?.trim();
+  const name = child ? displayChildName(child.name) : null;
 
   return (
     <ChildPage
@@ -64,14 +65,14 @@ export default function ChildHomeRoute() {
       footer={
         <View style={styles.grownUpsRow}>
           <Pressable
-            accessibilityHint="Asks for a grown-up’s PIN"
-            accessibilityLabel="Grown-ups"
+            accessibilityHint="Opens the parent PIN screen"
+            accessibilityLabel="Parent mode"
             accessibilityRole="button"
             onPress={() => router.push('/child/parent-return')}
             style={({ pressed }) => [styles.grownUps, pressed && styles.pressed]}
           >
             <PipIcon color={theme.colors.mutedText} name="lock" size={16} />
-            <Text style={styles.grownUpsText}>Grown-ups</Text>
+            <Text style={styles.grownUpsText}>Parent mode</Text>
           </Pressable>
         </View>
       }
@@ -82,17 +83,17 @@ export default function ChildHomeRoute() {
       <View style={styles.greeting}>
         {child ? <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={56} /> : null}
         <View style={styles.greetingCopy}>
-          <Text style={styles.hello}>{name ? `Hi ${name}` : 'Hi'}</Text>
-          <Text accessibilityRole="header" style={styles.title}>What sounds fun?</Text>
+          <Text style={styles.hello}>{name ? `Hi, ${name}!` : 'Hi!'}</Text>
+          <Text accessibilityRole="header" style={styles.title}>What do you want to play with?</Text>
         </View>
       </View>
 
       <View style={styles.choices}>
         <Choice
-          detail="Pick what sounds good"
+          detail="Choose what looks fun"
           icon="library"
           onPress={() => router.push('/child/categories')}
-          title="Find a toy"
+          title="Pick a toy"
           tone="primary"
         />
         <Choice
@@ -102,14 +103,15 @@ export default function ChildHomeRoute() {
           title="Surprise me"
           tone="sunshine"
         />
-        <Choice
-          detail={session?.toy ? session.toy.name : 'Nothing is out yet'}
-          disabled={!session}
-          icon="check"
-          onPress={() => router.push('/child/current-toy')}
-          title="Playing now"
-          tone="plain"
-        />
+        {session ? (
+          <Choice
+            detail={session.toy ? displayToyName(session.toy.name) : 'See the toy that is out'}
+            icon="check"
+            onPress={() => router.push('/child/current-toy')}
+            title="Playing now"
+            tone="plain"
+          />
+        ) : null}
       </View>
 
     </ChildPage>

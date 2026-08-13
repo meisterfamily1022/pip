@@ -67,7 +67,7 @@ describe('native sign-in interactions', () => {
 
   it('offers an obvious return to local-only setup', () => {
     const renderer = renderScreen();
-    act(() => control(renderer, 'Set up Pip on this device').props.onPress());
+    act(() => control(renderer, 'Back to get started').props.onPress());
     expect(router.replace).toHaveBeenCalledWith('/onboarding');
   });
 

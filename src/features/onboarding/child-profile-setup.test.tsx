@@ -33,6 +33,6 @@ describe('first child profile setup', () => {
     const next = renderer.root.findAll((node) => node.props.accessibilityLabel === 'Next: reading & cleanup')[0];
     act(() => next.props.onPress());
     expect(router.push).not.toHaveBeenCalled();
-    expect(renderer.root.findAll((node) => node.props.accessibilityLiveRegion === 'polite' && node.props.children === 'Child nickname is required.').length).toBeGreaterThan(0);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLiveRegion === 'polite' && node.props.children === "Child's name is required.").length).toBeGreaterThan(0);
   });
 });

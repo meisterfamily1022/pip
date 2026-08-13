@@ -8,7 +8,7 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@/database/client', () => ({ initializeDatabase: jest.fn(async () => ({})) }));
 jest.mock('@/repositories/child-profiles-repository', () => ({ listChildProfiles: jest.fn(async () => mockProfiles) }));
-jest.mock('@/repositories/settings-repository', () => ({ setActiveChild: jest.fn(async () => undefined) }));
+jest.mock('@/repositories/settings-repository', () => ({ markChildModeUsed: jest.fn(async () => undefined), setActiveChild: jest.fn(async () => undefined) }));
 jest.mock('@/startup/route-access', () => ({ enterChildMode: jest.fn(async () => undefined) }));
 
 import { createElement } from 'react';
@@ -49,7 +49,7 @@ describe('first toy handoff', () => {
     mockProfiles = [{ id: 7 }];
     const renderer = renderScreen();
     await act(async () => { await Promise.resolve(); });
-    await act(async () => press(renderer, 'Try Child Mode'));
+    await act(async () => press(renderer, 'Try Child mode'));
     expect(setActiveChild).toHaveBeenCalledWith({}, 7);
     expect(enterChildMode).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith('/child/home');
@@ -60,7 +60,7 @@ describe('first toy handoff', () => {
     mockProfiles = [{ id: 7 }, { id: 8 }];
     const renderer = renderScreen();
     await act(async () => { await Promise.resolve(); });
-    press(renderer, 'Try Child Mode');
+    press(renderer, 'Try Child mode');
     expect(router.replace).toHaveBeenCalledWith('/parent/select-child');
   });
 });

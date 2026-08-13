@@ -1,7 +1,7 @@
 import type { AppSettings } from '@/domain/models';
 import { getStartupDestination, type OnboardingState } from './startup-routing';
 
-const settings: AppSettings = { onboardingCompleted: false, childNickname: null, activeChildId: null, choiceLimit: 3, cleanupRequired: true, createdAt: '', updatedAt: '' };
+const settings: AppSettings = { onboardingCompleted: false, childModeUsed: false, childNickname: null, activeChildId: null, choiceLimit: 3, cleanupRequired: true, createdAt: '', updatedAt: '' };
 const state = (update: Partial<OnboardingState> = {}): OnboardingState => ({ settings, hasPin: false, hasChild: false, hasLocation: false, guestOnboardingStarted: false, ...update });
 
 describe('canonical onboarding destination', () => {

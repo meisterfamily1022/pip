@@ -681,7 +681,7 @@ export function SegmentedControl<T extends string | number | boolean>({
             onPress={() => onChange(option)}
             style={({ pressed }) => [styles.segment, selected && styles.segmentSelected, pressed && !selected && styles.pressed]}
           >
-            <Text maxFontSizeMultiplier={1.5} numberOfLines={1} style={[styles.segmentText, selected && styles.segmentTextSelected]}>{label}</Text>
+            <Text maxFontSizeMultiplier={1.8} style={[styles.segmentText, selected && styles.segmentTextSelected]}>{label}</Text>
           </Pressable>
         );
       })}
@@ -1092,7 +1092,7 @@ export function ToyImage({
     );
   }
   return (
-    <View accessibilityLabel="No photo yet" style={[styles.toyImage, styles.imageFallback, style]}>
+    <View accessibilityLabel={`${accessibilityLabel}. No photo available`} accessible style={[styles.toyImage, styles.imageFallback, style]}>
       <PipIcon color={theme.colors.mutedText} name="photo-missing" size={22} />
       <Text style={styles.imageFallbackText}>No photo yet</Text>
     </View>
@@ -1346,7 +1346,7 @@ const styles = StyleSheet.create({
   // Containers
   screen: { backgroundColor: theme.colors.background, flex: 1 },
   safePage: { backgroundColor: theme.colors.background, flex: 1 },
-  childScreen: { backgroundColor: theme.colors.background },
+  childScreen: { backgroundColor: theme.colors.childBackground },
   pageScroll: { flexGrow: 1 },
   pageContent: {
     alignSelf: 'center',
@@ -1545,9 +1545,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: theme.measurements.segmentHeight,
     paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[8],
   },
   segmentSelected: { backgroundColor: theme.colors.surface, ...theme.shadows.segment },
-  segmentText: { color: theme.colors.secondaryText, ...theme.typography.body, fontSize: 15 },
+  segmentText: { color: theme.colors.secondaryText, textAlign: 'center', ...theme.typography.body, fontSize: 15 },
   segmentTextSelected: { color: theme.colors.brandInk, fontFamily: theme.fonts.bold },
   toggleRow: {
     alignItems: 'center',
