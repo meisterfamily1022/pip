@@ -36,6 +36,7 @@ describe('toy media intake', () => {
       requestCameraPermissionsAsync: jest.fn().mockResolvedValue(denied),
       launchCameraAsync: jest.fn(),
     }, 'ios');
+    expect(result.blockedPermission).toBe('camera');
     expect(result.error).toMatch(/device settings/i);
     expect(result.error).toMatch(/choose a photo/i);
   });

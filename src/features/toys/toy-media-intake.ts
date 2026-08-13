@@ -3,7 +3,13 @@ import { Platform } from 'react-native';
 import { validateIntakeAsset } from './toy-batch-drafts';
 
 export type ImageIntakeAsset = { uri: string; mimeType?: string | null; fileSize?: number | null };
-export type ImageIntakeResult = { uris: string[]; assets: ImageIntakeAsset[]; cancelled: boolean; error: string | null };
+export type ImageIntakeResult = {
+  uris: string[];
+  assets: ImageIntakeAsset[];
+  cancelled: boolean;
+  error: string | null;
+  blockedPermission?: 'camera';
+};
 export const TOY_IMAGE_COMPRESSION_QUALITY = 0.82;
 
 export function normalizeImagePickerResult(result: ImagePicker.ImagePickerResult): ImageIntakeResult {
@@ -58,6 +64,7 @@ export async function captureWithSystemCamera(api: CameraPickerApi = ImagePicker
       error: permission.canAskAgain
         ? 'Camera access was not allowed. You can choose a photo instead.'
         : 'Camera access is blocked in device settings. You can enable it there or choose a photo instead.',
+      blockedPermission: permission.canAskAgain ? undefined : 'camera',
     };
     return normalizeImagePickerResult(await api.launchCameraAsync({ mediaTypes: ['images'], quality: TOY_IMAGE_COMPRESSION_QUALITY }));
   } catch { return { uris: [], assets: [], cancelled: false, error: 'Could not open the camera. Please try again or choose a photo.' }; }

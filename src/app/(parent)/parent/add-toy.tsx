@@ -172,6 +172,7 @@ export default function AddToyRoute() {
       <ToyForm
         error={null}
         locations={locations}
+        onCameraBlocked={() => setMode('camera-blocked')}
         onBulkSubmit={mode === 'batch' ? submitBulk : undefined}
         onSubmit={submit}
         saving={saving}

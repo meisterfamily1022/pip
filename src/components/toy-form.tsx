@@ -49,12 +49,13 @@ type ToyFormProps = {
   submitLabel: string;
   onSubmit(input: ToyFormInput): Promise<void>;
   onBulkSubmit?(drafts: readonly ToySetupDraft[]): Promise<ToySetupDraft[]>;
+  onCameraBlocked?(): void;
   startInBulkMode?: boolean;
 };
 
 type IntakeFeedback = { tone: 'neutral' | 'success' | 'error'; message: string } | null;
 
-export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, onBulkSubmit, startInBulkMode = false }: ToyFormProps) {
+export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, onBulkSubmit, onCameraBlocked, startInBulkMode = false }: ToyFormProps) {
   const firstUsableRoom = locations.find((room) => room.storageSpots.length > 0);
   const [name, setName] = useState(toy?.name ?? '');
   const [sourceImageUri, setSourceImageUri] = useState<string | null>(null);
@@ -159,6 +160,8 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, 
       const result = await captureWithSystemCamera();
       if (result.cancelled) {
         setManualFeedback({ tone: 'neutral', message: 'Camera canceled. Nothing was changed.' });
+      } else if (result.blockedPermission === 'camera' && onCameraBlocked) {
+        onCameraBlocked();
       } else if (result.error) {
         setManualFeedback({ tone: 'error', message: result.error });
       } else if (result.uris[0]) {
@@ -182,6 +185,8 @@ export function ToyForm({ locations, toy, saving, error, submitLabel, onSubmit, 
       const result = await captureWithSystemCamera();
       if (result.cancelled) {
         setFeedback({ tone: 'neutral', message: 'Camera canceled. The review queue is unchanged.' });
+      } else if (result.blockedPermission === 'camera' && onCameraBlocked) {
+        onCameraBlocked();
       } else if (result.error) {
         setFeedback({ tone: 'error', message: result.error });
       } else if (result.uris[0]) {
