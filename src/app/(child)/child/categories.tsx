@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ChildModeHeader, ChildPage } from '@/components/child-ui';
+import { ChildButton, ChildModeHeader, ChildPage } from '@/components/child-ui';
 import { PipIcon, type PipIconName } from '@/components/pip-icon';
 import type { PlayCategory } from '@/domain/play-category';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
@@ -36,9 +36,21 @@ const choices: readonly Choice[] = [
 
 export default function ChildCategoriesRoute() {
   return (
-    <ChildPage>
+    <ChildPage
+      footer={
+        <ChildButton
+          icon="sparkle"
+          label="Show me anything"
+          onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything' } })}
+          secondary
+        />
+      }
+    >
       <ChildModeHeader backLabel="Back" onBack={() => router.replace('/child/home')} />
-      <Text accessibilityRole="header" style={styles.title}>What kind of play?</Text>
+      <View style={styles.copy}>
+        <Text accessibilityRole="header" style={styles.title}>What sounds good right now?</Text>
+        <Text style={styles.subtitle}>Pick one.</Text>
+      </View>
 
       <View style={styles.grid}>
         {choices.map((choice) => (
@@ -55,16 +67,6 @@ export default function ChildCategoriesRoute() {
             <Text numberOfLines={2} style={styles.tileLabel}>{choice.label}</Text>
           </Pressable>
         ))}
-
-        <Pressable
-          accessibilityLabel="Show me anything"
-          accessibilityRole="button"
-          onPress={() => router.push({ pathname: '/child/toy-suggestions', params: { category: 'anything' } })}
-          style={({ pressed }) => [styles.anything, pressed && styles.pressed]}
-        >
-          <PipIcon color={theme.colors.brandPrimaryLabel} name="sparkle" size={26} strokeWidth={1.9} />
-          <Text style={styles.anythingLabel}>Show me anything</Text>
-        </Pressable>
       </View>
     </ChildPage>
   );
@@ -73,6 +75,8 @@ export default function ChildCategoriesRoute() {
 const styles = StyleSheet.create({
   pressed: { opacity: 0.78 },
   title: { color: theme.colors.primaryText, ...theme.typography.childTitle, fontSize: 30, lineHeight: 34 },
+  copy: { gap: 4 },
+  subtitle: { color: theme.colors.secondaryText, ...theme.typography.body },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[12] },
   tile: {
     alignItems: 'center',
@@ -96,18 +100,4 @@ const styles = StyleSheet.create({
     width: 60,
   },
   tileLabel: { color: theme.colors.primaryText, textAlign: 'center', ...theme.typography.rowTitle },
-  anything: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.accentSunshine,
-    borderColor: theme.colors.borderSunshine,
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: theme.spacing[12],
-    justifyContent: 'center',
-    minHeight: 72,
-    padding: theme.spacing[16],
-    width: '100%',
-  },
-  anythingLabel: { color: theme.colors.brandPrimaryLabel, ...theme.typography.rowTitle, fontSize: 19 },
 });
