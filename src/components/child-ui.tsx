@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PipIcon } from '@/components/pip-icon';
 import type { ChildToy } from '@/repositories/toys-repository';
+import { displayToyName, presentLocation } from '@/domain/presentation';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import {
   ChildPrimaryButton,
@@ -78,16 +79,15 @@ export function ChildPage({
 }
 
 /** Where the toy lives, said the way a child would be told it. */
-export function LocationPanel({ room, spot }: { room: string; spot: string }) {
+export function LocationPanel({ room, spot }: { room?: string | null; spot?: string | null }) {
+  const location = presentLocation(room, spot);
   return (
-    <View accessibilityLabel={`Look on the ${spot} in the ${room}`} accessible style={styles.locationPanel}>
+    <View accessibilityLabel={location.accessibilityLabel} accessible style={styles.locationPanel}>
       <PipIcon color={theme.colors.brandInk} name="spaces" size={22} />
-      <Text style={styles.locationValue}>
-        {'Look on the '}
-        <Text style={styles.locationStrong}>{spot}</Text>
-        {' in the '}
-        <Text style={styles.locationStrong}>{room}</Text>
-      </Text>
+      <View style={styles.locationCopy}>
+        <Text style={styles.locationLabel}>Where it lives</Text>
+        <Text style={styles.locationValue}>{location.instruction}</Text>
+      </View>
     </View>
   );
 }
@@ -118,9 +118,11 @@ export function ToyCard({
   onSpeak?(): void;
 }) {
   const unavailable = Boolean(unavailableBecause);
+  const name = displayToyName(toy.name);
+  const location = presentLocation(toy.roomName, toy.storageSpotName);
   const label = unavailable
-    ? `${toy.name}. ${unavailableBecause} has this one.`
-    : `${toy.name}. In the ${toy.roomName}, ${toy.storageSpotName}.`;
+    ? `${name}. ${unavailableBecause} has this one.`
+    : `${name}. ${location.accessibilityLabel}.`;
   return (
     <View style={[styles.card, unavailable && styles.cardUnavailable]}>
       <Pressable
@@ -135,14 +137,14 @@ export function ToyCard({
         <View style={[styles.cardPhoto, unavailable && styles.dimmed]}>
           <ToyImage uri={toy.imageUri} />
         </View>
-        {showName ? <Text numberOfLines={2} style={styles.toyName}>{toy.name}</Text> : null}
+        {showName ? <Text style={styles.toyName}>{name}</Text> : null}
         <Text numberOfLines={2} style={styles.location}>
-          {unavailable ? `${unavailableBecause} has this one` : `${toy.roomName} · ${toy.storageSpotName}`}
+          {unavailable ? `${unavailableBecause} has this one` : location.compact ?? 'Location not added'}
         </Text>
       </Pressable>
       {onSpeak && !unavailable ? (
         <Pressable
-          accessibilityLabel={`Say the name, ${toy.name}`}
+          accessibilityLabel={`Say the name, ${name}`}
           accessibilityRole="button"
           onPress={onSpeak}
           style={({ pressed }) => [styles.speakButton, pressed && styles.pressed]}
@@ -195,8 +197,9 @@ const styles = StyleSheet.create({
     padding: theme.spacing[16],
     width: '100%',
   },
+  locationCopy: { flex: 1, gap: 2 },
+  locationLabel: { color: theme.colors.secondaryText, ...theme.typography.meta },
   locationValue: { color: theme.colors.primaryText, flex: 1, ...theme.typography.body, fontSize: 18, lineHeight: 26 },
-  locationStrong: { fontFamily: theme.fonts.bold },
   link: { alignItems: 'center', justifyContent: 'center', minHeight: theme.measurements.minimumTouchTarget, paddingHorizontal: theme.spacing[12] },
   linkText: { color: theme.colors.brandInk, ...theme.typography.label },
 });

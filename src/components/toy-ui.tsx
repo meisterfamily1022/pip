@@ -1,4 +1,5 @@
 import type { ParentToy } from '@/repositories/toys-repository';
+import { displayToyName, presentLocation } from '@/domain/presentation';
 import {
   DestructiveButton,
   ErrorStateCard,
@@ -43,13 +44,14 @@ export function toyCardStatus(toy: ParentToy, holderName?: string | null): ToyCa
 }
 
 export function ToyGridCard({ toy, onPress, holderName }: { toy: ParentToy; onPress(): void; holderName?: string | null }) {
+  const location = presentLocation(toy.roomName, toy.storageSpotName);
   return (
     <ToyPhotoCard
       holderName={holderName ?? undefined}
-      location={`${toy.roomName} · ${toy.storageSpotName}`}
+      location={location.compact ?? 'Location not added'}
       onPress={onPress}
       status={toyCardStatus(toy, holderName)}
-      title={toy.name}
+      title={displayToyName(toy.name)}
       uri={toy.imageUri}
     />
   );
