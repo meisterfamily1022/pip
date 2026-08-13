@@ -59,7 +59,6 @@ export function AvatarPicker({
   accentColorId: string | null;
   label?: string;
 }) {
-  const selected = findChildAvatar(value);
   return (
     <View style={styles.pickerGroup}>
       <Text style={styles.pickerLabel}>{label}</Text>
@@ -90,8 +89,6 @@ export function AvatarPicker({
           );
         })}
       </ScrollView>
-      {/* The chosen character is said in words, so the tick is never the only signal. */}
-      <Text accessibilityLiveRegion="polite" style={styles.pickerCaption}>{`Selected: ${selected.label}`}</Text>
     </View>
   );
 }
@@ -99,7 +96,7 @@ export function AvatarPicker({
 export function AccentColorPicker({
   value,
   onChange,
-  label = "Colour",
+  label = "Color",
 }: {
   value: string;
   onChange: (accentColorId: string) => void;
@@ -164,7 +161,6 @@ const styles = StyleSheet.create({
   },
   pickerGroup: { gap: 6 },
   pickerLabel: { color: theme.colors.primaryText, ...theme.typography.fieldLabel },
-  pickerCaption: { color: theme.colors.secondaryText, ...theme.typography.meta },
   pickerRow: { gap: theme.spacing[8], paddingVertical: theme.spacing[4] },
   swatch: {
     alignItems: "center",

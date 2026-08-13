@@ -8,6 +8,7 @@ import { AccentColorPicker, AvatarPicker, ProfileAvatar } from '@/components/pro
 import { SegmentedControl } from '@/components/playmap-ui';
 import { READING_SUPPORT_LABELS, type ReadingSupport } from '@/domain/child-avatars';
 import type { ChoiceLimit } from '@/domain/models';
+import { displayChildName } from '@/domain/presentation';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { validateChildNickname } from '@/features/onboarding/validation';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
@@ -41,18 +42,19 @@ export default function ChildProfileSetupRoute() {
     router.push('/child-profile-preferences');
   };
 
-  const previewName = draft.childNickname.trim() || 'This profile';
+  const validName = validateChildNickname(draft.childNickname) === null;
+  const previewName = validName ? displayChildName(draft.childNickname) : "Your child's profile";
   const readingLabel = READING_SUPPORT_LABELS[draft.childReadingSupport as ReadingSupport] ?? READING_SUPPORT_LABELS['pictures-words'];
 
   return (
     <OnboardingScreen
-      description="A name and a badge so your child recognises their own space."
+      description="Create a profile your child can recognize."
       footer={
         <PrimaryButton label="Next: reading & cleanup" onPress={continueToPreferences} />
       }
       onBack={goBack}
       step={2}
-      title="Who will be playing?"
+      title="Add a child"
     >
       <View style={styles.preview}>
         <ProfileAvatar
@@ -72,7 +74,7 @@ export default function ChildProfileSetupRoute() {
 
       <Field
         error={error}
-        label="Name"
+        label="Child's name"
         onChangeText={(childNickname) => {
           updateDraft({ childNickname });
           setError(null);
@@ -85,18 +87,20 @@ export default function ChildProfileSetupRoute() {
 
       <AvatarPicker
         accentColorId={draft.childAccentColorId}
+        label="Choose an icon"
         onChange={(childAvatarId) => updateDraft({ childAvatarId })}
         value={draft.childAvatarId}
       />
       <AccentColorPicker
+        label="Color"
         onChange={(childAccentColorId) => updateDraft({ childAccentColorId })}
         value={draft.childAccentColorId}
       />
 
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>How many choices at once?</Text>
+        <Text style={styles.fieldLabel}>How many toys should Pip show at once?</Text>
         <SegmentedControl<ChoiceLimit>
-          accessibilityLabel="How many choices at once"
+          accessibilityLabel="How many toys should Pip show at once?"
           getOptionLabel={(limit) => `${limit} toy${limit === 1 ? '' : 's'}`}
           onChange={(choiceLimit) => updateDraft({ choiceLimit })}
           options={[1, 3, 5]}
