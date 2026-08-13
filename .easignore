@@ -1,0 +1,35 @@
+# Dependencies and local tooling
+node_modules/
+.claude/
+.expo/
+.git/
+
+# Generated output
+dist/
+web-build/
+ios/
+android/
+.kotlin/
+*.tsbuildinfo
+
+# Local credentials and environment
+.env
+.env*.local
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Editor, operating-system, and debug files
+.DS_Store
+.vscode/
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.orig.*
+
+# Non-product local scratch directory
+example/
