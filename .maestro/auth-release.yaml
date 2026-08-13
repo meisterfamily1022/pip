@@ -59,3 +59,21 @@ name: Release auth interaction regression
     visible: "Confirm your email"
     timeout: 30000
 - assertNotVisible: "Sign in"
+- tapOn:
+    id: "verification-code"
+- inputText: "000000"
+- tapOn: "Confirm email"
+- extendedWaitUntil:
+    visible: ".*That code is incorrect.*"
+    timeout: 10000
+- tapOn: "Send another code"
+- extendedWaitUntil:
+    visible: "A new code is on its way. Use the newest code in your email."
+    timeout: 10000
+- tapOn:
+    id: "verification-code"
+- inputText: "123456"
+- tapOn: "Confirm email"
+- extendedWaitUntil:
+    visible: "Set up Pip"
+    timeout: 30000

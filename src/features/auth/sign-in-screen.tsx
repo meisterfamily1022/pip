@@ -7,7 +7,7 @@ import { OnboardingScreen } from '@/components/onboarding-screen';
 import { PrimaryButton } from '@/components/onboarding-controls';
 import { QuietButton, RoundedTextInput } from '@/components/playmap-ui';
 import { AuthRequestError, signIn } from './auth-client';
-import { isValidEmail, pendingVerification } from './sign-up-form';
+import { isValidEmail } from './sign-up-form';
 
 /** Platform-neutral passwordless sign-in screen. */
 export function SignInScreen() {
@@ -23,7 +23,6 @@ export function SignInScreen() {
     setError(null);
     try {
       await signIn(email.trim());
-      await pendingVerification.set(email.trim());
       router.replace('/verify-email');
     } catch (caught: unknown) {
       setError(caught instanceof AuthRequestError ? caught.message : 'We could not reach the server. Try again shortly.');

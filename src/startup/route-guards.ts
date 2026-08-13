@@ -87,6 +87,7 @@ export function resolveRouteGuard(input: GuardInput): GuardDecision {
 
   // Signing in is meaningless when a session already exists.
   if (input.sessionStatus === 'signedIn' && input.group === '(auth)') {
+    if (!input.onboardingComplete) return { kind: 'redirect', href: '/onboarding' };
     return { kind: 'redirect', href: input.childModeLocked ? '/child/home' : '/parent/home' };
   }
 

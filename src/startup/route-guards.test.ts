@@ -111,6 +111,13 @@ describe("onboarding gating", () => {
     expect(resolveRouteGuard({ ...ready, group: "(auth)", onboardingComplete: false, sessionStatus: "signedOut" })).toEqual({ kind: "render" });
   });
 
+  it("takes a newly verified parent directly from auth to onboarding", () => {
+    expect(resolveRouteGuard({ ...ready, group: "(auth)", onboardingComplete: false })).toEqual({
+      kind: "redirect",
+      href: "/onboarding",
+    });
+  });
+
   it("sends a completed parent out of onboarding", () => {
     expect(resolveRouteGuard({ ...ready, group: "(onboarding)" })).toEqual({ kind: "redirect", href: "/parent/home" });
   });

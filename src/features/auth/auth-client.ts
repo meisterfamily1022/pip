@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import { clearSession, setAuthenticatedSession, type AuthenticatedAccount, type SessionRestorer } from './session-state';
+import { pendingVerification } from './sign-up-form';
 
 export class AuthRequestError extends Error {
   constructor(readonly code: string, message: string) {
@@ -12,13 +13,27 @@ export class AuthRequestError extends Error {
   }
 }
 
-function authError(error: { message: string; code?: string; status?: number }): AuthRequestError {
+export function authError(error: { message: string; code?: string; status?: number; name?: string }): AuthRequestError {
   const message = error.message.toLowerCase();
-  if (message.includes('expired')) return new AuthRequestError('OTP_EXPIRED', 'That code has expired. Send a new code and try again.');
+  const code = error.code?.toLowerCase();
+  if (error.status === 429 || code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit' || code === 'over_sms_send_rate_limit') {
+    return new AuthRequestError('RATE_LIMITED', 'Please wait a moment before requesting or checking another code.');
+  }
+  if (error.name === 'AuthRetryableFetchError' || error.status === 0 || ['failed to fetch', 'network request failed', 'network error', 'offline'].some((value) => message.includes(value))) {
+    return new AuthRequestError('NETWORK_ERROR', 'You appear to be offline. Check your connection and try again.');
+  }
   if (message.includes('already') || message.includes('used')) return new AuthRequestError('OTP_USED', 'That code has already been used. Send a new code and try again.');
-  if (message.includes('token') || message.includes('otp') || message.includes('code')) return new AuthRequestError('OTP_INVALID', 'That code is not valid. Check it and try again, or send a new code.');
-  if (error.status === 429) return new AuthRequestError('RATE_LIMITED', 'Please wait a moment before requesting another code.');
-  return new AuthRequestError(error.code ?? 'AUTH_ERROR', 'We could not complete sign-in. Try again shortly.');
+  // Supabase deliberately uses otp_expired for the non-distinguishing response
+  // "Token has expired or is invalid". Never turn that response into the
+  // definite (and often false) claim that a freshly entered code expired.
+  if (message.includes('expired or') || message.includes('invalid or expired')) {
+    return new AuthRequestError('OTP_INVALID_OR_EXPIRED', 'That code is incorrect, expired, or has already been used. Check the newest code or send another.');
+  }
+  if (code === 'otp_expired' || message.includes('expired')) return new AuthRequestError('OTP_EXPIRED', 'That code has expired. Send a new code and try again.');
+  if (code === 'otp_invalid' || message.includes('invalid') || message.includes('token') || message.includes('otp') || message.includes('code')) {
+    return new AuthRequestError('OTP_INVALID', 'That code is incorrect. Check the newest code and try again.');
+  }
+  return new AuthRequestError('SERVICE_ERROR', 'The sign-in service could not complete the request. Try again shortly.');
 }
 
 function toAccount(user: User): AuthenticatedAccount {
@@ -47,12 +62,32 @@ export async function sendEmailOtp(email: string): Promise<void> {
   if (error) throw authError(error);
 }
 
-export const signUp = async (input: { email: string }): Promise<void> => sendEmailOtp(input.email);
-export const signIn = async (email: string, _unusedPassword?: string): Promise<void> => sendEmailOtp(email);
-export const resendVerification = async (email: string): Promise<void> => sendEmailOtp(email);
+async function requestFreshEmailOtp(email: string): Promise<void> {
+  const normalizedEmail = email.trim();
+  // The old address is no longer a resumable verification attempt as soon as
+  // the user asks for a replacement. Persist only after Supabase accepts the
+  // fresh request, so a failed send cannot resurrect stale local context.
+  await pendingVerification.clear();
+  await sendEmailOtp(normalizedEmail);
+  await pendingVerification.set(normalizedEmail);
+}
+
+export const signUp = async (input: { email: string }): Promise<void> => requestFreshEmailOtp(input.email);
+export const signIn = async (email: string, _unusedPassword?: string): Promise<void> => requestFreshEmailOtp(email);
+export const resendVerification = async (email: string): Promise<void> => requestFreshEmailOtp(email);
 
 /** Verifies Supabase's six-digit email OTP and publishes the resulting session. */
 export async function verifyEmail(email: string, code: string): Promise<AuthenticatedAccount> {
+  if (shouldBypassSimulatorAuth({
+    enabled: process.env.EXPO_PUBLIC_PIP_SIMULATOR_AUTH === 'true',
+    platform: Platform.OS,
+    isPhysicalDevice: isDevice,
+  })) {
+    if (code !== '123456') throw new AuthRequestError('OTP_INVALID', 'That code is incorrect. Check the newest code and try again.');
+    const account = { accountId: 'simulator-auth-user', email, emailVerified: true };
+    setAuthenticatedSession(account);
+    return account;
+  }
   const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
   if (error) throw authError(error);
   if (!data.user) throw new AuthRequestError('AUTH_ERROR', 'We could not complete sign-in. Try again shortly.');

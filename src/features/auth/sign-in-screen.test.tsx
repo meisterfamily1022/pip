@@ -15,7 +15,6 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { router } from 'expo-router';
 
 import { signIn } from './auth-client';
-import { pendingVerification } from './sign-up-form';
 import { SignInScreen } from './sign-in-screen';
 
 const metrics = { frame: { height: 852, width: 393, x: 0, y: 0 }, insets: { bottom: 34, left: 0, right: 0, top: 59 } };
@@ -39,7 +38,6 @@ function control(renderer: ReactTestRenderer, label: string): ReactTestInstance 
 describe('native sign-in interactions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(pendingVerification, 'set').mockResolvedValue();
     (signIn as jest.Mock).mockResolvedValue(undefined);
   });
 
@@ -76,7 +74,6 @@ describe('native sign-in interactions', () => {
     });
 
     expect(signIn).toHaveBeenCalledWith('parent@example.com');
-    expect(pendingVerification.set).toHaveBeenCalledWith('parent@example.com');
     expect(router.replace).toHaveBeenCalledWith('/verify-email');
   });
 

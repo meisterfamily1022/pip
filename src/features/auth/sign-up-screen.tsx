@@ -9,7 +9,7 @@ import { PrimaryButton } from '@/components/onboarding-controls';
 import { QuietButton, RoundedTextInput } from '@/components/playmap-ui';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { AuthRequestError, signUp } from './auth-client';
-import { errorSummary, hasErrors, pendingVerification, validateSignUp, type SignUpFieldErrors } from './sign-up-form';
+import { errorSummary, hasErrors, validateSignUp, type SignUpFieldErrors } from './sign-up-form';
 
 export function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -30,7 +30,6 @@ export function SignUpScreen() {
     setSubmitting(true);
     try {
       await signUp({ email: email.trim() });
-      await pendingVerification.set(email.trim());
       router.replace('/verify-email');
     } catch (caught: unknown) {
       setSubmitError(caught instanceof AuthRequestError ? caught.message : 'We could not reach the server. Try again shortly.');
