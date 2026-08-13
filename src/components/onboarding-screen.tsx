@@ -18,6 +18,7 @@ type OnboardingScreenProps = PropsWithChildren<{
   /** 1-based. Omit on screens outside the numbered run, like Welcome. */
   step?: number;
   totalSteps?: number;
+  progressLabel?: string;
   title: string;
   description?: string;
   footer?: ReactNode;
@@ -27,6 +28,7 @@ type OnboardingScreenProps = PropsWithChildren<{
 export function OnboardingScreen({
   step,
   totalSteps = 3,
+  progressLabel,
   title,
   description,
   children,
@@ -35,7 +37,7 @@ export function OnboardingScreen({
 }: OnboardingScreenProps) {
   return (
     <PageShell footer={footer}>
-      {step ? <StepEyebrow current={step} onBack={onBack} total={totalSteps} /> : null}
+      {progressLabel ? <Text accessibilityLabel="Setup progress" style={styles.progressLabel}>{progressLabel}</Text> : step ? <StepEyebrow current={step} onBack={onBack} total={totalSteps} /> : null}
       <View style={styles.copy}>
         <Text accessibilityRole="header" style={styles.title}>{title}</Text>
         {description ? <Text style={styles.description}>{description}</Text> : null}
@@ -46,6 +48,7 @@ export function OnboardingScreen({
 }
 
 const styles = StyleSheet.create({
+  progressLabel: { color: theme.colors.mutedText, ...theme.typography.meta },
   copy: { gap: 6 },
   title: { color: theme.colors.primaryText, ...theme.typography.pageTitle },
   description: { color: theme.colors.secondaryText, ...theme.typography.body },

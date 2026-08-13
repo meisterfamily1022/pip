@@ -7,6 +7,7 @@ import { PipBrandMark } from '@/components/pip-brand-mark';
 import { PipIcon, type PipIconName } from '@/components/pip-icon';
 import { PageShell, QuietButton } from '@/components/playmap-ui';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { onboardingProgressStorage } from '@/services/onboarding-progress-storage';
 
 /**
  * Welcome.
@@ -26,7 +27,7 @@ export default function OnboardingHomeRoute() {
     <PageShell
       footer={
         <>
-          <PrimaryButton label={`Set up ${pipBrand.name}`} onPress={() => router.push('/parent-pin-setup')} />
+          <PrimaryButton label={`Set up ${pipBrand.name}`} onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
           <Text style={styles.footnote}>Takes about two minutes. Nothing leaves this device.</Text>
         </>
       }

@@ -6,6 +6,8 @@ import { OnboardingScreen } from '@/components/onboarding-screen';
 import { Banner, PinInput, SecondaryButton } from '@/components/playmap-ui';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { validatePinConfirmation } from '@/features/onboarding/validation';
+import { pinStorage } from '@/services/pin-storage';
+import { onboardingProgressStorage } from '@/services/onboarding-progress-storage';
 
 /**
  * Step 1, second half: confirm the PIN.
@@ -36,7 +38,11 @@ export default function ParentPinConfirmRoute() {
       setMismatch(true);
       return;
     }
-    router.push('/child-profile-setup');
+    void (async () => {
+      await pinStorage.savePin(draft.pin);
+      await onboardingProgressStorage.markStarted();
+      router.replace('/child-profile-setup');
+    })();
   };
 
   return (
@@ -44,7 +50,7 @@ export default function ParentPinConfirmRoute() {
       description="Confirming makes sure it’s the PIN you meant."
       footer={<PrimaryButton disabled={!complete} label="Continue" onPress={continueToProfile} />}
       onBack={goBack}
-      step={1}
+      progressLabel="Confirm your PIN"
       title="Type it once more"
     >
       {mismatch ? (

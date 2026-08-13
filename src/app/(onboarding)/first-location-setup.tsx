@@ -6,7 +6,7 @@ import { Field, PrimaryButton } from '@/components/onboarding-controls';
 import { OnboardingScreen } from '@/components/onboarding-screen';
 import { Banner, FilterChip } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
-import { completeOnboardingFlow } from '@/features/onboarding/complete-onboarding-flow';
+import { completeOnboarding } from '@/features/onboarding/complete-onboarding';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { validateRequiredName } from '@/features/onboarding/validation';
 import { markOnboardingComplete } from '@/startup/route-access';
@@ -36,7 +36,7 @@ export default function FirstLocationSetupRoute() {
     setSubmitting(true);
     setSubmitError(null);
     initializeDatabase()
-      .then((database) => completeOnboardingFlow(database, draft))
+      .then((database) => completeOnboarding(database, draft))
       .then(() => {
         markOnboardingComplete();
         router.replace('/ready');

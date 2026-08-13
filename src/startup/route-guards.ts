@@ -35,6 +35,7 @@ export type GuardInput = {
   initialized: boolean;
   initializationError: string | null;
   onboardingComplete: boolean;
+  onboardingDestination?: '/onboarding' | '/parent-pin-setup' | '/child-profile-setup' | '/first-location-setup' | '/parent/home';
   childModeLocked: boolean;
   sessionStatus: SessionStatus;
   pendingVerificationStatus: 'restoring' | 'none' | 'pending';
@@ -44,7 +45,7 @@ export type GuardInput = {
  * Every destination a guard may send someone to. Kept as a literal union so it
  * satisfies Expo Router's typed routes and so a typo cannot become a dead link.
  */
-export type GuardRedirect = '/sign-in' | '/sign-up' | '/verify-email' | '/onboarding' | '/parent/home' | '/child/home' | '/child/parent-return';
+export type GuardRedirect = '/sign-in' | '/sign-up' | '/verify-email' | '/onboarding' | '/parent-pin-setup' | '/child-profile-setup' | '/first-location-setup' | '/parent/home' | '/child/home' | '/child/parent-return';
 
 export type GuardDecision =
   | { kind: 'render' }
@@ -75,30 +76,26 @@ export function resolveRouteGuard(input: GuardInput): GuardDecision {
   // startup under this single state machine instead of mounting a second
   // component that independently initializes and replaces the navigator.
   if (input.group === undefined) {
+    if (input.pendingVerificationStatus === 'pending') return { kind: 'redirect', href: '/verify-email' };
     if (input.sessionStatus === 'signedIn') {
-      if (!input.onboardingComplete) return { kind: 'redirect', href: '/onboarding' };
+      if (!input.onboardingComplete) return { kind: 'redirect', href: input.onboardingDestination ?? '/onboarding' };
       return { kind: 'redirect', href: input.childModeLocked ? '/child/home' : '/parent/home' };
     }
-    return {
-      kind: 'redirect',
-      href: input.pendingVerificationStatus === 'pending' ? '/verify-email' : '/sign-in',
-    };
+    return input.onboardingComplete
+      ? { kind: 'redirect', href: input.childModeLocked ? '/child/home' : '/parent/home' }
+      : { kind: 'redirect', href: input.onboardingDestination ?? '/onboarding' };
   }
 
   // Signing in is meaningless when a session already exists.
   if (input.sessionStatus === 'signedIn' && input.group === '(auth)') {
-    if (!input.onboardingComplete) return { kind: 'redirect', href: '/onboarding' };
+    if (!input.onboardingComplete) return { kind: 'redirect', href: input.onboardingDestination ?? '/onboarding' };
     return { kind: 'redirect', href: input.childModeLocked ? '/child/home' : '/parent/home' };
-  }
-
-  if (input.sessionStatus !== 'signedIn' && (input.group === '(onboarding)' || input.group === '(parent)' || input.group === '(child)')) {
-    return { kind: 'redirect', href: '/sign-in' };
   }
 
   // Local setup gates the product surfaces. Auth routes stay reachable so a
   // returning parent can sign in before completing setup on a new device.
   if (!input.onboardingComplete && (input.group === '(parent)' || input.group === '(child)')) {
-    return { kind: 'redirect', href: '/onboarding' };
+    return { kind: 'redirect', href: input.onboardingDestination ?? '/onboarding' };
   }
 
   if (input.onboardingComplete && input.group === '(onboarding)') {

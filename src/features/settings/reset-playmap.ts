@@ -1,6 +1,7 @@
 import type { DatabaseConnection } from '@/database/types';
 import { deleteUniqueManagedImages, expoToyImageStorage, type ToyImageStorage } from '@/features/toys/toy-image-storage';
 import { pinStorage, type PinStorage } from '@/services/pin-storage';
+import { onboardingProgressStorage } from '@/services/onboarding-progress-storage';
 
 type StoredImageRow = {
   image_uri: string | null;
@@ -51,6 +52,7 @@ export async function resetPlayMapData(
     }
     throw error;
   }
+  await onboardingProgressStorage.clear();
 
   const imageCleanupFailures = await deleteUniqueManagedImages(
     storage,

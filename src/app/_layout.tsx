@@ -17,7 +17,7 @@ import {
   restorePendingVerification,
   subscribePendingVerification,
 } from '@/features/auth/sign-up-form';
-import { getRouteAccessSnapshot, initializeRouteAccess, subscribeRouteAccess } from '@/startup/route-access';
+import { getOnboardingDestination, getRouteAccessSnapshot, initializeRouteAccess, subscribeRouteAccess } from '@/startup/route-access';
 import { isPublicGroup, resolveRouteGuard, type RouteGroup } from '@/startup/route-guards';
 
 /**
@@ -90,6 +90,7 @@ export default function RootLayout() {
     initialized: access.initialized,
     initializationError: access.initializationError,
     onboardingComplete: access.onboardingComplete,
+    onboardingDestination: getOnboardingDestination(session.status === 'signedIn'),
     childModeLocked: access.childModeLocked,
     sessionStatus: session.status,
     pendingVerificationStatus: pendingVerification.status === 'restoring'

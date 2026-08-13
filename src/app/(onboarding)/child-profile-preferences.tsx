@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -7,6 +8,9 @@ import { OptionCard, ToggleRow } from '@/components/playmap-ui';
 import { READING_SUPPORTS, type ReadingSupport } from '@/domain/child-avatars';
 import { useOnboarding } from '@/features/onboarding/onboarding-context';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
+import { initializeDatabase } from '@/database/client';
+import { createChildProfile } from '@/repositories/child-profiles-repository';
+import { updateSettings } from '@/repositories/settings-repository';
 
 /**
  * Step 2, second half: how this child reads, and whether tidying comes first.
@@ -23,6 +27,7 @@ const readingDescriptions: Record<ReadingSupport, { title: string; description: 
 
 export default function ChildProfilePreferencesRoute() {
   const { draft, updateDraft } = useOnboarding();
+  const [saving, setSaving] = useState(false);
   const name = draft.childNickname.trim() || 'your child';
 
   const goBack = (): void => {
@@ -35,8 +40,9 @@ export default function ChildProfilePreferencesRoute() {
       description="Photos are always shown. Choose what goes with them."
       footer={
         <PrimaryButton
-          label={`Save ${draft.childNickname.trim() ? `${draft.childNickname.trim()}’s` : 'this'} profile`}
-          onPress={() => router.push('/first-location-setup')}
+          busy={saving}
+          label={saving ? 'Saving profile…' : `Save ${draft.childNickname.trim() ? `${draft.childNickname.trim()}’s` : 'this'} profile`}
+          onPress={() => void saveProfile()}
         />
       }
       onBack={goBack}
@@ -65,6 +71,18 @@ export default function ChildProfilePreferencesRoute() {
       <Text style={styles.note}>Both of these can change at any time in Settings.</Text>
     </OnboardingScreen>
   );
+
+  async function saveProfile(): Promise<void> {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const database = await initializeDatabase();
+      const existing = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE hidden_at IS NULL LIMIT 1;');
+      const child = existing ?? await createChildProfile(database, { name: draft.childNickname, avatarId: draft.childAvatarId, accentColorId: draft.childAccentColorId, choiceLimit: draft.choiceLimit, readingSupport: draft.childReadingSupport });
+      await updateSettings(database, { childNickname: draft.childNickname.trim(), activeChildId: child.id, choiceLimit: draft.choiceLimit, cleanupRequired: draft.cleanupRequired });
+      router.replace('/first-location-setup');
+    } finally { setSaving(false); }
+  }
 }
 
 const styles = StyleSheet.create({

@@ -18,15 +18,16 @@ export type CompleteOnboardingInput = {
 
 export async function completeOnboarding(database: DatabaseConnection, input: CompleteOnboardingInput): Promise<void> {
   await database.withTransactionAsync(async () => {
-    const room = await createRoom(database, input.roomName);
-    await createStorageSpot(database, room.id, input.storageSpotName);
-    const child = await createChildProfile(database, {
+    const existingRoom = await database.getFirstAsync<{ id: number }>('SELECT id FROM rooms WHERE name = ? COLLATE NOCASE LIMIT 1;', input.roomName.trim());
+    const room = existingRoom ?? await createRoom(database, input.roomName);
+    const existingSpot = await database.getFirstAsync<{ id: number }>('SELECT id FROM storage_spots WHERE room_id = ? AND name = ? COLLATE NOCASE LIMIT 1;', room.id, input.storageSpotName.trim());
+    if (!existingSpot) await createStorageSpot(database, room.id, input.storageSpotName);
+    const existingChild = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE hidden_at IS NULL LIMIT 1;');
+    const child = existingChild ?? await createChildProfile(database, {
       name: input.childNickname,
       avatarId: input.childAvatarId,
       accentColorId: input.childAccentColorId,
       readingSupport: input.childReadingSupport,
-      // The onboarding choice count is this first child's own setting, not just
-      // a device-wide default.
       choiceLimit: input.choiceLimit,
     });
     await updateSettings(database, {

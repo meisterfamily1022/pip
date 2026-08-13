@@ -1,9 +1,11 @@
 import { childModeLockStorage, type ChildModeLockStorage } from '@/services/child-mode-lock-storage';
 import { initializeApp } from './initialize-app';
+import { getStartupDestination, type OnboardingDestination, type OnboardingState } from './startup-routing';
 
 export type RouteAccessState = {
   initialized: boolean;
   onboardingComplete: boolean;
+  onboardingState: OnboardingState | null;
   childModeLocked: boolean;
   initializationError: string | null;
 };
@@ -13,6 +15,7 @@ let initialization: Promise<void> | null = null;
 let state: RouteAccessState = {
   initialized: false,
   onboardingComplete: false,
+  onboardingState: null,
   childModeLocked: false,
   initializationError: null,
 };
@@ -32,18 +35,20 @@ export function getRouteAccessSnapshot(): RouteAccessState {
 }
 
 export function initializeRouteAccess(
-  start: typeof initializeApp = initializeApp,
+  start: (() => Promise<OnboardingState | '/onboarding' | '/parent/home'>) = initializeApp,
   lockStorage: ChildModeLockStorage = childModeLockStorage,
 ): Promise<void> {
   if (!initialization) {
     publish({ initialized: false, initializationError: null });
     initialization = Promise.all([start(), lockStorage.getLocked()])
-      .then(async ([destination, storedLock]) => {
-        const onboardingComplete = destination === '/parent/home';
+      .then(async ([result, storedLock]) => {
+        const onboardingState = typeof result === 'string' ? null : result;
+        const onboardingComplete = onboardingState ? getStartupDestination(onboardingState, true) === '/parent/home' : result === '/parent/home';
         if (!onboardingComplete && storedLock) await lockStorage.setLocked(false);
         publish({
           initialized: true,
           onboardingComplete,
+          onboardingState,
           childModeLocked: onboardingComplete && storedLock,
           initializationError: null,
         });
@@ -63,6 +68,10 @@ export function markOnboardingComplete(): void {
   publish({ initialized: true, onboardingComplete: true, initializationError: null });
 }
 
+export function getOnboardingDestination(authenticated: boolean): OnboardingDestination {
+  return state.onboardingState ? getStartupDestination(state.onboardingState, authenticated) : '/onboarding';
+}
+
 export async function enterChildMode(lockStorage: ChildModeLockStorage = childModeLockStorage): Promise<void> {
   await lockStorage.setLocked(true);
   publish({ childModeLocked: true });
@@ -76,5 +85,5 @@ export async function leaveChildMode(lockStorage: ChildModeLockStorage = childMo
 export async function resetRouteAccess(lockStorage: ChildModeLockStorage = childModeLockStorage): Promise<void> {
   initialization = null;
   await lockStorage.setLocked(false);
-  publish({ initialized: true, onboardingComplete: false, childModeLocked: false, initializationError: null });
+  publish({ initialized: true, onboardingComplete: false, onboardingState: null, childModeLocked: false, initializationError: null });
 }

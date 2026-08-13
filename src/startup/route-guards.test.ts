@@ -77,8 +77,8 @@ describe("startup gating", () => {
     expect(resolveRouteGuard({ ...ready, group: undefined, pendingVerificationStatus: "restoring" })).toEqual({ kind: "launching" });
   });
 
-  it("sends a cold signed-out launch to stable sign-in", () => {
-    expect(resolveRouteGuard({ ...ready, group: undefined, sessionStatus: "signedOut" })).toEqual({ kind: "redirect", href: "/sign-in" });
+  it("opens completed local-only setup without requiring an account", () => {
+    expect(resolveRouteGuard({ ...ready, group: undefined, sessionStatus: "signedOut" })).toEqual({ kind: "redirect", href: "/parent/home" });
     expect(resolveRouteGuard({ ...ready, group: "(auth)", sessionStatus: "signedOut" })).toEqual({ kind: "render" });
   });
 
@@ -163,8 +163,8 @@ describe("session status", () => {
     expect(resolveRouteGuard({ ...ready, group: "(auth)", sessionStatus: "expired" })).toEqual({ kind: "render" });
   });
 
-  it("redirects unauthenticated visitors away from household data", () => {
-    expect(resolveRouteGuard({ ...ready, group: "(parent)", sessionStatus: "signedOut" })).toEqual({ kind: "redirect", href: "/sign-in" });
+  it("keeps completed local-only household data reachable while signed out", () => {
+    expect(resolveRouteGuard({ ...ready, group: "(parent)", sessionStatus: "signedOut" })).toEqual({ kind: "render" });
   });
 });
 
