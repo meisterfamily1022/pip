@@ -41,7 +41,7 @@ export function SignUpScreen() {
 
   return (
     <OnboardingScreen
-      description={`An account keeps a backup of your library and lets you use ${pipBrand.name} on more than one device. You can keep using ${pipBrand.name} on this device without one.`}
+      description={`An account signs you in to ${pipBrand.name}. Your library stays on this device; backup and syncing are not available yet.`}
       footer={<PrimaryButton disabled={submitting} label={submitting ? 'Sending code…' : 'Email me a code'} onPress={() => void submit()} />}
       title={`Create your ${pipBrand.name} account`}
     >
