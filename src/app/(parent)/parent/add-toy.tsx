@@ -33,9 +33,9 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
 type Mode = 'choose' | 'batch' | 'manual' | 'camera-blocked';
 
 export default function AddToyRoute() {
-  const { mode: modeParam } = useLocalSearchParams<{ mode?: string }>();
+  const { mode: modeParam, first } = useLocalSearchParams<{ mode?: string; first?: string }>();
   const [locations, setLocations] = useState<LocationTreeItem[]>([]);
-  const [mode, setMode] = useState<Mode>(modeParam === 'bulk' ? 'batch' : 'choose');
+  const [mode, setMode] = useState<Mode>(modeParam === 'bulk' ? 'batch' : modeParam === 'manual' ? 'manual' : 'choose');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export default function AddToyRoute() {
     try {
       const database = await initializeDatabase();
       await createParentToy(database, input);
-      router.replace('/parent/toy-library');
+      router.replace(first === '1' ? '/parent/first-toy?added=1' : '/parent/toy-library');
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'That toy could not be saved.');
     } finally {
@@ -85,7 +85,9 @@ export default function AddToyRoute() {
     setError(null);
     try {
       const database = await initializeDatabase();
-      return await saveIntakeQueue(database, drafts);
+      const next = await saveIntakeQueue(database, drafts);
+      if (first === '1' && next.some((draft) => draft.savedToyId !== null)) router.replace('/parent/first-toy?added=1');
+      return next;
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'Those toys could not be saved.');
       return [...drafts];

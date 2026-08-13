@@ -70,7 +70,7 @@ describe('Parent Home overview', () => {
     expect(overview.setup?.remaining).toBe(2);
     const outstanding = overview.setup?.steps.filter((step) => !step.done) ?? [];
     expect(outstanding.map((step) => step.id)).toEqual(['toys', 'child-mode']);
-    expect(outstanding.map((step) => step.href)).toEqual(['/parent/add-toy', '/parent/select-child']);
+    expect(outstanding.map((step) => step.href)).toEqual(['/parent/first-toy', '/parent/select-child']);
   });
 
   it('names the first child in the Child Mode step so the invitation is concrete', () => {

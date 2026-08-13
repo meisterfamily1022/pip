@@ -65,6 +65,12 @@ describe('native sign-in interactions', () => {
     expect(router.replace).toHaveBeenCalledWith('/sign-up');
   });
 
+  it('offers an obvious return to local-only setup', () => {
+    const renderer = renderScreen();
+    act(() => control(renderer, 'Set up Pip on this device').props.onPress());
+    expect(router.replace).toHaveBeenCalledWith('/onboarding');
+  });
+
   it('sends the trimmed email, persists it, and opens verification', async () => {
     const renderer = renderScreen();
     act(() => control(renderer, 'Email').props.onChangeText(' parent@example.com '));

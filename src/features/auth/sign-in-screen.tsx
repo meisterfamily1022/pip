@@ -51,6 +51,7 @@ export function SignInScreen() {
         testID="sign-in-email"
         value={email}
       />
+      <QuietButton label={`Set up ${pipBrand.name} on this device`} onPress={() => router.replace('/onboarding')} />
       <QuietButton label="Create an account instead" onPress={() => router.replace('/sign-up')} />
     </OnboardingScreen>
   );

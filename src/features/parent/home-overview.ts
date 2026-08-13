@@ -65,7 +65,7 @@ export function buildHomeOverview(input: {
       id: 'toys',
       label: `Photograph ${STARTER_TOY_TARGET} toys`,
       done: toyCount >= STARTER_TOY_TARGET,
-      href: '/parent/add-toy',
+      href: '/parent/first-toy',
       actionLabel: 'Start',
     },
     {

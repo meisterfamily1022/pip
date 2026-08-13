@@ -39,7 +39,7 @@ export default function FirstLocationSetupRoute() {
       .then((database) => completeOnboarding(database, draft))
       .then(() => {
         markOnboardingComplete();
-        router.replace('/ready');
+        router.replace('/parent/first-toy');
       })
       .catch((caught: unknown) => {
         const message = caught instanceof Error ? caught.message : 'Please try again.';

@@ -27,7 +27,8 @@ export default function OnboardingHomeRoute() {
     <PageShell
       footer={
         <>
-          <PrimaryButton label={`Set up ${pipBrand.name}`} onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
+          <PrimaryButton label={`Set up ${pipBrand.name} on this device`} onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
+          <QuietButton label="Sign in" onPress={() => router.push('/sign-in')} />
           <Text style={styles.footnote}>Takes about two minutes. Nothing leaves this device.</Text>
         </>
       }
@@ -50,7 +51,7 @@ export default function OnboardingHomeRoute() {
 
       <View style={styles.account}>
         <Text style={styles.accountText}>
-          {`${pipBrand.name} works on this device without an account. Create one only if you want a backup, or to use ${pipBrand.name} on another device.`}
+          {`${pipBrand.name} works privately on this device without an account. Create one only for future backup or use on another device.`}
         </Text>
         <QuietButton label="Create an account" onPress={() => router.push('/sign-up')} />
       </View>
