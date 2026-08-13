@@ -21,6 +21,7 @@ export type ToySetupDraftRow = {
 export type PlaySessionRow = {
   id: number; child_id: number; toy_id: number; status: 'active' | 'completed'; started_at: string;
   completed_at: string | null; cleanup_started_at: string | null; help_requested: number;
+  cleanup_step: number;
   parent_override_used: number; created_at: string; updated_at: string;
 };
 export type SettingsRow = {

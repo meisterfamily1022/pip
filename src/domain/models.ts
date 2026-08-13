@@ -77,6 +77,7 @@ export type PlaySession = {
   startedAt: Timestamp;
   completedAt: Timestamp | null;
   cleanupStartedAt: Timestamp | null;
+  cleanupStep: number;
   helpRequested: boolean;
   parentOverrideUsed: boolean;
   createdAt: Timestamp;

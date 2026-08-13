@@ -6,6 +6,7 @@ import {
   getActivePlaySession,
   markCleanupHelpRequested,
   markCleanupStarted,
+  markCleanupStep,
 } from '@/repositories/play-sessions-repository';
 import { getSettings } from '@/repositories/settings-repository';
 import { telemetry } from '@/features/analytics/telemetry-client';
@@ -18,6 +19,15 @@ export type CleanupState = {
 export async function loadCleanupState(database: DatabaseConnection, childId: number): Promise<CleanupState> {
   const [activeSession, settings] = await Promise.all([getActivePlaySession(database, childId), getSettings(database)]);
   return { activeSession, cleanupRequired: settings.cleanupRequired };
+}
+
+export async function saveCleanupStep(database: DatabaseConnection, childId: number, step: number): Promise<ActivePlaySession> {
+  const active = await getActivePlaySession(database, childId);
+  if (!active) throw new Error('There is no active cleanup session.');
+  await markCleanupStep(database, active.id, childId, step);
+  const next = await getActivePlaySession(database, childId);
+  if (!next) throw new Error('Cleanup progress could not be recovered.');
+  return next;
 }
 
 export async function beginCleanup(database: DatabaseConnection, childId: number): Promise<ActivePlaySession> {

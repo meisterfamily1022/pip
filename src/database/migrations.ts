@@ -279,6 +279,10 @@ async function ensureChildModeProgress(database: DatabaseConnection): Promise<vo
   `);
 }
 
+async function ensureCleanupProgress(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'play_sessions', 'cleanup_step', 'INTEGER NOT NULL DEFAULT 0 CHECK (cleanup_step BETWEEN 0 AND 2)');
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -419,6 +423,10 @@ const migrations: readonly Migration[] = [
   {
     version: 12,
     apply: ensureChildModeProgress,
+  },
+  {
+    version: 13,
+    apply: ensureCleanupProgress,
   },
 ];
 

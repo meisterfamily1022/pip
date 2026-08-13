@@ -13,7 +13,9 @@ import {
   completeCleanupWithParentOverride,
   loadCleanupState,
   requestCleanupHelp,
+  saveCleanupStep,
 } from '@/features/child/cleanup-service';
+import { displayChildName, displayToyName, presentLocation } from '@/domain/presentation';
 import { getActiveChildProfile } from '@/repositories/child-profiles-repository';
 import type { ActivePlaySession } from '@/repositories/play-sessions-repository';
 import { pinStorage } from '@/services/pin-storage';
@@ -29,9 +31,9 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * giving up.
  */
 const steps = [
-  { key: 'pieces', label: 'Pieces', title: 'Find all the pieces', body: 'Have a look around. Under things counts too.' },
+  { key: 'pieces', label: 'Pieces', title: 'Find all the pieces', body: "Look around for all the pieces. Don't forget to check underneath things!" },
   { key: 'back', label: 'Put it back', title: 'Put it back where it lives', body: null },
-  { key: 'done', label: 'All done', title: 'Is everything away?', body: 'Have a last look, then tell Pip you are done.' },
+  { key: 'done', label: 'All done', title: 'All done', body: 'Everything is back where it lives.' },
 ] as const;
 
 type HelpMode = 'child' | 'asking' | 'parent';
@@ -62,6 +64,7 @@ export default function CleanupRoute() {
         if (!mounted) return;
         setChildId(child.id);
         setSession(active);
+        setStep(active?.cleanupStep ?? 0);
       } catch (caught: unknown) {
         if (mounted) setError(caught instanceof Error ? caught.message : 'Pip could not open tidy-up.');
       } finally {
@@ -155,9 +158,9 @@ export default function CleanupRoute() {
           <View style={styles.doneMark}>
             <PipIcon color={theme.colors.success} name="check" size={30} strokeWidth={2.6} />
           </View>
-          <Text accessibilityRole="header" style={styles.doneTitle}>All tidy</Text>
+          <Text accessibilityRole="header" style={styles.doneTitle}>All done</Text>
           <Text style={styles.doneBody}>
-            {toy ? `The ${toy.name.toLocaleLowerCase()} is back on the ${toy.storageSpotName}.` : 'Everything is back where it lives.'}
+            {toy ? `${displayToyName(toy.name)} is back where it lives.` : 'Everything is back where it lives.'}
           </Text>
         </View>
       </ChildPage>
@@ -209,9 +212,9 @@ export default function CleanupRoute() {
         }
       >
         <View style={styles.copy}>
-          <Text accessibilityRole="header" style={styles.title}>Finish tidy-up for {session?.childName ?? 'this child'}?</Text>
+          <Text accessibilityRole="header" style={styles.title}>Finish tidy-up for {displayChildName(session?.childName, 'this child')}?</Text>
           <Text style={styles.body}>
-            {toy ? `${toy.name} goes back on the ${toy.storageSpotName} in the ${toy.roomName}.` : 'The toy will be marked as put away.'}
+            {toy ? `${displayToyName(toy.name)} goes back to ${presentLocation(toy.roomName, toy.storageSpotName).instruction}.` : 'The toy will be marked as put away.'}
             {' This is recorded as a grown-up finishing it.'}
           </Text>
         </View>
@@ -223,17 +226,29 @@ export default function CleanupRoute() {
   const current = steps[step];
   const isLast = step === steps.length - 1;
 
+  const moveToStep = async (nextStep: number): Promise<void> => {
+    if (childId === null || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const database = await initializeDatabase();
+      setSession(await saveCleanupStep(database, childId, nextStep));
+      setStep(nextStep);
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Pip could not save tidy-up progress.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <ChildPage
       footer={
         <>
           <ChildButton
             disabled={saving}
-            label={isLast ? 'Done — what’s next?' : 'Done — next step'}
-            onPress={() => {
-              if (isLast) void finish();
-              else setStep((value) => Math.min(value + 1, steps.length - 1));
-            }}
+            label={step === 0 ? 'I found all the pieces' : step === 1 ? "It's put away" : 'All done'}
+            onPress={() => { if (isLast) void finish(); else void moveToStep(step + 1); }}
           />
           <ChildButton label="I need a grown-up" onPress={() => { void askForHelp(); }} secondary />
         </>
@@ -241,7 +256,7 @@ export default function CleanupRoute() {
     >
       <ChildModeHeader
         backLabel="Back"
-        onBack={() => (step === 0 ? router.replace('/child/current-toy') : setStep((value) => value - 1))}
+        onBack={() => { if (step === 0) router.replace('/child/current-toy'); else void moveToStep(step - 1); }}
       />
 
       {error ? <Banner message={error} tone="alert" /> : null}
@@ -260,7 +275,7 @@ export default function CleanupRoute() {
       </View>
 
       <Text accessibilityRole="header" style={styles.stepTitle}>
-        {step === 1 && toy ? `Put the ${toy.name.toLocaleLowerCase()} back where it lives` : current.title}
+        {step === 1 && toy ? `Put ${displayToyName(toy.name)} back where it lives` : current.title}
       </Text>
       {current.body ? <Text style={styles.body}>{current.body}</Text> : null}
 
@@ -269,13 +284,15 @@ export default function CleanupRoute() {
           <View style={styles.photoFrame}>
             <ToyImage uri={toy.imageUri} />
           </View>
-          <LocationPanel room={toy.roomName} spot={toy.storageSpotName} />
+          {step === 1 ? <LocationPanel room={toy.roomName} spot={toy.storageSpotName} /> : null}
         </>
       ) : null}
 
-      <View style={styles.reassurance}>
-        <Text style={styles.reassuranceText}>Take as long as you like. Nothing is counting.</Text>
-      </View>
+      {step === 0 ? (
+        <View style={styles.reassurance}>
+          <Text style={styles.reassuranceText}>Take your time. There&apos;s no timer.</Text>
+        </View>
+      ) : null}
 
       {session?.helpRequested ? (
         <Banner message="A grown-up has been asked to help. You can keep going while you wait." tone="info" />
@@ -306,7 +323,7 @@ const styles = StyleSheet.create({
   stepLabelActive: { color: theme.colors.brandInk, fontFamily: theme.fonts.bold },
 
   stepTitle: { color: theme.colors.primaryText, ...theme.typography.childTitle, fontSize: 28, lineHeight: 33 },
-  photoFrame: { borderRadius: theme.radii.sheet, overflow: 'hidden' },
+  photoFrame: { alignSelf: 'center', borderRadius: theme.radii.sheet, overflow: 'hidden', width: '54%' },
   reassurance: {
     backgroundColor: theme.colors.surfaceSunshine,
     borderColor: theme.colors.borderSunshine,

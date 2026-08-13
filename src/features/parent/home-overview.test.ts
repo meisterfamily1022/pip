@@ -37,6 +37,7 @@ function session(id: number, childId: number, childName: string): ActivePlaySess
     startedAt: '2026-01-01T09:00:00.000Z',
     completedAt: null,
     cleanupStartedAt: null,
+    cleanupStep: 0,
     helpRequested: false,
     parentOverrideUsed: false,
     createdAt: '2026-01-01T09:00:00.000Z',

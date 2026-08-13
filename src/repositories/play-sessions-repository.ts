@@ -6,8 +6,8 @@ import { selectToyImageUri } from '@/features/toys/toy-image-selection';
 import { telemetry } from '@/features/analytics/telemetry-client';
 
 const now = (): string => new Date().toISOString();
-const SESSION_COLUMNS = 'p.id, p.child_id, p.toy_id, p.status, p.started_at, p.completed_at, p.cleanup_started_at, p.help_requested, p.parent_override_used, p.created_at, p.updated_at';
-const toSession = (row: PlaySessionRow): PlaySession => ({ id: row.id, childId: row.child_id, toyId: row.toy_id, status: row.status, startedAt: row.started_at, completedAt: row.completed_at, cleanupStartedAt: row.cleanup_started_at, helpRequested: row.help_requested === 1, parentOverrideUsed: row.parent_override_used === 1, createdAt: row.created_at, updatedAt: row.updated_at });
+const SESSION_COLUMNS = 'p.id, p.child_id, p.toy_id, p.status, p.started_at, p.completed_at, p.cleanup_started_at, p.cleanup_step, p.help_requested, p.parent_override_used, p.created_at, p.updated_at';
+const toSession = (row: PlaySessionRow): PlaySession => ({ id: row.id, childId: row.child_id, toyId: row.toy_id, status: row.status, startedAt: row.started_at, completedAt: row.completed_at, cleanupStartedAt: row.cleanup_started_at, cleanupStep: row.cleanup_step ?? 0, helpRequested: row.help_requested === 1, parentOverrideUsed: row.parent_override_used === 1, createdAt: row.created_at, updatedAt: row.updated_at });
 
 export type ActivePlaySession = PlaySession & { childName: string; toy: ChildToy | null };
 
@@ -111,6 +111,16 @@ export async function markCleanupStarted(database: DatabaseConnection, id: numbe
   const result = await database.runAsync('UPDATE play_sessions SET cleanup_started_at = COALESCE(cleanup_started_at, ?), updated_at = ? WHERE id = ? AND child_id = ? AND status = ?;', timestamp, timestamp, id, childId, 'active');
   if (result.changes !== 1) throw new Error('Cleanup could not be started.');
   const session = await getPlaySession(database, id); if (!session) throw new Error('Cleanup session could not be loaded.'); return session;
+}
+
+export async function markCleanupStep(database: DatabaseConnection, id: number, childId: number, step: number): Promise<PlaySession> {
+  if (!Number.isInteger(step) || step < 0 || step > 2) throw new Error('Cleanup step is invalid.');
+  const timestamp = now();
+  const result = await database.runAsync('UPDATE play_sessions SET cleanup_step = ?, updated_at = ? WHERE id = ? AND child_id = ? AND status = ?;', step, timestamp, id, childId, 'active');
+  if (result.changes !== 1) throw new Error('Cleanup progress could not be saved.');
+  const session = await getPlaySession(database, id);
+  if (!session) throw new Error('Cleanup session could not be loaded.');
+  return session;
 }
 
 export async function markCleanupHelpRequested(database: DatabaseConnection, id: number, childId: number): Promise<PlaySession> {
