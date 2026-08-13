@@ -141,6 +141,7 @@ export function ToyCard({
         <Text numberOfLines={2} style={styles.location}>
           {unavailable ? `${unavailableBecause} has this one` : location.compact ?? 'Location not added'}
         </Text>
+        {!unavailable ? <Text style={styles.cardAction}>Play with this toy</Text> : null}
       </Pressable>
       {onSpeak && !unavailable ? (
         <Pressable
@@ -176,6 +177,7 @@ const styles = StyleSheet.create({
   cardPhoto: { backgroundColor: theme.colors.photoFallback, width: '100%' },
   toyName: { color: theme.colors.primaryText, paddingHorizontal: theme.spacing[12], paddingTop: theme.spacing[8], ...theme.typography.sectionTitle },
   location: { color: theme.colors.secondaryText, paddingHorizontal: theme.spacing[12], ...theme.typography.meta },
+  cardAction: { color: theme.colors.brandInk, paddingHorizontal: theme.spacing[12], paddingTop: theme.spacing[8], ...theme.typography.label },
   speakButton: {
     alignItems: 'center',
     borderTopColor: theme.colors.divider,

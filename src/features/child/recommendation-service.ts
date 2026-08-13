@@ -10,7 +10,9 @@ export function safeChoiceLimit(value: number | null | undefined): ChoiceLimit {
 }
 
 function eligible(toys: readonly ChildToy[], category: PlayType): ChildToy[] {
-  return toys.filter((toy) => toy.isAvailable && !toy.isArchived && toy.roomName.length > 0 && toy.storageSpotName.length > 0 && (category === 'anything' || toy.categories.includes(category)));
+  // Location presentation must never decide whether a safe, available toy can
+  // be chosen. Older or partial records degrade gracefully on the next screen.
+  return toys.filter((toy) => toy.isAvailable && !toy.isArchived && (category === 'anything' || toy.categories.includes(category)));
 }
 
 function shuffled(toys: readonly ChildToy[]): ChildToy[] {

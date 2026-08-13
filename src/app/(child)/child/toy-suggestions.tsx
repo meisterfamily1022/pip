@@ -202,15 +202,13 @@ export default function ChildToySuggestionsRoute() {
       </View>
 
       <Pressable
-        accessibilityLabel={`Show me ${toys.length === 1 ? 'a different toy' : `${toys.length} different toys`}`}
+        accessibilityLabel="Show me another toy"
         accessibilityRole="button"
         onPress={() => reshuffle(state?.shown ?? [])}
         style={({ pressed }) => [styles.reshuffle, pressed && styles.pressed]}
       >
-        <Text style={styles.reshuffleTitle}>Nothing here feels right?</Text>
-        <Text style={styles.reshuffleAction}>
-          {toys.length === 1 ? 'Show me a different toy' : `Show me ${toys.length} different toys`}
-        </Text>
+        <Text style={styles.reshuffleTitle}>Want a different choice?</Text>
+        <Text style={styles.reshuffleAction}>Show me another toy</Text>
       </Pressable>
     </ChildPage>
   );
