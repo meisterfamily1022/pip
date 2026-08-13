@@ -282,7 +282,7 @@ export default function CleanupRoute() {
       {toy ? (
         <>
           <View style={styles.photoFrame}>
-            <ToyImage uri={toy.imageUri} />
+            <ToyImage accessibilityLabel={`${displayToyName(toy.name)} photo`} uri={toy.imageUri} />
           </View>
           {step === 1 ? <LocationPanel room={toy.roomName} spot={toy.storageSpotName} /> : null}
         </>

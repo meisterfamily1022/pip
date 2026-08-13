@@ -121,7 +121,7 @@ export default function ChildToyDetailRoute() {
       {error ? <Banner message={error} tone="alert" /> : null}
 
       <View style={styles.photoFrame}>
-        <ToyImage uri={toy.imageUri} />
+        <ToyImage accessibilityLabel={`${toyName} photo`} uri={toy.imageUri} />
       </View>
 
       <View style={styles.nameRow}>

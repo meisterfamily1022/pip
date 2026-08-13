@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ChildButton, ChildModeHeader, ChildPage, LocationPanel, ToyImage } from '@/components/child-ui';
 import { Banner, SkeletonRows } from '@/components/playmap-ui';
 import { initializeDatabase } from '@/database/client';
+import { displayChildName, displayToyName } from '@/domain/presentation';
 import { getActiveChildProfile } from '@/repositories/child-profiles-repository';
 import { getActivePlaySession, type ActivePlaySession } from '@/repositories/play-sessions-repository';
 import { getSettings } from '@/repositories/settings-repository';
@@ -68,6 +69,7 @@ export default function CurrentToyRoute() {
   }
 
   const toy = session.toy;
+  const toyName = displayToyName(toy.name);
 
   return (
     <ChildPage
@@ -85,16 +87,16 @@ export default function CurrentToyRoute() {
       <ChildModeHeader backLabel="Back" onBack={() => router.replace('/child/home')} />
 
       {resumed ? (
-        <Banner message={`Welcome back, ${session.childName}. You still have this toy out.`} tone="info" />
+        <Banner message={`Welcome back, ${displayChildName(session.childName)}. You still have this toy out.`} tone="info" />
       ) : null}
 
       <View style={styles.photoFrame}>
-        <ToyImage uri={toy.imageUri} />
+        <ToyImage accessibilityLabel={`${toyName} photo`} uri={toy.imageUri} />
       </View>
 
       <View style={styles.copy}>
         <Text style={styles.lead}>You’re playing with</Text>
-        <Text accessibilityRole="header" style={styles.name}>{toy.name}</Text>
+        <Text accessibilityRole="header" style={styles.name}>{toyName}</Text>
       </View>
 
       <LocationPanel room={toy.roomName} spot={toy.storageSpotName} />
@@ -103,7 +105,7 @@ export default function CurrentToyRoute() {
 }
 
 const styles = StyleSheet.create({
-  photoFrame: { borderRadius: theme.radii.sheet, overflow: 'hidden' },
+  photoFrame: { alignSelf: 'center', borderRadius: theme.radii.sheet, overflow: 'hidden', width: '70%' },
   copy: { gap: 2 },
   lead: { color: theme.colors.secondaryText, ...theme.typography.body },
   name: { color: theme.colors.primaryText, ...theme.typography.childTitle },

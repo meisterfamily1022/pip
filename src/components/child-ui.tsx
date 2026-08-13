@@ -55,8 +55,8 @@ export function ChildButton({
   return <Button disabled={disabled} icon={icon} label={label} onPress={onPress} />;
 }
 
-export function ToyImage({ uri }: { uri: string | null }) {
-  return <SharedToyImage accessibilityLabel="Toy photo" uri={uri} />;
+export function ToyImage({ uri, accessibilityLabel = 'Toy photo' }: { uri: string | null; accessibilityLabel?: string }) {
+  return <SharedToyImage accessibilityLabel={accessibilityLabel} uri={uri} />;
 }
 
 export function ChildPage({
@@ -135,7 +135,7 @@ export function ToyCard({
         style={({ pressed }) => [styles.cardPress, pressed && !unavailable && styles.pressed]}
       >
         <View style={[styles.cardPhoto, unavailable && styles.dimmed]}>
-          <ToyImage uri={toy.imageUri} />
+          <ToyImage accessibilityLabel={`${name} photo`} uri={toy.imageUri} />
         </View>
         {showName ? <Text style={styles.toyName}>{name}</Text> : null}
         <Text numberOfLines={2} style={styles.location}>
