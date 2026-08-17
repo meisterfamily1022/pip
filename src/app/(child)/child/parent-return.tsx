@@ -73,6 +73,12 @@ export default function ParentReturnRoute() {
 
   return (
     <ChildPage
+      /*
+       * Centred rather than top-aligned. This is a short, single-purpose
+       * checkpoint; top-aligning it left a screen's worth of emptiness between
+       * the PIN boxes and the button, which read as an unfinished screen.
+       */
+      centered
       footer={
         <PrimaryButton
           busy={submitting}
@@ -138,7 +144,7 @@ const styles = StyleSheet.create({
     paddingRight: theme.spacing[8],
   },
   backLabel: { color: theme.colors.brandInk, ...theme.typography.label },
-  lockRow: { alignItems: 'center', paddingTop: theme.spacing[24] },
+  lockRow: { alignItems: 'center' },
   lockTile: {
     alignItems: 'center',
     backgroundColor: theme.colors.brandPrimarySoft,

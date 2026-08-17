@@ -279,6 +279,30 @@ export const playmapTheme = {
 
 export const pipTheme = playmapTheme;
 
+/**
+ * How a toy's own photograph is sized wherever it appears.
+ *
+ * Pip is a picture of your actual shelf, so the photograph is the interface —
+ * not decoration on top of it. Three tiers keep that consistent:
+ *
+ *  - `hero`    the thing being decided about: the child's primary choice, the
+ *              toy that is out. Wide crop, generous radius, fills its card.
+ *  - `medium`  one of several comparable options: library and choice cards.
+ *              Square, so a grid reads as a grid.
+ *  - `small`   a photo supporting a row of text, never the subject itself.
+ *
+ * Cropping is `cover` at every tier: a toy photographed on a shelf reads best
+ * filling its frame, and letterboxing would reintroduce the pale empty boxes
+ * this replaces.
+ */
+export type ToyPhotoTier = 'hero' | 'medium' | 'small';
+
+export const pipPhotoTiers = {
+  hero: { aspectRatio: 4 / 3, radius: playmapTheme.radii.sheet, minHeight: 200 },
+  medium: { aspectRatio: 1, radius: playmapTheme.radii.photo, minHeight: 104 },
+  small: { aspectRatio: 1, radius: playmapTheme.radii.control, minHeight: 56 },
+} as const satisfies Record<ToyPhotoTier, { aspectRatio: number; radius: number; minHeight: number }>;
+
 export const screenContentStyle = {
   alignSelf: 'center' as const,
   maxWidth: playmapTheme.measurements.pageMaxWidth,

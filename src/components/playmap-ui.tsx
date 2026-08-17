@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -20,9 +19,11 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PipIcon, type PipIconName } from '@/components/pip-icon';
+import { ToyPhoto } from '@/components/toy-photo';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 /**
@@ -1072,29 +1073,42 @@ export function ToyImage({
   uri,
   source,
   accessibilityLabel = 'Toy photo',
+  name,
   style,
 }: {
   uri?: string | null;
   source?: ImageSourcePropType;
   accessibilityLabel?: string;
+  /** The toy's real name, so the missing-photo card can still say what it is. */
+  name?: string;
   style?: StyleProp<ImageStyle>;
 }) {
   const [failed, setFailed] = useState(false);
   if ((uri || source) && !failed) {
     return (
-      <Image
+      <ExpoImage
         accessibilityIgnoresInvertColors
         accessibilityLabel={accessibilityLabel}
+        // Memory-and-disk cached: a library scrolled twice should not re-decode
+        // the same file, and a child flicking between choices should not watch
+        // the photographs fade in again.
+        cachePolicy="memory-disk"
+        contentFit="cover"
         onError={() => setFailed(true)}
         source={source ?? { uri: uri ?? undefined }}
         style={[styles.toyImage, style]}
+        transition={140}
       />
     );
   }
   return (
-    <View accessibilityLabel={`${accessibilityLabel}. No photo available`} accessible style={[styles.toyImage, styles.imageFallback, style]}>
-      <PipIcon color={theme.colors.mutedText} name="photo-missing" size={22} />
-      <Text style={styles.imageFallbackText}>No photo yet</Text>
+    <View
+      accessible
+      accessibilityLabel={`${name ?? accessibilityLabel}. ${failed ? 'Photo could not be loaded' : 'No photo yet'}`}
+      style={[styles.toyImage, styles.imageFallback, style]}
+    >
+      <PipIcon color={theme.colors.mutedText} name={failed ? 'alert' : 'photo-missing'} size={22} />
+      <Text numberOfLines={2} style={styles.imageFallbackText}>{name ?? 'No photo yet'}</Text>
     </View>
   );
 }
@@ -1104,9 +1118,18 @@ export function ImageTile({ uri, label = 'Toy photo', size = 56 }: { uri?: strin
   return (
     <View style={[styles.imageTile, { height: size, width: size }]}>
       {uri && !failed ? (
-        <Image accessibilityIgnoresInvertColors accessibilityLabel={label} onError={() => setFailed(true)} source={{ uri }} style={styles.fill} />
+        <ExpoImage
+          accessibilityIgnoresInvertColors
+          accessibilityLabel={label}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          onError={() => setFailed(true)}
+          source={{ uri }}
+          style={styles.fill}
+          transition={140}
+        />
       ) : (
-        <View accessibilityLabel="No photo yet" style={styles.imageFallback}>
+        <View accessible accessibilityLabel={`${label}. ${failed ? 'Photo could not be loaded' : 'No photo yet'}`} style={styles.imageFallback}>
           <PipIcon color={theme.colors.mutedText} name="photo-missing" size={Math.round(size * 0.36)} />
         </View>
       )}
@@ -1151,7 +1174,10 @@ export function ToyPhotoCard({
   const body = (
     <>
       <View style={[styles.toyCardPhoto, { height: photoHeight }]}>
-        <ToyImage accessibilityLabel={`${title} photo`} style={[styles.fill, dimmed && styles.dimmed]} uri={uri} />
+        {/* The toy's own photograph, cropped identically on every card so the
+            grid reads as one shelf. The card announces the toy itself, so the
+            photo stays decorative and is not read out twice. */}
+        <ToyPhoto decorative dimmed={dimmed} name={title} style={styles.fill} tier="medium" uri={uri} />
         {status === 'selected' ? (
           <View style={styles.selectedBadge}>
             <PipIcon color={theme.colors.brandPrimaryLabel} name="check" size={13} strokeWidth={3} />

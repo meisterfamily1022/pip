@@ -9,11 +9,11 @@ import {
   Banner,
   Card,
   ConfirmationDialog,
-  ImageTile,
   SectionHeading,
   SkeletonRows,
   StatCard,
 } from '@/components/playmap-ui';
+import { ToyPhoto } from '@/components/toy-photo';
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
 import { displayChildName, displayToyName, presentLocation } from '@/domain/presentation';
@@ -147,13 +147,19 @@ export default function ParentHomeRoute() {
             />
             {overview.checkouts.length === 0 ? (
               <View style={styles.emptyCheckouts}>
-                <Text style={styles.emptyTitle}>No toys are out right now</Text>
-                <Text style={styles.meta}>When a child picks a toy, it appears here with their name.</Text>
+                <PipIcon color={theme.colors.mutedText} name="check" size={16} />
+                <Text style={styles.emptyTitle}>Nothing is out right now</Text>
               </View>
             ) : (
               overview.checkouts.map((session) => (
                 <View key={session.id} style={styles.checkout}>
-                  <ImageTile label={`${session.toy?.name ?? 'Toy'} photo`} size={56} uri={session.toy?.imageUri} />
+                  <ToyPhoto
+                    decorative
+                    name={session.toy ? displayToyName(session.toy.name) : 'This toy'}
+                    style={styles.checkoutPhoto}
+                    tier="small"
+                    uri={session.toy?.imageUri}
+                  />
                   <View style={styles.checkoutCopy}>
                     <Text style={styles.checkoutWho}>{`${displayChildName(session.childName)} · ${formatElapsed(session.startedAt, now)}`}</Text>
                     <Text numberOfLines={2} style={styles.checkoutToy}>{session.toy ? displayToyName(session.toy.name) : 'This toy is no longer in the library'}</Text>
@@ -311,15 +317,16 @@ const styles = StyleSheet.create({
   stepLabelDone: { color: theme.colors.secondaryText, fontFamily: theme.fonts.regular },
   stepAction: { color: theme.colors.brandInk, ...theme.typography.label, fontSize: 14 },
 
+  // Compact and quiet: "nothing is out" is the normal case and should not be
+  // the largest thing on the parent's home screen.
   emptyCheckouts: {
-    borderColor: theme.colors.dashedBorder,
-    borderRadius: theme.radii.card,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    gap: 2,
-    padding: theme.spacing[16],
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing[8],
+    paddingVertical: theme.spacing[8],
   },
-  emptyTitle: { color: theme.colors.primaryText, ...theme.typography.label, fontSize: 14 },
+  emptyTitle: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  checkoutPhoto: { borderRadius: theme.radii.card, height: 64, minHeight: 0, width: 64 },
   checkout: {
     alignItems: 'center',
     backgroundColor: theme.colors.cardSurface,
