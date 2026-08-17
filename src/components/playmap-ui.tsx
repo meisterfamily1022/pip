@@ -1177,7 +1177,7 @@ export function ToyPhotoCard({
         {/* The toy's own photograph, cropped identically on every card so the
             grid reads as one shelf. The card announces the toy itself, so the
             photo stays decorative and is not read out twice. */}
-        <ToyPhoto decorative dimmed={dimmed} name={title} style={styles.fill} tier="medium" uri={uri} />
+        <ToyPhoto decorative dimmed={dimmed} fill name={title} tier="medium" uri={uri} />
         {status === 'selected' ? (
           <View style={styles.selectedBadge}>
             <PipIcon color={theme.colors.brandPrimaryLabel} name="check" size={13} strokeWidth={3} />

@@ -36,6 +36,12 @@ export type ToyPhotoProps = {
   decorative?: boolean;
   /** Dims the photo for a toy that cannot be chosen right now. */
   dimmed?: boolean;
+  /**
+   * Fills the parent instead of keeping the tier's aspect ratio. For cards that
+   * already fix their own photo height — otherwise the ratio wins and the photo
+   * sits square inside a wider frame with dead space beside it.
+   */
+  fill?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -47,15 +53,14 @@ export function ToyPhoto({
   aspectRatio,
   decorative = false,
   dimmed = false,
+  fill = false,
   style,
 }: ToyPhotoProps) {
   const [failed, setFailed] = useState(false);
   const shape = pipPhotoTiers[tier];
-  const frame: ViewStyle = {
-    aspectRatio: aspectRatio ?? shape.aspectRatio,
-    borderRadius: shape.radius,
-    minHeight: shape.minHeight,
-  };
+  const frame: ViewStyle = fill
+    ? { borderRadius: 0, flex: 1, height: '100%', width: '100%' }
+    : { aspectRatio: aspectRatio ?? shape.aspectRatio, borderRadius: shape.radius, minHeight: shape.minHeight };
 
   const hasPhoto = Boolean(uri) && !failed;
   // The label names the toy either way, so a screen reader hears "Wooden train
@@ -129,20 +134,16 @@ export function ToyPhotoCollage({
   return (
     <View accessible accessibilityLabel={accessibilityLabel} accessibilityRole="image" style={[styles.collage, style]}>
       {shown.length === 1 ? (
-        <ToyPhoto decorative name={shown[0].name} style={styles.collageFill} tier="hero" uri={shown[0].imageUri} />
+        <ToyPhoto decorative fill name={shown[0].name} tier="hero" uri={shown[0].imageUri} />
       ) : (
         <>
           <View style={styles.collageColumn}>
-            <ToyPhoto aspectRatio={undefined} decorative name={shown[0].name} style={styles.collageCell} tier="medium" uri={shown[0].imageUri} />
-            {shown[2] ? (
-              <ToyPhoto decorative name={shown[2].name} style={styles.collageCell} tier="medium" uri={shown[2].imageUri} />
-            ) : null}
+            <ToyPhoto decorative fill name={shown[0].name} tier="medium" uri={shown[0].imageUri} />
+            {shown[2] ? <ToyPhoto decorative fill name={shown[2].name} tier="medium" uri={shown[2].imageUri} /> : null}
           </View>
           <View style={styles.collageColumn}>
-            <ToyPhoto decorative name={shown[1].name} style={styles.collageCell} tier="medium" uri={shown[1].imageUri} />
-            {shown[3] ? (
-              <ToyPhoto decorative name={shown[3].name} style={styles.collageCell} tier="medium" uri={shown[3].imageUri} />
-            ) : null}
+            <ToyPhoto decorative fill name={shown[1].name} tier="medium" uri={shown[1].imageUri} />
+            {shown[3] ? <ToyPhoto decorative fill name={shown[3].name} tier="medium" uri={shown[3].imageUri} /> : null}
           </View>
         </>
       )}
@@ -173,8 +174,4 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   collageColumn: { flex: 1, gap: 2 },
-  // Cells fill the column rather than keeping their tier's ratio, so the
-  // collage stays one clean rectangle whatever it is given.
-  collageCell: { aspectRatio: undefined, borderRadius: 0, flex: 1, minHeight: 0 },
-  collageFill: { aspectRatio: undefined, borderRadius: 0, flex: 1, minHeight: 0 },
 });
