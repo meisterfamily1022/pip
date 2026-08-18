@@ -130,8 +130,8 @@ export default function ParentHomeRoute() {
         <>
           {overview.setup ? (
             <Card tone="surface">
-              <Text accessibilityRole="header" style={styles.cardTitle}>Finish setting up</Text>
-              <Text style={styles.meta}>{describeRemainingSetup(overview.setup.remaining, firstChildName)}</Text>
+              <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.cardTitle}>Finish setting up</Text>
+              <Text maxFontSizeMultiplier={1.8} style={styles.meta}>{describeRemainingSetup(overview.setup.remaining, firstChildName)}</Text>
               <View style={styles.steps}>
                 {overview.setup.steps.map((step) => <SetupRow key={step.id} step={step} />)}
               </View>
@@ -148,7 +148,7 @@ export default function ParentHomeRoute() {
             {overview.checkouts.length === 0 ? (
               <View style={styles.emptyCheckouts}>
                 <PipIcon color={theme.colors.mutedText} name="check" size={16} />
-                <Text style={styles.emptyTitle}>Nothing is out right now</Text>
+                <Text maxFontSizeMultiplier={1.8} style={styles.emptyTitle}>Nothing is out right now</Text>
               </View>
             ) : (
               overview.checkouts.map((session) => (
@@ -161,9 +161,9 @@ export default function ParentHomeRoute() {
                     uri={session.toy?.imageUri}
                   />
                   <View style={styles.checkoutCopy}>
-                    <Text style={styles.checkoutWho}>{`${displayChildName(session.childName)} · ${formatElapsed(session.startedAt, now)}`}</Text>
-                    <Text numberOfLines={2} style={styles.checkoutToy}>{session.toy ? displayToyName(session.toy.name) : 'This toy is no longer in the library'}</Text>
-                    <Text style={styles.meta}>
+                    <Text maxFontSizeMultiplier={1.8} style={styles.checkoutWho}>{`${displayChildName(session.childName)} · ${formatElapsed(session.startedAt, now)}`}</Text>
+                    <Text maxFontSizeMultiplier={1.6} numberOfLines={2} style={styles.checkoutToy}>{session.toy ? displayToyName(session.toy.name) : 'This toy is no longer in the library'}</Text>
+                    <Text maxFontSizeMultiplier={1.8} style={styles.meta}>
                       {session.toy ? presentLocation(session.toy.roomName, session.toy.storageSpotName).compact ?? 'Location not added' : 'The checkout can still be closed safely.'}
                     </Text>
                   </View>
@@ -174,7 +174,7 @@ export default function ParentHomeRoute() {
                     onPress={() => setResolving(session)}
                     style={({ pressed }) => [styles.putAway, pressed && styles.pressed]}
                   >
-                    <Text style={styles.putAwayLabel}>Put away</Text>
+                    <Text maxFontSizeMultiplier={1.6} style={styles.putAwayLabel}>Put away</Text>
                   </Pressable>
                 </View>
               ))
@@ -183,16 +183,16 @@ export default function ParentHomeRoute() {
 
           {overview.libraryMilestone ? (
             <Card tone="warm">
-              <Text accessibilityRole="header" style={styles.cardTitle}>{`Build ${displayChildName(firstChildName, 'your child')}’s toy library`}</Text>
-              <Text style={styles.meta}>Add a few more toys to give them more choices.</Text>
-              <Text style={styles.milestoneProgress}>{`${overview.libraryMilestone.count} of ${overview.libraryMilestone.target} ${overview.libraryMilestone.count === 1 ? 'toy' : 'toys'} added`}</Text>
+              <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.cardTitle}>{`Build ${displayChildName(firstChildName, 'your child')}’s toy library`}</Text>
+              <Text maxFontSizeMultiplier={1.8} style={styles.meta}>Add a few more toys to give them more choices.</Text>
+              <Text maxFontSizeMultiplier={1.6} style={styles.milestoneProgress}>{`${overview.libraryMilestone.count} of ${overview.libraryMilestone.target} ${overview.libraryMilestone.count === 1 ? 'toy' : 'toys'} added`}</Text>
               <Pressable
                 accessibilityLabel={overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}
                 accessibilityRole="button"
                 onPress={() => router.replace(overview.libraryMilestone!.count === 0 ? '/parent/first-toy' : '/parent/add-toy')}
                 style={({ pressed }) => [styles.milestoneAction, pressed && styles.pressed]}
               >
-                <Text style={styles.stepAction}>{overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}</Text>
+                <Text maxFontSizeMultiplier={1.6} style={styles.stepAction}>{overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}</Text>
                 <PipIcon color={theme.colors.brandInk} name="chevron-right" size={16} />
               </Pressable>
             </Card>
@@ -217,8 +217,8 @@ export default function ParentHomeRoute() {
                 style={({ pressed }) => [styles.startChildMode, pressed && styles.pressed]}
               >
                 <View style={styles.rowCopy}>
-                  <Text style={styles.cardTitle}>Start Child mode</Text>
-                  <Text style={styles.meta}>Choose who is playing</Text>
+                  <Text maxFontSizeMultiplier={1.5} style={styles.cardTitle}>Start Child mode</Text>
+                  <Text maxFontSizeMultiplier={1.8} style={styles.meta}>Choose who is playing</Text>
                 </View>
                 <PipIcon color={theme.colors.brandInk} name="chevron-right" size={18} />
               </Pressable>
@@ -236,8 +236,8 @@ export default function ParentHomeRoute() {
                     style={({ pressed }) => [styles.handoffCard, pressed && styles.pressed]}
                   >
                     <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={48} />
-                    <Text style={styles.handoffName}>{displayChildName(child.name)}</Text>
-                    <Text style={[styles.handoffState, playing && styles.handoffPlaying]}>{playing ? 'Playing now' : 'Ready'}</Text>
+                    <Text maxFontSizeMultiplier={1.6} style={styles.handoffName}>{displayChildName(child.name)}</Text>
+                    <Text maxFontSizeMultiplier={1.8} style={[styles.handoffState, playing && styles.handoffPlaying]}>{playing ? 'Playing now' : 'Ready'}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -268,10 +268,10 @@ function SetupRow({ step }: { step: SetupStep }) {
       <View style={[styles.stepMark, step.done && styles.stepMarkDone]}>
         {step.done ? <PipIcon color={theme.colors.success} name="check" size={12} strokeWidth={3} /> : null}
       </View>
-      <Text style={[styles.stepLabel, step.done && styles.stepLabelDone]}>{step.label}</Text>
+      <Text maxFontSizeMultiplier={1.6} style={[styles.stepLabel, step.done && styles.stepLabelDone]}>{step.label}</Text>
       {!step.done && step.href ? (
         <>
-          <Text style={styles.stepAction}>{step.actionLabel}</Text>
+          <Text maxFontSizeMultiplier={1.6} style={styles.stepAction}>{step.actionLabel}</Text>
           <PipIcon color={theme.colors.brandInk} name="chevron-right" size={16} />
         </>
       ) : null}

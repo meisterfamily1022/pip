@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { ChildPage } from '@/components/child-ui';
 import { PipIcon } from '@/components/pip-icon';
@@ -29,6 +29,7 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * The only way to Parent Mode is the PIN, pinned quietly at the bottom.
  */
 export default function ChildHomeRoute() {
+  const { fontScale } = useWindowDimensions();
   const [child, setChild] = useState<ChildProfile | null>(null);
   const [session, setSession] = useState<ActivePlaySession | null>(null);
   const [toys, setToys] = useState<ChildToy[]>([]);
@@ -69,7 +70,7 @@ export default function ChildHomeRoute() {
         style={({ pressed }) => [styles.grownUps, pressed && styles.pressed]}
       >
         <PipIcon color={theme.colors.mutedText} name="lock" size={16} />
-        <Text style={styles.grownUpsText}>Parent mode</Text>
+        <Text maxFontSizeMultiplier={1.4} style={styles.grownUpsText}>Parent mode</Text>
       </Pressable>
     </View>
   );
@@ -91,10 +92,12 @@ export default function ChildHomeRoute() {
       {error ? <Banner message={error} tone="alert" /> : null}
 
       <View style={styles.greeting}>
-        {child ? <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={56} /> : null}
+        {child && fontScale < 2 ? (
+          <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={56} />
+        ) : null}
         <View style={styles.greetingCopy}>
-          <Text style={styles.hello}>{name ? `Hi, ${name}!` : 'Hi!'}</Text>
-          <Text accessibilityRole="header" style={styles.title}>What do you want to play with?</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.hello}>{name ? `Hi, ${name}!` : 'Hi!'}</Text>
+          <Text accessibilityRole="header" maxFontSizeMultiplier={1.1} style={styles.title}>What do you want to play with?</Text>
         </View>
       </View>
 
@@ -160,8 +163,8 @@ function PickAToyCard({
       ) : null}
       <View style={styles.heroCaption}>
         <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>Pick a toy</Text>
-          <Text numberOfLines={2} style={styles.heroDetail}>
+          <Text maxFontSizeMultiplier={1.5} style={styles.heroTitle}>Pick a toy</Text>
+          <Text maxFontSizeMultiplier={1.8} numberOfLines={2} style={styles.heroDetail}>
             {collage.length > 0
               ? 'Choose what looks fun'
               : `${total} ${total === 1 ? 'toy is' : 'toys are'} ready to choose from`}
@@ -205,8 +208,8 @@ function SurpriseMeCard({ photographed, onPress }: { photographed: readonly Chil
         </View>
       ) : null}
       <View style={styles.surpriseCopy}>
-        <Text style={styles.surpriseTitle}>Surprise me</Text>
-        <Text numberOfLines={2} style={styles.surpriseDetail}>Let Pip pick one</Text>
+        <Text maxFontSizeMultiplier={1.5} style={styles.surpriseTitle}>Surprise me</Text>
+        <Text maxFontSizeMultiplier={1.8} numberOfLines={2} style={styles.surpriseDetail}>Let Pip pick one</Text>
       </View>
       <PipIcon color={theme.colors.brandInk} name="chevron-right" size={20} />
     </Pressable>
@@ -225,8 +228,8 @@ function PlayingNowCard({ name, uri, onPress }: { name: string; uri: string | nu
     >
       <ToyPhoto decorative name={name} style={styles.playingPhoto} tier="small" uri={uri} />
       <View style={styles.playingCopy}>
-        <Text style={styles.playingLabel}>Playing now</Text>
-        <Text numberOfLines={2} style={styles.playingName}>{name}</Text>
+        <Text maxFontSizeMultiplier={1.8} style={styles.playingLabel}>Playing now</Text>
+        <Text maxFontSizeMultiplier={1.5} numberOfLines={2} style={styles.playingName}>{name}</Text>
       </View>
       <PipIcon color={theme.colors.brandInk} name="chevron-right" size={20} />
     </Pressable>
@@ -237,8 +240,8 @@ function PlayingNowCard({ name, uri, onPress }: { name: string; uri: string | nu
 function NoToysYet() {
   return (
     <View style={styles.empty}>
-      <Text accessibilityRole="header" style={styles.emptyTitle}>No toys yet</Text>
-      <Text style={styles.emptyBody}>
+      <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.emptyTitle}>No toys yet</Text>
+      <Text maxFontSizeMultiplier={1.8} style={styles.emptyBody}>
         A grown-up adds toys by taking a photo of each one. Once they have, your toys show up right here.
       </Text>
     </View>

@@ -24,6 +24,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { PipIcon, type PipIconName } from '@/components/pip-icon';
 import { ToyPhoto } from '@/components/toy-photo';
+import { resolveManagedToyImageUri } from '@/features/toys/toy-image-storage';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 /**
@@ -193,8 +194,8 @@ export function PageHeader({
   const copy = (
     <>
       {eyebrow ? <EyebrowLabel>{eyebrow}</EyebrowLabel> : null}
-      <Text accessibilityRole="header" style={styles.pageTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.body}>{subtitle}</Text> : null}
+      <Text accessibilityRole="header" maxFontSizeMultiplier={1.4} style={styles.pageTitle}>{title}</Text>
+      {subtitle ? <Text maxFontSizeMultiplier={1.8} style={styles.body}>{subtitle}</Text> : null}
     </>
   );
   return (
@@ -215,8 +216,8 @@ export function SectionHeading({ title, supporting, action }: { title: string; s
   return (
     <View style={styles.headerRow}>
       <View style={styles.headerCopy}>
-        <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
-        {supporting ? <Text style={styles.meta}>{supporting}</Text> : null}
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.sectionTitle}>{title}</Text>
+        {supporting ? <Text maxFontSizeMultiplier={1.8} style={styles.meta}>{supporting}</Text> : null}
       </View>
       {action}
     </View>
@@ -440,6 +441,7 @@ export function SearchField({
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="never"
+        maxFontSizeMultiplier={1.5}
         onBlur={() => setFocused(false)}
         onChangeText={onChangeText}
         onFocus={() => setFocused(true)}
@@ -919,8 +921,8 @@ export function OptionCard({
 export function StatCard({ value, label }: { value: string | number; label: string }) {
   return (
     <View accessibilityLabel={`${value} ${label}`} style={styles.statCard}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.meta}>{label}</Text>
+      <Text maxFontSizeMultiplier={1.4} style={styles.statValue}>{value}</Text>
+      <Text maxFontSizeMultiplier={1.5} style={styles.meta}>{label}</Text>
     </View>
   );
 }
@@ -1095,7 +1097,7 @@ export function ToyImage({
         cachePolicy="memory-disk"
         contentFit="cover"
         onError={() => setFailed(true)}
-        source={source ?? { uri: uri ?? undefined }}
+        source={source ?? { uri: uri ? resolveManagedToyImageUri(uri) : undefined }}
         style={[styles.toyImage, style]}
         transition={140}
       />
@@ -1124,7 +1126,7 @@ export function ImageTile({ uri, label = 'Toy photo', size = 56 }: { uri?: strin
           cachePolicy="memory-disk"
           contentFit="cover"
           onError={() => setFailed(true)}
-          source={{ uri }}
+          source={{ uri: resolveManagedToyImageUri(uri) }}
           style={styles.fill}
           transition={140}
         />
@@ -1190,9 +1192,9 @@ export function ToyPhotoCard({
         ) : null}
       </View>
       <View style={styles.toyCardBody}>
-        <Text numberOfLines={2} style={[styles.toyCardTitle, dimmed && styles.mutedInk]}>{title}</Text>
+        <Text maxFontSizeMultiplier={1.4} numberOfLines={2} style={[styles.toyCardTitle, dimmed && styles.mutedInk]}>{title}</Text>
         {statusWord ? (
-          <Text numberOfLines={1} style={[styles.toyCardMeta, status === 'selected' && styles.brandInk, dimmed && styles.alertInk, status === 'no-photo' && styles.brandInk]}>
+          <Text maxFontSizeMultiplier={1.5} numberOfLines={1} style={[styles.toyCardMeta, status === 'selected' && styles.brandInk, dimmed && styles.alertInk, status === 'no-photo' && styles.brandInk]}>
             {statusWord}
           </Text>
         ) : null}

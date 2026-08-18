@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { Image } from 'expo-image';
 
 import { PipIcon } from '@/components/pip-icon';
+import { resolveManagedToyImageUri } from '@/features/toys/toy-image-storage';
 import { pipPhotoTiers, playmapTheme as theme, type ToyPhotoTier } from '@/theme/playmap-theme';
 
 /**
@@ -63,6 +64,7 @@ export function ToyPhoto({
     : { aspectRatio: aspectRatio ?? shape.aspectRatio, borderRadius: shape.radius, minHeight: shape.minHeight };
 
   const hasPhoto = Boolean(uri) && !failed;
+  const resolvedUri = uri ? resolveManagedToyImageUri(uri) : null;
   // The label names the toy either way, so a screen reader hears "Wooden train
   // set, photo" rather than the useless "image".
   const label = hasPhoto
@@ -82,7 +84,7 @@ export function ToyPhoto({
           cachePolicy="memory-disk"
           contentFit="cover"
           onError={() => setFailed(true)}
-          source={{ uri: uri ?? undefined }}
+          source={{ uri: resolvedUri ?? undefined }}
           style={[styles.fill, dimmed && styles.dimmed]}
           // A short cross-fade covers the disk read without drawing attention.
           transition={140}

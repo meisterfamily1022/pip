@@ -98,7 +98,7 @@ export default function ParentReturnRoute() {
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
           <PipIcon color={theme.colors.brandInk} name="chevron-left" size={20} />
-          <Text style={styles.backLabel}>Back to play</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.backLabel}>Back to play</Text>
         </Pressable>
       </View>
 
@@ -109,8 +109,8 @@ export default function ParentReturnRoute() {
       </View>
 
       <View style={styles.copy}>
-        <Text accessibilityRole="header" style={styles.title}>Parent mode</Text>
-        <Text style={styles.subtitle}>Enter your 4-digit PIN.</Text>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>Parent mode</Text>
+        <Text maxFontSizeMultiplier={1.6} style={styles.subtitle}>Enter your 4-digit PIN.</Text>
       </View>
 
       {error ? <Banner message={error} tone="alert" /> : null}
