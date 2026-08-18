@@ -48,8 +48,8 @@ export function ParentGreeting({ greeting, day }: { greeting: string; day: strin
   return (
     <View style={styles.greetingRow}>
       <View style={styles.greetingCopy}>
-        <Text style={styles.greetingDay}>{day}</Text>
-        <Text accessibilityRole="header" style={styles.greetingTitle}>{greeting}</Text>
+        <Text maxFontSizeMultiplier={1.6} style={styles.greetingDay}>{day}</Text>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.4} style={styles.greetingTitle}>{greeting}</Text>
       </View>
       <PipBrandMark variant="wordmark" width={54} />
     </View>

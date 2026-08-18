@@ -1,4 +1,6 @@
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { pipBrand } from '@/brand/pip-brand';
 import { landingPrivacy } from '@/features/landing/landing-copy';
@@ -16,11 +18,22 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  */
 export default function PrivacyRoute() {
   return (
-    <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
-      <View style={styles.column}>
-        <Text accessibilityRole="header" style={styles.title}>
-          {`${pipBrand.name} privacy notice`}
-        </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.page} contentInsetAdjustmentBehavior="automatic" style={styles.scroll}>
+        <View style={styles.column}>
+          {Platform.OS === 'web' ? null : (
+            <Pressable
+              accessibilityLabel="Back to Settings"
+              accessibilityRole="button"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/parent/settings'))}
+              style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+            >
+              <Text style={styles.backLabel}>‹ Back to Settings</Text>
+            </Pressable>
+          )}
+          <Text accessibilityRole="header" style={styles.title}>
+            {`${pipBrand.name} privacy notice`}
+          </Text>
 
         <Text accessibilityRole="header" style={styles.heading}>
           What Pip does
@@ -68,12 +81,15 @@ export default function PrivacyRoute() {
         </Text>
 
         <Text style={styles.footer}>{`${pipBrand.name} — ${pipBrand.primaryTagline}`}</Text>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  back: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 44 },
+  backLabel: { color: theme.colors.brandInk, ...theme.typography.label },
   body: { color: theme.colors.secondaryText, ...theme.typography.body },
   column: {
     alignSelf: 'center',
@@ -99,5 +115,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'web' ? theme.spacing[40] : theme.spacing[24],
   },
   scroll: { backgroundColor: theme.colors.backgroundCream, flex: 1 },
+  safeArea: { backgroundColor: theme.colors.backgroundCream, flex: 1 },
+  pressed: { opacity: 0.72 },
   title: { color: theme.colors.primaryText, ...theme.typography.pageTitle },
 });
