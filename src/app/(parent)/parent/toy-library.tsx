@@ -66,14 +66,14 @@ export default function ParentToyLibraryRoute() {
     setError(null);
     try {
       const database = await initializeDatabase();
-      const [visible, unfiltered, tree, sessions] = await Promise.all([
+      const [visible, all, tree, sessions] = await Promise.all([
         listParentToys(database, filters),
-        listParentToys(database, { archived: filters.archived ?? 'active' }),
+        listParentToys(database, { archived: 'all' }),
         loadLocationTree(database),
         listActivePlaySessions(database),
       ]);
       setToys(visible);
-      setTotal(unfiltered.length);
+      setTotal(all.length);
       setLocations(tree);
       setHolders(new Map(sessions.map((session) => [session.toyId, session.childName])));
       setState('ready');
@@ -168,7 +168,7 @@ export default function ParentToyLibraryRoute() {
       tab="library"
     >
       <View style={styles.headerRow}>
-        <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>Library</Text>
+        <Text accessibilityRole="header" style={styles.title}>Library</Text>
         {toys.length > 0 || selecting ? (
           <Pressable
             accessibilityLabel={selecting ? 'Done selecting' : 'Select toys'}
@@ -177,7 +177,7 @@ export default function ParentToyLibraryRoute() {
             onPress={() => (selecting ? leaveSelection() : setSelecting(true))}
             style={({ pressed }) => [styles.selectAction, pressed && styles.pressed]}
           >
-            <Text maxFontSizeMultiplier={1.5} style={styles.selectLabel}>{selecting ? 'Done' : 'Select'}</Text>
+            <Text style={styles.selectLabel}>{selecting ? 'Done' : 'Select'}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -201,7 +201,7 @@ export default function ParentToyLibraryRoute() {
           style={({ pressed }) => [styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive, pressed && styles.pressed]}
         >
           <PipIcon color={theme.colors.brandInk} name="settings" size={20} />
-          {activeFilterCount > 0 ? <Text maxFontSizeMultiplier={1.5} style={styles.filterCount}>{activeFilterCount}</Text> : null}
+          {activeFilterCount > 0 ? <Text style={styles.filterCount}>{activeFilterCount}</Text> : null}
         </Pressable>
       </View>
 
@@ -211,7 +211,7 @@ export default function ParentToyLibraryRoute() {
             <FilterChip key={label} label={label} onRemove={clearFilters} selected />
           ))}
           <QuietButton label="Clear" onPress={clearFilters} style={styles.clearButton} />
-          <Text maxFontSizeMultiplier={1.8} style={styles.shown}>{`${toys.length} shown`}</Text>
+          <Text style={styles.shown}>{`${toys.length} shown`}</Text>
         </View>
       ) : null}
 
@@ -295,7 +295,7 @@ export default function ParentToyLibraryRoute() {
 function NoResults({ search, suggestions, onClear }: { search?: string; suggestions: string[]; onClear(): void }) {
   return (
     <View style={styles.noResults}>
-      <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.noResultsTitle}>
+      <Text accessibilityRole="header" style={styles.noResultsTitle}>
         {search ? `No toys called “${search}”` : 'No toys match these filters'}
       </Text>
       <Text style={styles.noResultsBody}>

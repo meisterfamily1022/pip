@@ -32,27 +32,6 @@ function ensureToyDirectory(): Directory {
   return directory;
 }
 
-const managedToyImagePathMarker = '/Documents/toy-images/';
-
-/**
- * iOS changes an app's data-container UUID when installing a new build. Files
- * in Documents move with the app data, but an absolute file URI stored in
- * SQLite still contains the previous UUID. Rebase only Pip-managed toy-image
- * URIs onto the current Documents directory; picker/cache/external URIs stay
- * untouched.
- */
-export function resolveManagedToyImageUri(
-  uri: string,
-  managedDirectoryUri: string = new Directory(Paths.document, 'toy-images').uri,
-): string {
-  if (Platform.OS === 'web' || !uri.startsWith('file:')) return uri;
-  const markerIndex = uri.lastIndexOf(managedToyImagePathMarker);
-  if (markerIndex < 0) return uri;
-  const relativePath = uri.slice(markerIndex + managedToyImagePathMarker.length);
-  if (!relativePath || relativePath.includes('/')) return uri;
-  return `${managedDirectoryUri.replace(/\/?$/, '/')}${relativePath}`;
-}
-
 async function durableWebImageUri(sourceUri: string): Promise<string> {
   if (sourceUri.startsWith('data:')) return sourceUri;
   const response = await fetch(sourceUri);
@@ -69,7 +48,7 @@ async function durableWebImageUri(sourceUri: string): Promise<string> {
 export const expoToyImageStorage: ToyImageStorage = {
   async copyIntoManagedStorage(sourceUri: string): Promise<string> {
     if (Platform.OS === 'web') return durableWebImageUri(sourceUri);
-    const source = new File(resolveManagedToyImageUri(sourceUri));
+    const source = new File(sourceUri);
     const destination = new File(ensureToyDirectory(), uniqueImageName(sourceUri));
     await source.copy(destination);
     return destination.uri;
@@ -78,14 +57,13 @@ export const expoToyImageStorage: ToyImageStorage = {
   async deleteManagedImage(uri: string | null): Promise<void> {
     if (!uri || Platform.OS === 'web') return;
     const managedPrefix = new Directory(Paths.document, 'toy-images').uri;
-    const resolvedUri = resolveManagedToyImageUri(uri, managedPrefix);
-    if (!resolvedUri.startsWith(managedPrefix)) return;
-    const file = new File(resolvedUri);
+    if (!uri.startsWith(managedPrefix)) return;
+    const file = new File(uri);
     if (file.exists) file.delete();
   },
 
   async fingerprintImage(uri: string): Promise<string | null> {
-    if (Platform.OS !== 'web') return new File(resolveManagedToyImageUri(uri)).md5;
+    if (Platform.OS !== 'web') return new File(uri).md5;
     let hash = 2166136261;
     for (let index = 0; index < uri.length; index += 1) {
       hash ^= uri.charCodeAt(index);

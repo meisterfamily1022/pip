@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,12 +20,9 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PipIcon, type PipIconName } from '@/components/pip-icon';
-import { ToyPhoto } from '@/components/toy-photo';
-import { resolveManagedToyImageUri } from '@/features/toys/toy-image-storage';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 /**
@@ -194,8 +192,8 @@ export function PageHeader({
   const copy = (
     <>
       {eyebrow ? <EyebrowLabel>{eyebrow}</EyebrowLabel> : null}
-      <Text accessibilityRole="header" maxFontSizeMultiplier={1.4} style={styles.pageTitle}>{title}</Text>
-      {subtitle ? <Text maxFontSizeMultiplier={1.8} style={styles.body}>{subtitle}</Text> : null}
+      <Text accessibilityRole="header" style={styles.pageTitle}>{title}</Text>
+      {subtitle ? <Text style={styles.body}>{subtitle}</Text> : null}
     </>
   );
   return (
@@ -216,8 +214,8 @@ export function SectionHeading({ title, supporting, action }: { title: string; s
   return (
     <View style={styles.headerRow}>
       <View style={styles.headerCopy}>
-        <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.sectionTitle}>{title}</Text>
-        {supporting ? <Text maxFontSizeMultiplier={1.8} style={styles.meta}>{supporting}</Text> : null}
+        <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
+        {supporting ? <Text style={styles.meta}>{supporting}</Text> : null}
       </View>
       {action}
     </View>
@@ -441,7 +439,6 @@ export function SearchField({
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="never"
-        maxFontSizeMultiplier={1.5}
         onBlur={() => setFocused(false)}
         onChangeText={onChangeText}
         onFocus={() => setFocused(true)}
@@ -921,8 +918,8 @@ export function OptionCard({
 export function StatCard({ value, label }: { value: string | number; label: string }) {
   return (
     <View accessibilityLabel={`${value} ${label}`} style={styles.statCard}>
-      <Text maxFontSizeMultiplier={1.4} style={styles.statValue}>{value}</Text>
-      <Text maxFontSizeMultiplier={1.5} style={styles.meta}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.meta}>{label}</Text>
     </View>
   );
 }
@@ -1075,42 +1072,29 @@ export function ToyImage({
   uri,
   source,
   accessibilityLabel = 'Toy photo',
-  name,
   style,
 }: {
   uri?: string | null;
   source?: ImageSourcePropType;
   accessibilityLabel?: string;
-  /** The toy's real name, so the missing-photo card can still say what it is. */
-  name?: string;
   style?: StyleProp<ImageStyle>;
 }) {
   const [failed, setFailed] = useState(false);
   if ((uri || source) && !failed) {
     return (
-      <ExpoImage
+      <Image
         accessibilityIgnoresInvertColors
         accessibilityLabel={accessibilityLabel}
-        // Memory-and-disk cached: a library scrolled twice should not re-decode
-        // the same file, and a child flicking between choices should not watch
-        // the photographs fade in again.
-        cachePolicy="memory-disk"
-        contentFit="cover"
         onError={() => setFailed(true)}
-        source={source ?? { uri: uri ? resolveManagedToyImageUri(uri) : undefined }}
+        source={source ?? { uri: uri ?? undefined }}
         style={[styles.toyImage, style]}
-        transition={140}
       />
     );
   }
   return (
-    <View
-      accessible
-      accessibilityLabel={`${name ?? accessibilityLabel}. ${failed ? 'Photo could not be loaded' : 'No photo yet'}`}
-      style={[styles.toyImage, styles.imageFallback, style]}
-    >
-      <PipIcon color={theme.colors.mutedText} name={failed ? 'alert' : 'photo-missing'} size={22} />
-      <Text numberOfLines={2} style={styles.imageFallbackText}>{name ?? 'No photo yet'}</Text>
+    <View accessibilityLabel={`${accessibilityLabel}. No photo available`} accessible style={[styles.toyImage, styles.imageFallback, style]}>
+      <PipIcon color={theme.colors.mutedText} name="photo-missing" size={22} />
+      <Text style={styles.imageFallbackText}>No photo yet</Text>
     </View>
   );
 }
@@ -1120,18 +1104,9 @@ export function ImageTile({ uri, label = 'Toy photo', size = 56 }: { uri?: strin
   return (
     <View style={[styles.imageTile, { height: size, width: size }]}>
       {uri && !failed ? (
-        <ExpoImage
-          accessibilityIgnoresInvertColors
-          accessibilityLabel={label}
-          cachePolicy="memory-disk"
-          contentFit="cover"
-          onError={() => setFailed(true)}
-          source={{ uri: resolveManagedToyImageUri(uri) }}
-          style={styles.fill}
-          transition={140}
-        />
+        <Image accessibilityIgnoresInvertColors accessibilityLabel={label} onError={() => setFailed(true)} source={{ uri }} style={styles.fill} />
       ) : (
-        <View accessible accessibilityLabel={`${label}. ${failed ? 'Photo could not be loaded' : 'No photo yet'}`} style={styles.imageFallback}>
+        <View accessibilityLabel="No photo yet" style={styles.imageFallback}>
           <PipIcon color={theme.colors.mutedText} name="photo-missing" size={Math.round(size * 0.36)} />
         </View>
       )}
@@ -1176,10 +1151,7 @@ export function ToyPhotoCard({
   const body = (
     <>
       <View style={[styles.toyCardPhoto, { height: photoHeight }]}>
-        {/* The toy's own photograph, cropped identically on every card so the
-            grid reads as one shelf. The card announces the toy itself, so the
-            photo stays decorative and is not read out twice. */}
-        <ToyPhoto decorative dimmed={dimmed} fill name={title} tier="medium" uri={uri} />
+        <ToyImage accessibilityLabel={`${title} photo`} style={[styles.fill, dimmed && styles.dimmed]} uri={uri} />
         {status === 'selected' ? (
           <View style={styles.selectedBadge}>
             <PipIcon color={theme.colors.brandPrimaryLabel} name="check" size={13} strokeWidth={3} />
@@ -1192,9 +1164,9 @@ export function ToyPhotoCard({
         ) : null}
       </View>
       <View style={styles.toyCardBody}>
-        <Text maxFontSizeMultiplier={1.4} numberOfLines={2} style={[styles.toyCardTitle, dimmed && styles.mutedInk]}>{title}</Text>
+        <Text numberOfLines={2} style={[styles.toyCardTitle, dimmed && styles.mutedInk]}>{title}</Text>
         {statusWord ? (
-          <Text maxFontSizeMultiplier={1.5} numberOfLines={1} style={[styles.toyCardMeta, status === 'selected' && styles.brandInk, dimmed && styles.alertInk, status === 'no-photo' && styles.brandInk]}>
+          <Text numberOfLines={1} style={[styles.toyCardMeta, status === 'selected' && styles.brandInk, dimmed && styles.alertInk, status === 'no-photo' && styles.brandInk]}>
             {statusWord}
           </Text>
         ) : null}

@@ -9,11 +9,11 @@ import {
   Banner,
   Card,
   ConfirmationDialog,
+  ImageTile,
   SectionHeading,
   SkeletonRows,
   StatCard,
 } from '@/components/playmap-ui';
-import { ToyPhoto, ToyPhotoCollage, toysWithPhotos } from '@/components/toy-photo';
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
 import { displayChildName, displayToyName, presentLocation } from '@/domain/presentation';
@@ -33,7 +33,7 @@ import {
 } from '@/repositories/play-sessions-repository';
 import { countStorageSpots, listRooms } from '@/repositories/rooms-repository';
 import { getSettings, markChildModeUsed, setActiveChild } from '@/repositories/settings-repository';
-import { countToys, listParentToys, type ParentToy } from '@/repositories/toys-repository';
+import { countToys } from '@/repositories/toys-repository';
 import { enterChildMode } from '@/startup/route-access';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
@@ -46,7 +46,6 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  */
 export default function ParentHomeRoute() {
   const [overview, setOverview] = useState<HomeOverview | null>(null);
-  const [libraryToys, setLibraryToys] = useState<ParentToy[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [resolving, setResolving] = useState<ActivePlaySession | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,13 +56,12 @@ export default function ParentHomeRoute() {
   const load = useCallback(async () => {
     try {
       const database = await initializeDatabase();
-      const [children, sessions, toyCount, rooms, settings, toys] = await Promise.all([
+      const [children, sessions, toyCount, rooms, settings] = await Promise.all([
         listChildProfiles(database),
         listActivePlaySessions(database),
         countToys(database),
         listRooms(database),
         getSettings(database),
-        listParentToys(database),
       ]);
       const spotCounts = await Promise.all(rooms.map((room) => countStorageSpots(database, room.id)));
       setOverview(buildHomeOverview({
@@ -74,7 +72,6 @@ export default function ParentHomeRoute() {
         spotCount: spotCounts.reduce((total, count) => total + count, 0),
         childModeUsed: settings.childModeUsed,
       }));
-      setLibraryToys(toys);
       setNow(Date.now());
       setError(null);
     } catch (caught: unknown) {
@@ -133,8 +130,8 @@ export default function ParentHomeRoute() {
         <>
           {overview.setup ? (
             <Card tone="surface">
-              <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.cardTitle}>Finish setting up</Text>
-              <Text maxFontSizeMultiplier={1.8} style={styles.meta}>{describeRemainingSetup(overview.setup.remaining, firstChildName)}</Text>
+              <Text accessibilityRole="header" style={styles.cardTitle}>Finish setting up</Text>
+              <Text style={styles.meta}>{describeRemainingSetup(overview.setup.remaining, firstChildName)}</Text>
               <View style={styles.steps}>
                 {overview.setup.steps.map((step) => <SetupRow key={step.id} step={step} />)}
               </View>
@@ -150,23 +147,17 @@ export default function ParentHomeRoute() {
             />
             {overview.checkouts.length === 0 ? (
               <View style={styles.emptyCheckouts}>
-                <PipIcon color={theme.colors.mutedText} name="check" size={16} />
-                <Text maxFontSizeMultiplier={1.8} style={styles.emptyTitle}>Nothing is out right now</Text>
+                <Text style={styles.emptyTitle}>No toys are out right now</Text>
+                <Text style={styles.meta}>When a child picks a toy, it appears here with their name.</Text>
               </View>
             ) : (
               overview.checkouts.map((session) => (
                 <View key={session.id} style={styles.checkout}>
-                  <ToyPhoto
-                    decorative
-                    name={session.toy ? displayToyName(session.toy.name) : 'This toy'}
-                    style={styles.checkoutPhoto}
-                    tier="small"
-                    uri={session.toy?.imageUri}
-                  />
+                  <ImageTile label={`${session.toy?.name ?? 'Toy'} photo`} size={56} uri={session.toy?.imageUri} />
                   <View style={styles.checkoutCopy}>
-                    <Text maxFontSizeMultiplier={1.8} style={styles.checkoutWho}>{`${displayChildName(session.childName)} · ${formatElapsed(session.startedAt, now)}`}</Text>
-                    <Text maxFontSizeMultiplier={1.6} numberOfLines={2} style={styles.checkoutToy}>{session.toy ? displayToyName(session.toy.name) : 'This toy is no longer in the library'}</Text>
-                    <Text maxFontSizeMultiplier={1.8} style={styles.meta}>
+                    <Text style={styles.checkoutWho}>{`${displayChildName(session.childName)} · ${formatElapsed(session.startedAt, now)}`}</Text>
+                    <Text numberOfLines={2} style={styles.checkoutToy}>{session.toy ? displayToyName(session.toy.name) : 'This toy is no longer in the library'}</Text>
+                    <Text style={styles.meta}>
                       {session.toy ? presentLocation(session.toy.roomName, session.toy.storageSpotName).compact ?? 'Location not added' : 'The checkout can still be closed safely.'}
                     </Text>
                   </View>
@@ -177,7 +168,7 @@ export default function ParentHomeRoute() {
                     onPress={() => setResolving(session)}
                     style={({ pressed }) => [styles.putAway, pressed && styles.pressed]}
                   >
-                    <Text maxFontSizeMultiplier={1.6} style={styles.putAwayLabel}>Put away</Text>
+                    <Text style={styles.putAwayLabel}>Put away</Text>
                   </Pressable>
                 </View>
               ))
@@ -186,42 +177,19 @@ export default function ParentHomeRoute() {
 
           {overview.libraryMilestone ? (
             <Card tone="warm">
-              <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.cardTitle}>{`Build ${displayChildName(firstChildName, 'your child')}’s toy library`}</Text>
-              <Text maxFontSizeMultiplier={1.8} style={styles.meta}>Add a few more toys to give them more choices.</Text>
-              <Text maxFontSizeMultiplier={1.6} style={styles.milestoneProgress}>{`${overview.libraryMilestone.count} of ${overview.libraryMilestone.target} ${overview.libraryMilestone.count === 1 ? 'toy' : 'toys'} added`}</Text>
+              <Text accessibilityRole="header" style={styles.cardTitle}>{`Build ${displayChildName(firstChildName, 'your child')}’s toy library`}</Text>
+              <Text style={styles.meta}>Add a few more toys to give them more choices.</Text>
+              <Text style={styles.milestoneProgress}>{`${overview.libraryMilestone.count} of ${overview.libraryMilestone.target} ${overview.libraryMilestone.count === 1 ? 'toy' : 'toys'} added`}</Text>
               <Pressable
                 accessibilityLabel={overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}
                 accessibilityRole="button"
                 onPress={() => router.replace(overview.libraryMilestone!.count === 0 ? '/parent/first-toy' : '/parent/add-toy')}
                 style={({ pressed }) => [styles.milestoneAction, pressed && styles.pressed]}
               >
-                <Text maxFontSizeMultiplier={1.6} style={styles.stepAction}>{overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}</Text>
+                <Text style={styles.stepAction}>{overview.libraryMilestone.count === 0 ? 'Add first toy' : 'Add another toy'}</Text>
                 <PipIcon color={theme.colors.brandInk} name="chevron-right" size={16} />
               </Pressable>
             </Card>
-          ) : null}
-
-          {toysWithPhotos(libraryToys).length > 0 ? (
-            <Pressable
-              accessibilityHint="Opens the toy library"
-              accessibilityLabel={`Your toy shelf. ${overview.toyCount} ${overview.toyCount === 1 ? 'toy' : 'toys'}`}
-              accessibilityRole="button"
-              onPress={() => router.replace('/parent/toy-library')}
-              style={({ pressed }) => [styles.libraryShelf, pressed && styles.pressed]}
-            >
-              <ToyPhotoCollage
-                accessibilityLabel="Photos from your toy library"
-                style={styles.libraryCollage}
-                toys={toysWithPhotos(libraryToys)}
-              />
-              <View style={styles.libraryShelfCopy}>
-                <View style={styles.rowCopy}>
-                  <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.cardTitle}>Your toy shelf</Text>
-                  <Text maxFontSizeMultiplier={1.8} style={styles.meta}>{`${overview.toyCount} ${overview.toyCount === 1 ? 'toy' : 'toys'} ready for play`}</Text>
-                </View>
-                <PipIcon color={theme.colors.brandInk} name="chevron-right" size={18} />
-              </View>
-            </Pressable>
           ) : null}
 
           <View style={styles.stats}>
@@ -243,8 +211,8 @@ export default function ParentHomeRoute() {
                 style={({ pressed }) => [styles.startChildMode, pressed && styles.pressed]}
               >
                 <View style={styles.rowCopy}>
-                  <Text maxFontSizeMultiplier={1.5} style={styles.cardTitle}>Start Child mode</Text>
-                  <Text maxFontSizeMultiplier={1.8} style={styles.meta}>Choose who is playing</Text>
+                  <Text style={styles.cardTitle}>Start Child mode</Text>
+                  <Text style={styles.meta}>Choose who is playing</Text>
                 </View>
                 <PipIcon color={theme.colors.brandInk} name="chevron-right" size={18} />
               </Pressable>
@@ -262,8 +230,8 @@ export default function ParentHomeRoute() {
                     style={({ pressed }) => [styles.handoffCard, pressed && styles.pressed]}
                   >
                     <ProfileAvatar accentColorId={child.accentColorId} avatarId={child.avatarId} decorative size={48} />
-                    <Text maxFontSizeMultiplier={1.6} style={styles.handoffName}>{displayChildName(child.name)}</Text>
-                    <Text maxFontSizeMultiplier={1.8} style={[styles.handoffState, playing && styles.handoffPlaying]}>{playing ? 'Playing now' : 'Ready'}</Text>
+                    <Text style={styles.handoffName}>{displayChildName(child.name)}</Text>
+                    <Text style={[styles.handoffState, playing && styles.handoffPlaying]}>{playing ? 'Playing now' : 'Ready'}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -294,10 +262,10 @@ function SetupRow({ step }: { step: SetupStep }) {
       <View style={[styles.stepMark, step.done && styles.stepMarkDone]}>
         {step.done ? <PipIcon color={theme.colors.success} name="check" size={12} strokeWidth={3} /> : null}
       </View>
-      <Text maxFontSizeMultiplier={1.6} style={[styles.stepLabel, step.done && styles.stepLabelDone]}>{step.label}</Text>
+      <Text style={[styles.stepLabel, step.done && styles.stepLabelDone]}>{step.label}</Text>
       {!step.done && step.href ? (
         <>
-          <Text maxFontSizeMultiplier={1.6} style={styles.stepAction}>{step.actionLabel}</Text>
+          <Text style={styles.stepAction}>{step.actionLabel}</Text>
           <PipIcon color={theme.colors.brandInk} name="chevron-right" size={16} />
         </>
       ) : null}
@@ -343,16 +311,15 @@ const styles = StyleSheet.create({
   stepLabelDone: { color: theme.colors.secondaryText, fontFamily: theme.fonts.regular },
   stepAction: { color: theme.colors.brandInk, ...theme.typography.label, fontSize: 14 },
 
-  // Compact and quiet: "nothing is out" is the normal case and should not be
-  // the largest thing on the parent's home screen.
   emptyCheckouts: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.spacing[8],
-    paddingVertical: theme.spacing[8],
+    borderColor: theme.colors.dashedBorder,
+    borderRadius: theme.radii.card,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    gap: 2,
+    padding: theme.spacing[16],
   },
-  emptyTitle: { color: theme.colors.secondaryText, ...theme.typography.meta },
-  checkoutPhoto: { borderRadius: theme.radii.card, height: 64, minHeight: 0, width: 64 },
+  emptyTitle: { color: theme.colors.primaryText, ...theme.typography.label, fontSize: 14 },
   checkout: {
     alignItems: 'center',
     backgroundColor: theme.colors.cardSurface,
@@ -378,21 +345,6 @@ const styles = StyleSheet.create({
   putAwayLabel: { color: theme.colors.brandInk, ...theme.typography.label, fontSize: 14 },
 
   stats: { flexDirection: 'row', gap: theme.spacing[12] },
-  libraryShelf: {
-    backgroundColor: theme.colors.cardSurface,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radii.card,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  libraryCollage: { aspectRatio: 2.25, borderRadius: 0 },
-  libraryShelfCopy: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.spacing[12],
-    minHeight: theme.measurements.minimumTouchTarget,
-    padding: theme.spacing[12],
-  },
 
   startChildMode: {
     alignItems: 'center',

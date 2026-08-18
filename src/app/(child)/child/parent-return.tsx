@@ -73,12 +73,6 @@ export default function ParentReturnRoute() {
 
   return (
     <ChildPage
-      /*
-       * Centred rather than top-aligned. This is a short, single-purpose
-       * checkpoint; top-aligning it left a screen's worth of emptiness between
-       * the PIN boxes and the button, which read as an unfinished screen.
-       */
-      centered
       footer={
         <PrimaryButton
           busy={submitting}
@@ -98,7 +92,7 @@ export default function ParentReturnRoute() {
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
           <PipIcon color={theme.colors.brandInk} name="chevron-left" size={20} />
-          <Text maxFontSizeMultiplier={1.3} style={styles.backLabel}>Back to play</Text>
+          <Text style={styles.backLabel}>Back to play</Text>
         </Pressable>
       </View>
 
@@ -109,8 +103,8 @@ export default function ParentReturnRoute() {
       </View>
 
       <View style={styles.copy}>
-        <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>Parent mode</Text>
-        <Text maxFontSizeMultiplier={1.6} style={styles.subtitle}>Enter your 4-digit PIN.</Text>
+        <Text accessibilityRole="header" style={styles.title}>Parent mode</Text>
+        <Text style={styles.subtitle}>Enter your 4-digit PIN.</Text>
       </View>
 
       {error ? <Banner message={error} tone="alert" /> : null}
@@ -144,7 +138,7 @@ const styles = StyleSheet.create({
     paddingRight: theme.spacing[8],
   },
   backLabel: { color: theme.colors.brandInk, ...theme.typography.label },
-  lockRow: { alignItems: 'center' },
+  lockRow: { alignItems: 'center', paddingTop: theme.spacing[24] },
   lockTile: {
     alignItems: 'center',
     backgroundColor: theme.colors.brandPrimarySoft,

@@ -144,20 +144,7 @@ export default function ToyDetailRoute() {
       footer={<PrimaryButton label="Edit toy" onPress={() => router.push(`/parent/edit-toy?id=${toy.id}`)} />}
     >
       <View style={styles.hero}>
-        {toy.imageUri ? (
-          <ToyImage accessibilityLabel={`${toy.name} photo`} style={styles.heroPhoto} uri={toy.imageUri} />
-        ) : (
-          <Pressable
-            accessibilityHint="Opens Edit Toy so you can take or choose a photo"
-            accessibilityLabel={`Add a photo for ${toy.name}`}
-            accessibilityRole="button"
-            onPress={() => router.push(`/parent/edit-toy?id=${toy.id}`)}
-            style={({ pressed }) => [styles.missingPhoto, pressed && styles.pressed]}
-          >
-            <PipIcon color={theme.colors.brandInk} name="photo-missing" size={22} />
-            <Text style={styles.missingPhotoLabel}>Add a toy photo</Text>
-          </Pressable>
-        )}
+        <ToyImage accessibilityLabel={`${toy.name} photo`} style={styles.heroPhoto} uri={toy.imageUri} />
         <View style={styles.heroBar}>
           <Pressable
             accessibilityLabel="Back to the library"
@@ -270,16 +257,6 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   hero: { borderRadius: theme.radii.card, marginHorizontal: -theme.spacing[4], overflow: 'hidden' },
   heroPhoto: { aspectRatio: 16 / 11, width: '100%' },
-  missingPhoto: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.photoFallback,
-    gap: theme.spacing[8],
-    height: 156,
-    justifyContent: 'flex-end',
-    paddingBottom: theme.spacing[16],
-    width: '100%',
-  },
-  missingPhotoLabel: { color: theme.colors.brandInk, ...theme.typography.label, fontSize: 14 },
   heroBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
