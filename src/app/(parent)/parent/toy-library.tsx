@@ -66,14 +66,14 @@ export default function ParentToyLibraryRoute() {
     setError(null);
     try {
       const database = await initializeDatabase();
-      const [visible, all, tree, sessions] = await Promise.all([
+      const [visible, unfiltered, tree, sessions] = await Promise.all([
         listParentToys(database, filters),
-        listParentToys(database, { archived: 'all' }),
+        listParentToys(database, { archived: filters.archived ?? 'active' }),
         loadLocationTree(database),
         listActivePlaySessions(database),
       ]);
       setToys(visible);
-      setTotal(all.length);
+      setTotal(unfiltered.length);
       setLocations(tree);
       setHolders(new Map(sessions.map((session) => [session.toyId, session.childName])));
       setState('ready');

@@ -13,7 +13,7 @@ import {
   SkeletonRows,
   StatCard,
 } from '@/components/playmap-ui';
-import { ToyPhoto } from '@/components/toy-photo';
+import { ToyPhoto, ToyPhotoCollage, toysWithPhotos } from '@/components/toy-photo';
 import { initializeDatabase } from '@/database/client';
 import type { ChildProfile } from '@/domain/models';
 import { displayChildName, displayToyName, presentLocation } from '@/domain/presentation';
@@ -33,7 +33,7 @@ import {
 } from '@/repositories/play-sessions-repository';
 import { countStorageSpots, listRooms } from '@/repositories/rooms-repository';
 import { getSettings, markChildModeUsed, setActiveChild } from '@/repositories/settings-repository';
-import { countToys } from '@/repositories/toys-repository';
+import { countToys, listParentToys, type ParentToy } from '@/repositories/toys-repository';
 import { enterChildMode } from '@/startup/route-access';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
@@ -46,6 +46,7 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  */
 export default function ParentHomeRoute() {
   const [overview, setOverview] = useState<HomeOverview | null>(null);
+  const [libraryToys, setLibraryToys] = useState<ParentToy[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [resolving, setResolving] = useState<ActivePlaySession | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,12 +57,13 @@ export default function ParentHomeRoute() {
   const load = useCallback(async () => {
     try {
       const database = await initializeDatabase();
-      const [children, sessions, toyCount, rooms, settings] = await Promise.all([
+      const [children, sessions, toyCount, rooms, settings, toys] = await Promise.all([
         listChildProfiles(database),
         listActivePlaySessions(database),
         countToys(database),
         listRooms(database),
         getSettings(database),
+        listParentToys(database),
       ]);
       const spotCounts = await Promise.all(rooms.map((room) => countStorageSpots(database, room.id)));
       setOverview(buildHomeOverview({
@@ -72,6 +74,7 @@ export default function ParentHomeRoute() {
         spotCount: spotCounts.reduce((total, count) => total + count, 0),
         childModeUsed: settings.childModeUsed,
       }));
+      setLibraryToys(toys);
       setNow(Date.now());
       setError(null);
     } catch (caught: unknown) {
@@ -196,6 +199,29 @@ export default function ParentHomeRoute() {
                 <PipIcon color={theme.colors.brandInk} name="chevron-right" size={16} />
               </Pressable>
             </Card>
+          ) : null}
+
+          {toysWithPhotos(libraryToys).length > 0 ? (
+            <Pressable
+              accessibilityHint="Opens the toy library"
+              accessibilityLabel={`Your toy shelf. ${overview.toyCount} ${overview.toyCount === 1 ? 'toy' : 'toys'}`}
+              accessibilityRole="button"
+              onPress={() => router.replace('/parent/toy-library')}
+              style={({ pressed }) => [styles.libraryShelf, pressed && styles.pressed]}
+            >
+              <ToyPhotoCollage
+                accessibilityLabel="Photos from your toy library"
+                style={styles.libraryCollage}
+                toys={toysWithPhotos(libraryToys)}
+              />
+              <View style={styles.libraryShelfCopy}>
+                <View style={styles.rowCopy}>
+                  <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={styles.cardTitle}>Your toy shelf</Text>
+                  <Text maxFontSizeMultiplier={1.8} style={styles.meta}>{`${overview.toyCount} ${overview.toyCount === 1 ? 'toy' : 'toys'} ready for play`}</Text>
+                </View>
+                <PipIcon color={theme.colors.brandInk} name="chevron-right" size={18} />
+              </View>
+            </Pressable>
           ) : null}
 
           <View style={styles.stats}>
@@ -352,6 +378,21 @@ const styles = StyleSheet.create({
   putAwayLabel: { color: theme.colors.brandInk, ...theme.typography.label, fontSize: 14 },
 
   stats: { flexDirection: 'row', gap: theme.spacing[12] },
+  libraryShelf: {
+    backgroundColor: theme.colors.cardSurface,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.card,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  libraryCollage: { aspectRatio: 2.25, borderRadius: 0 },
+  libraryShelfCopy: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing[12],
+    minHeight: theme.measurements.minimumTouchTarget,
+    padding: theme.spacing[12],
+  },
 
   startChildMode: {
     alignItems: 'center',

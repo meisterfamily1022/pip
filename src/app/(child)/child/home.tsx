@@ -70,7 +70,7 @@ export default function ChildHomeRoute() {
         style={({ pressed }) => [styles.grownUps, pressed && styles.pressed]}
       >
         <PipIcon color={theme.colors.mutedText} name="lock" size={16} />
-        <Text maxFontSizeMultiplier={1.4} style={styles.grownUpsText}>Parent mode</Text>
+        <Text maxFontSizeMultiplier={1.15} style={styles.grownUpsText}>Parent mode</Text>
       </Pressable>
     </View>
   );
@@ -163,8 +163,8 @@ function PickAToyCard({
       ) : null}
       <View style={styles.heroCaption}>
         <View style={styles.heroCopy}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.heroTitle}>Pick a toy</Text>
-          <Text maxFontSizeMultiplier={1.8} numberOfLines={2} style={styles.heroDetail}>
+          <Text maxFontSizeMultiplier={1.15} style={styles.heroTitle}>Pick a toy</Text>
+          <Text maxFontSizeMultiplier={1.2} numberOfLines={2} style={styles.heroDetail}>
             {collage.length > 0
               ? 'Choose what looks fun'
               : `${total} ${total === 1 ? 'toy is' : 'toys are'} ready to choose from`}
@@ -208,8 +208,8 @@ function SurpriseMeCard({ photographed, onPress }: { photographed: readonly Chil
         </View>
       ) : null}
       <View style={styles.surpriseCopy}>
-        <Text maxFontSizeMultiplier={1.5} style={styles.surpriseTitle}>Surprise me</Text>
-        <Text maxFontSizeMultiplier={1.8} numberOfLines={2} style={styles.surpriseDetail}>Let Pip pick one</Text>
+        <Text maxFontSizeMultiplier={1.15} style={styles.surpriseTitle}>Surprise me</Text>
+        <Text maxFontSizeMultiplier={1.2} numberOfLines={2} style={styles.surpriseDetail}>Let Pip pick one</Text>
       </View>
       <PipIcon color={theme.colors.brandInk} name="chevron-right" size={20} />
     </Pressable>
@@ -228,8 +228,8 @@ function PlayingNowCard({ name, uri, onPress }: { name: string; uri: string | nu
     >
       <ToyPhoto decorative name={name} style={styles.playingPhoto} tier="small" uri={uri} />
       <View style={styles.playingCopy}>
-        <Text maxFontSizeMultiplier={1.8} style={styles.playingLabel}>Playing now</Text>
-        <Text maxFontSizeMultiplier={1.5} numberOfLines={2} style={styles.playingName}>{name}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={styles.playingLabel}>Playing now</Text>
+        <Text maxFontSizeMultiplier={1.15} numberOfLines={2} style={styles.playingName}>{name}</Text>
       </View>
       <PipIcon color={theme.colors.brandInk} name="chevron-right" size={20} />
     </Pressable>
