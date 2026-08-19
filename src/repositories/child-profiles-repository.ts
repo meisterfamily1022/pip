@@ -1,7 +1,7 @@
 import type { DatabaseConnection } from '@/database/types';
 import type { ChildProfileRow } from '@/database/rows';
 import type { ChildProfile, ChoiceLimit } from '@/domain/models';
-import { LOCAL_HOUSEHOLD_ID } from '@/database/migrations';
+import { getActiveHouseholdId } from '@/features/household/household-scope';
 import {
   DEFAULT_ACCENT_COLOR_ID,
   DEFAULT_AVATAR_ID,
@@ -57,7 +57,7 @@ export async function listChildProfiles(
   database: DatabaseConnection,
   options: { includeHidden?: boolean; householdId?: string } = {},
 ): Promise<ChildProfile[]> {
-  const householdId = options.householdId ?? LOCAL_HOUSEHOLD_ID;
+  const householdId = options.householdId ?? (await getActiveHouseholdId(database));
   const hiddenClause = options.includeHidden ? '' : 'AND hidden_at IS NULL';
   const rows = await database.getAllAsync<ChildProfileRow>(
     `SELECT ${COLUMNS} FROM child_profiles WHERE household_id = ? ${hiddenClause} ORDER BY display_order, id;`,
@@ -67,19 +67,24 @@ export async function listChildProfiles(
 }
 
 export async function getChildProfile(database: DatabaseConnection, id: number): Promise<ChildProfile | null> {
-  const row = await database.getFirstAsync<ChildProfileRow>(`SELECT ${COLUMNS} FROM child_profiles WHERE id = ?;`, id);
+  const row = await database.getFirstAsync<ChildProfileRow>(
+    `SELECT ${COLUMNS} FROM child_profiles WHERE id = ? AND household_id = ?;`,
+    id,
+    await getActiveHouseholdId(database),
+  );
   return row ? toProfile(row) : null;
 }
 
 export async function createChildProfile(
   database: DatabaseConnection,
   input: ChildProfileInput | string,
-  householdId: string = LOCAL_HOUSEHOLD_ID,
+  explicitHouseholdId?: string,
 ): Promise<ChildProfile> {
   // The original signature took a bare name; both forms are accepted so callers
   // that only set a nickname keep working.
   const details: ChildProfileInput = typeof input === 'string' ? { name: input } : input;
   const name = validateName(details.name);
+  const householdId = explicitHouseholdId ?? (await getActiveHouseholdId(database));
   const timestamp = now();
 
   const nextOrder = await database.getFirstAsync<{ next: number }>(

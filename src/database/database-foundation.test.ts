@@ -80,15 +80,21 @@ class TestDatabase implements DatabaseConnection {
   }
 
   async getFirstAsync<T>(source: string, ...params: SqlParameters): Promise<T | null> {
+    // The active household. This fake holds a single library, so it is always
+    // the device-local one; scoping is proven against real SQLite in
+    // features/household/household-scope.test.ts.
+    if (source.includes('FROM device_household_state')) return { active_household_id: 'local' } as T;
     if (source.startsWith('PRAGMA user_version')) return { user_version: this.version } as T;
-    if (source.includes('FROM rooms WHERE name')) {
-      const name = String(params[0]).trim().toLowerCase();
-      const excluded = params.length > 1 ? params[1] : null;
+    // Name-uniqueness is now scoped: the household parameter leads, so these
+    // read one position further along than they used to.
+    if (source.includes('FROM rooms WHERE household_id') && source.includes('name =')) {
+      const name = String(params[1]).trim().toLowerCase();
+      const excluded = params.length > 2 ? params[2] : null;
       const found = [...this.rooms.values()].find((row) => String(row.name).toLowerCase() === name && row.id !== excluded);
       return (found ?? null) as T | null;
     }
     if (source.includes('FROM storage_spots WHERE room_id') && source.includes('name =')) {
-      const roomId = params[0]; const name = String(params[1]).trim().toLowerCase(); const excluded = params.length > 2 ? params[2] : null;
+      const roomId = params[0]; const name = String(params[2]).trim().toLowerCase(); const excluded = params.length > 3 ? params[3] : null;
       const found = [...this.spots.values()].find((row) => row.room_id === roomId && String(row.name).toLowerCase() === name && row.id !== excluded);
       return (found ?? null) as T | null;
     }

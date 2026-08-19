@@ -2,6 +2,7 @@ import type { Toy } from '@/domain/models';
 import { isPlayCategory, type PlayCategory } from '@/domain/play-category';
 import type { ToyRow } from '@/database/rows';
 import type { DatabaseConnection } from '@/database/types';
+import { getActiveHouseholdId } from '@/features/household/household-scope';
 
 type CategoryRow = { category: string };
 const now = (): string => new Date().toISOString();
@@ -41,14 +42,28 @@ function mapChildToy(row: ChildToyRow, categories: PlayCategory[]): ChildToy {
   return { ...mapToy(row, categories), roomName: row.room_name, storageSpotName: row.storage_spot_name };
 }
 
+/**
+ * Every read and write below is scoped to the household this device is showing.
+ *
+ * The column has existed since migration 9 but nothing filtered on it, and
+ * `createToy` never even populated it — so toys added since then carry a NULL
+ * household and belong to nobody. Scoping is applied in SQL rather than in the
+ * callers so that a stale screen, a queued write or a direct service call
+ * cannot reach another family's library by passing an id it should not know.
+ */
+async function scope(database: DatabaseConnection): Promise<string> {
+  return getActiveHouseholdId(database);
+}
+
 export async function createToy(database: DatabaseConnection, input: SaveToyInput): Promise<Toy> {
   if (input.categories.length === 0) throw new Error('A toy must have at least one play category.');
+  const householdId = await scope(database);
   const timestamp = now();
   let toyId: number | null = null;
   await database.withTransactionAsync(async () => {
     const result = await database.runAsync(
-      'INSERT INTO toys (name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at, intake_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
-      input.name.trim(), input.imageUri, input.imageUri, null, 'original', 'manual', null, null, null, null, input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, timestamp, input.intakeKey ?? null,
+      'INSERT INTO toys (name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at, intake_key, household_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      input.name.trim(), input.imageUri, input.imageUri, null, 'original', 'manual', null, null, null, null, input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, timestamp, input.intakeKey ?? null, householdId,
     );
     toyId = result.lastInsertRowId;
     for (const category of [...new Set(input.categories)]) {
@@ -62,7 +77,7 @@ export async function createToy(database: DatabaseConnection, input: SaveToyInpu
 }
 
 export async function getToy(database: DatabaseConnection, id: number): Promise<Toy | null> {
-  const row = await database.getFirstAsync<ToyRow>('SELECT id, name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at FROM toys WHERE id = ?;', id);
+  const row = await database.getFirstAsync<ToyRow>('SELECT id, name, image_uri, original_image_uri, enhanced_image_uri, preferred_image_variant, ai_metadata_status, ai_analysis_id, ai_schema_version, ai_consent_at, ai_confirmed_at, room_id, storage_spot_id, cleanup_difficulty, adult_help_required, is_available, is_archived, created_at, updated_at FROM toys WHERE id = ? AND household_id = ?;', id, await scope(database));
   return row ? mapToy(row, await getCategories(database, row.id)) : null;
 }
 
@@ -95,7 +110,7 @@ export async function listChildToys(
        FROM toys t
        JOIN rooms r ON r.id = t.room_id
        JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
-      WHERE t.is_available = 1 AND t.is_archived = 0
+      WHERE t.household_id = ? AND t.is_available = 1 AND t.is_archived = 0
         AND t.availability_scope IN ('everyone', 'selected')
         AND (
           t.availability_scope = 'everyone'
@@ -105,6 +120,7 @@ export async function listChildToys(
         )
         AND NOT EXISTS (SELECT 1 FROM play_sessions p WHERE p.toy_id = t.id AND p.status = 'active')
       ORDER BY t.name COLLATE NOCASE ASC, t.id ASC;`,
+    await scope(database),
     audience.childId,
     audience.childId,
   );
@@ -168,6 +184,7 @@ function appendFilter(clauses: string[], parameters: (string | number | null)[],
 export async function listParentToys(database: DatabaseConnection, filters: ToyFilters = {}): Promise<ParentToy[]> {
   const clauses: string[] = [];
   const parameters: (string | number | null)[] = [];
+  appendFilter(clauses, parameters, 't.household_id = ?', await scope(database));
   const archived = filters.archived ?? 'active';
   if (archived !== 'all') appendFilter(clauses, parameters, 't.is_archived = ?', archived === 'archived' ? 1 : 0);
   if (filters.availability === 'available') appendFilter(clauses, parameters, 't.is_available = ?', 1);
@@ -179,7 +196,7 @@ export async function listParentToys(database: DatabaseConnection, filters: ToyF
   const search = filters.search?.trim();
   if (search) appendFilter(clauses, parameters, 't.name LIKE ? COLLATE NOCASE', `%${search}%`);
   if (filters.category) appendFilter(clauses, parameters, 'EXISTS (SELECT 1 FROM toy_categories tc WHERE tc.toy_id = t.id AND tc.category = ?)', filters.category);
-  const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const where = `WHERE ${clauses.join(' AND ')}`;
   const rows = await database.getAllAsync<ChildToyRow>(
     `SELECT t.id, t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.ai_metadata_status, t.ai_analysis_id, t.ai_schema_version, t.ai_consent_at, t.ai_confirmed_at, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
             t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
@@ -200,8 +217,9 @@ export async function getParentToy(database: DatabaseConnection, id: number): Pr
        FROM toys t
        JOIN rooms r ON r.id = t.room_id
        JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
-      WHERE t.id = ?;`,
+      WHERE t.id = ? AND t.household_id = ?;`,
     id,
+    await scope(database),
   );
   return row ? mapChildToy(row, await getCategories(database, row.id)) : null;
 }
@@ -213,19 +231,21 @@ export async function getParentToyByIntakeKey(database: DatabaseConnection, inta
        FROM toys t
        JOIN rooms r ON r.id = t.room_id
        JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
-      WHERE t.intake_key = ?;`,
+      WHERE t.intake_key = ? AND t.household_id = ?;`,
     intakeKey,
+    await scope(database),
   );
   return row ? mapChildToy(row, await getCategories(database, row.id)) : null;
 }
 
 export async function updateToy(database: DatabaseConnection, id: number, input: SaveToyInput): Promise<Toy> {
   if (input.categories.length === 0) throw new Error('A toy must have at least one play category.');
+  const householdId = await scope(database);
   const timestamp = now();
   await database.withTransactionAsync(async () => {
     const result = await database.runAsync(
-      'UPDATE toys SET name = ?, image_uri = ?, original_image_uri = ?, enhanced_image_uri = NULL, preferred_image_variant = ?, ai_metadata_status = ?, ai_analysis_id = NULL, ai_schema_version = NULL, ai_consent_at = NULL, ai_confirmed_at = NULL, room_id = ?, storage_spot_id = ?, cleanup_difficulty = ?, adult_help_required = ?, is_available = ?, is_archived = ?, updated_at = ? WHERE id = ?;',
-      input.name.trim(), input.imageUri, input.imageUri, 'original', 'manual', input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, id,
+      'UPDATE toys SET name = ?, image_uri = ?, original_image_uri = ?, enhanced_image_uri = NULL, preferred_image_variant = ?, ai_metadata_status = ?, ai_analysis_id = NULL, ai_schema_version = NULL, ai_consent_at = NULL, ai_confirmed_at = NULL, room_id = ?, storage_spot_id = ?, cleanup_difficulty = ?, adult_help_required = ?, is_available = ?, is_archived = ?, updated_at = ? WHERE id = ? AND household_id = ?;',
+      input.name.trim(), input.imageUri, input.imageUri, 'original', 'manual', input.roomId, input.storageSpotId, input.cleanupDifficulty, input.adultHelpRequired ? 1 : 0, input.isAvailable ? 1 : 0, input.isArchived ? 1 : 0, timestamp, id, householdId,
     );
     if (result.changes !== 1) throw new Error('Toy not found.');
     await database.runAsync('DELETE FROM toy_categories WHERE toy_id = ?;', id);
@@ -239,20 +259,31 @@ export async function updateToy(database: DatabaseConnection, id: number, input:
 }
 
 export async function setToyArchived(database: DatabaseConnection, id: number, archived: boolean): Promise<void> {
-  const result = await database.runAsync('UPDATE toys SET is_archived = ?, updated_at = ? WHERE id = ?;', archived ? 1 : 0, now(), id);
+  const result = await database.runAsync('UPDATE toys SET is_archived = ?, updated_at = ? WHERE id = ? AND household_id = ?;', archived ? 1 : 0, now(), id, await scope(database));
   if (result.changes !== 1) throw new Error('Toy not found.');
 }
 
 export async function setToyAvailable(database: DatabaseConnection, id: number, available: boolean): Promise<void> {
-  const result = await database.runAsync('UPDATE toys SET is_available = ?, updated_at = ? WHERE id = ?;', available ? 1 : 0, now(), id);
+  const result = await database.runAsync('UPDATE toys SET is_available = ?, updated_at = ? WHERE id = ? AND household_id = ?;', available ? 1 : 0, now(), id, await scope(database));
   if (result.changes !== 1) throw new Error('Toy not found.');
 }
 
 export async function deleteToy(database: DatabaseConnection, id: number): Promise<void> {
+  const householdId = await scope(database);
   await database.withTransactionAsync(async () => {
+    // Ownership is checked before anything is removed. play_sessions references
+    // toys with ON DELETE RESTRICT, so the toy itself has to go last — which
+    // would otherwise mean deleting another household's sessions before finding
+    // out the toy was never ours.
+    const owned = await database.getFirstAsync<{ id: number }>(
+      'SELECT id FROM toys WHERE id = ? AND household_id = ?;',
+      id,
+      householdId,
+    );
+    if (!owned) throw new Error('Toy not found.');
     await database.runAsync('DELETE FROM play_sessions WHERE toy_id = ?;', id);
     await database.runAsync('DELETE FROM toy_categories WHERE toy_id = ?;', id);
-    const result = await database.runAsync('DELETE FROM toys WHERE id = ?;', id);
+    const result = await database.runAsync('DELETE FROM toys WHERE id = ? AND household_id = ?;', id, householdId);
     if (result.changes !== 1) throw new Error('Toy not found.');
   });
 }
@@ -260,7 +291,8 @@ export async function deleteToy(database: DatabaseConnection, id: number): Promi
 /** Toys in the library, excluding archived ones. */
 export async function countToys(database: DatabaseConnection, includeArchived = false): Promise<number> {
   const row = await database.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) AS count FROM toys${includeArchived ? '' : ' WHERE is_archived = 0'};`,
+    `SELECT COUNT(*) AS count FROM toys WHERE household_id = ?${includeArchived ? '' : ' AND is_archived = 0'};`,
+    await scope(database),
   );
   return row?.count ?? 0;
 }
