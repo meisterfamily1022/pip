@@ -176,7 +176,7 @@ export default function ParentSettingsRoute() {
           <ListRow onPress={() => router.push('/privacy')} title="Privacy" />
           {cloudEligible ? <ListRow onPress={() => router.push('/parent/analytics-privacy' as never)} title="Optional analytics" /> : null}
           {cloudEligible ? <ListRow onPress={() => router.push('/parent/analytics-profile' as never)} title="Optional household profile" /> : null}
-          <ListRow onPress={() => router.push('/parent/account')} title="Account & your data" />
+          <ListRow onPress={() => router.push('/parent/account')} title="Account & data" />
           <ListRow detail={pipBrand.primaryTagline} title={`About ${pipBrand.name} 1.0`} />
         </ListCard>
         <Text style={styles.note}>Core family data stays on this device. Optional analytics is off unless a signed-in parent chooses it.</Text>

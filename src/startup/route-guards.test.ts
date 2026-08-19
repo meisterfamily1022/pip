@@ -145,6 +145,16 @@ describe("child mode lock", () => {
     });
   });
 
+  it("puts the account surface behind the PIN, like the rest of Parent Mode", () => {
+    // Account & data lives in the (parent) group precisely so it inherits this.
+    // A child must never reach sign-out, account switching or the adult's email.
+    expect(groupForHref("/parent/account")).toBe("(parent)");
+    expect(resolveRouteGuard({ ...ready, group: groupForHref("/parent/account"), childModeLocked: true })).toEqual({
+      kind: "redirect",
+      href: "/child/parent-return",
+    });
+  });
+
   it("leaves the child group reachable while locked", () => {
     expect(resolveRouteGuard({ ...ready, group: "(child)", childModeLocked: true })).toEqual({ kind: "render" });
   });
