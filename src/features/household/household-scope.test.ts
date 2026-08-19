@@ -1,0 +1,159 @@
+import { LOCAL_HOUSEHOLD_ID, runMigrations } from '@/database/migrations';
+import { RealSqliteConnection } from '@/database/real-sqlite-connection.test-helper';
+import type { DatabaseConnection } from '@/database/types';
+import { getHousehold } from '@/repositories/households-repository';
+
+import {
+  activateHouseholdForAccount,
+  backUpHouseholdToAccount,
+  canAccountReadHousehold,
+  DEVICE_LOCAL_ACCOUNT,
+  findHouseholdForAccount,
+  getActiveHouseholdId,
+  HouseholdScopeError,
+} from './household-scope';
+
+const PARENT_A = 'account-a';
+const PARENT_B = 'account-b';
+
+async function freshDatabase(): Promise<DatabaseConnection> {
+  const database = new RealSqliteConnection();
+  await runMigrations(database);
+  return database;
+}
+
+/** A second household on the device, as a restore for another account would create. */
+async function seedHouseholdOwnedBy(database: DatabaseConnection, id: string, accountId: string): Promise<void> {
+  await database.runAsync(
+    `INSERT INTO households (id, name, is_local_only, owner_account_id, created_at, updated_at)
+     VALUES (?, 'Their Pip', 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    id,
+    accountId,
+  );
+}
+
+describe('household ownership', () => {
+  it('starts device-local and unowned, so Pip works with no account at all', async () => {
+    const database = await freshDatabase();
+
+    expect(await getActiveHouseholdId(database)).toBe(LOCAL_HOUSEHOLD_ID);
+    const household = await getHousehold(database, LOCAL_HOUSEHOLD_ID);
+    expect(household?.ownerAccountId).toBeNull();
+  });
+
+  it('does not claim the local household merely because somebody signed in', async () => {
+    const database = await freshDatabase();
+
+    await activateHouseholdForAccount(database, PARENT_A);
+
+    // Still the family's own device-local library, still unowned.
+    expect(await getActiveHouseholdId(database)).toBe(LOCAL_HOUSEHOLD_ID);
+    expect((await getHousehold(database, LOCAL_HOUSEHOLD_ID))?.ownerAccountId).toBeNull();
+  });
+
+  it('takes an explicit backup for a household to gain an owner', async () => {
+    const database = await freshDatabase();
+
+    const household = await backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
+
+    expect(household.ownerAccountId).toBe(PARENT_A);
+    expect(household.isLocalOnly).toBe(false);
+    expect(await getActiveHouseholdId(database)).toBe(LOCAL_HOUSEHOLD_ID);
+  });
+
+  it('never shows one parent the household another parent backed up', async () => {
+    const database = await freshDatabase();
+    await backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
+
+    // Parent A signs out, parent B signs in on the same phone.
+    await activateHouseholdForAccount(database, DEVICE_LOCAL_ACCOUNT);
+    const active = await activateHouseholdForAccount(database, PARENT_B);
+
+    expect(active).not.toBe(LOCAL_HOUSEHOLD_ID);
+    expect(await findHouseholdForAccount(database, PARENT_B)).toBeNull();
+  });
+
+  it('hides an owned household on sign out without deleting a single row', async () => {
+    const database = await freshDatabase();
+    await backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
+
+    await activateHouseholdForAccount(database, DEVICE_LOCAL_ACCOUNT);
+
+    const household = await getHousehold(database, LOCAL_HOUSEHOLD_ID);
+    expect(household?.ownerAccountId).toBe(PARENT_A);
+    expect(canAccountReadHousehold(household!, DEVICE_LOCAL_ACCOUNT)).toBe(false);
+    expect(canAccountReadHousehold(household!, PARENT_A)).toBe(true);
+  });
+
+  it('returns the owner to their own household when they sign back in', async () => {
+    const database = await freshDatabase();
+    await seedHouseholdOwnedBy(database, 'household-a', PARENT_A);
+
+    await activateHouseholdForAccount(database, DEVICE_LOCAL_ACCOUNT);
+    expect(await getActiveHouseholdId(database)).toBe(LOCAL_HOUSEHOLD_ID);
+
+    expect(await activateHouseholdForAccount(database, PARENT_A)).toBe('household-a');
+  });
+
+  it('refuses to re-point a household that already belongs to somebody else', async () => {
+    const database = await freshDatabase();
+    await backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
+
+    await expect(backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_B)).rejects.toThrow(
+      HouseholdScopeError,
+    );
+    expect((await getHousehold(database, LOCAL_HOUSEHOLD_ID))?.ownerAccountId).toBe(PARENT_A);
+  });
+
+  it('treats a retried backup confirmation as a no-op rather than a second household', async () => {
+    const database = await freshDatabase();
+
+    await backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
+    await backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
+
+    const rows = await database.getAllAsync<{ id: string }>(
+      'SELECT id FROM households WHERE owner_account_id = ?;',
+      PARENT_A,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('will not give one account two libraries on the same device', async () => {
+    const database = await freshDatabase();
+    await seedHouseholdOwnedBy(database, 'household-a', PARENT_A);
+
+    await expect(backUpHouseholdToAccount(database, LOCAL_HOUSEHOLD_ID, PARENT_A)).rejects.toThrow(
+      HouseholdScopeError,
+    );
+  });
+
+  it('keeps the active household across a relaunch, with no session to consult', async () => {
+    const database = await freshDatabase();
+    await seedHouseholdOwnedBy(database, 'household-a', PARENT_A);
+    await activateHouseholdForAccount(database, PARENT_A);
+
+    // Relaunch: migrations run again against the same database, nothing else.
+    await runMigrations(database);
+
+    expect(await getActiveHouseholdId(database)).toBe('household-a');
+  });
+});
+
+describe('migration 14', () => {
+  it('is idempotent and leaves existing libraries device-local', async () => {
+    const database = new RealSqliteConnection();
+    await runMigrations(database, 13);
+    await database.runAsync(
+      `INSERT INTO rooms (name, created_at, updated_at, household_id) VALUES ('Playroom', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?);`,
+      LOCAL_HOUSEHOLD_ID,
+    );
+
+    await runMigrations(database);
+    await runMigrations(database);
+
+    expect((await getHousehold(database, LOCAL_HOUSEHOLD_ID))?.ownerAccountId).toBeNull();
+    expect(await getActiveHouseholdId(database)).toBe(LOCAL_HOUSEHOLD_ID);
+    const rooms = await database.getAllAsync<{ name: string }>('SELECT name FROM rooms;');
+    expect(rooms).toHaveLength(1);
+  });
+});

@@ -70,6 +70,12 @@ class TestDatabase implements DatabaseConnection {
     // which this fake does not model, so they are accepted and ignored.
     if (source.startsWith('INSERT OR IGNORE INTO households')) return { lastInsertRowId: 0, changes: 1 };
     if (/^UPDATE "\w+" SET household_id/.test(source)) return { lastInsertRowId: 0, changes: 0 };
+    // Version 14 gives households an owner and records which one this device is
+    // showing. Ownership is exercised against real SQLite in
+    // features/household/household-scope.test.ts; here the statements only have
+    // to be accepted so the migration runner reaches the end.
+    if (source.startsWith('UPDATE households SET owner_account_id')) return { lastInsertRowId: 0, changes: 1 };
+    if (source.startsWith('INSERT OR IGNORE INTO device_household_state')) return { lastInsertRowId: 0, changes: 1 };
     throw new Error(`Unhandled SQL: ${source}`);
   }
 

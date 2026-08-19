@@ -283,6 +283,53 @@ async function ensureCleanupProgress(database: DatabaseConnection): Promise<void
   await addColumnIfMissing(database, 'play_sessions', 'cleanup_step', 'INTEGER NOT NULL DEFAULT 0 CHECK (cleanup_step BETWEEN 0 AND 2)');
 }
 
+/**
+ * Gives a household an owner, so two adults on one device stay separate.
+ *
+ * Until now every row belonged to the single household `'local'` and nothing
+ * filtered on it: signing out and signing in as somebody else left the previous
+ * family's library on screen, because no part of the schema knew a library
+ * could belong to anyone in particular.
+ *
+ * `owner_account_id` is deliberately nullable, and NULL is the meaningful case:
+ * it marks the device-local household — a family using Pip without an account,
+ * which stays the supported default. A household gains an owner only when a
+ * parent explicitly backs it up, never as a side effect of signing in.
+ *
+ * The partial unique index allows many NULLs while preventing one account from
+ * ending up with two households on the same device, which is how a restore
+ * retried at the wrong moment would otherwise split a family's library in half.
+ */
+async function ensureHouseholdAccountOwnership(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'households', 'owner_account_id', 'TEXT');
+  await database.execAsync(`
+    CREATE UNIQUE INDEX IF NOT EXISTS households_owner_account_index
+      ON households(owner_account_id) WHERE owner_account_id IS NOT NULL;
+
+    -- Which household this device is showing. One row, by construction: the
+    -- active household is a property of the device, not of a session, so it
+    -- survives relaunch and does not depend on auth state being readable yet
+    -- at startup.
+    CREATE TABLE IF NOT EXISTS device_household_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      active_household_id TEXT NOT NULL REFERENCES households(id) ON DELETE RESTRICT,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  // Everything that exists today predates accounts, so it is device-local and
+  // active. Both writes are idempotent: a replayed migration changes nothing.
+  await database.runAsync(
+    'UPDATE households SET owner_account_id = NULL WHERE id = ? AND remote_id IS NULL;',
+    LOCAL_HOUSEHOLD_ID,
+  );
+  await database.runAsync(
+    `INSERT OR IGNORE INTO device_household_state (id, active_household_id, updated_at)
+     VALUES (1, ?, CURRENT_TIMESTAMP);`,
+    LOCAL_HOUSEHOLD_ID,
+  );
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -427,6 +474,10 @@ const migrations: readonly Migration[] = [
   {
     version: 13,
     apply: ensureCleanupProgress,
+  },
+  {
+    version: 14,
+    apply: ensureHouseholdAccountOwnership,
   },
 ];
 

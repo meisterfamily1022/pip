@@ -37,5 +37,7 @@ export type ChildProfileRow = {
 };
 export type HouseholdRow = {
   id: string; name: string; is_local_only: number; remote_id: string | null;
+  /** NULL marks the device-local household, which belongs to no account. */
+  owner_account_id: string | null;
   created_at: string; updated_at: string;
 };
