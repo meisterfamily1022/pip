@@ -317,16 +317,6 @@ async function ensureHouseholdAccountOwnership(database: DatabaseConnection): Pr
     );
   `);
 
-  // Migration 9 backfilled household_id once, but the inserts were never
-  // updated to populate it — so every row created since then has a NULL
-  // household and belongs to nobody. That was invisible while nothing filtered
-  // on the column. It stops being invisible the moment scoping is enforced, as
-  // a library that silently empties itself on upgrade, so those rows are
-  // adopted by the device-local household before any filter can hide them.
-  for (const table of ['rooms', 'storage_spots', 'toys', 'child_profiles', 'play_sessions']) {
-    await database.runAsync(`UPDATE "${table}" SET household_id = ? WHERE household_id IS NULL;`, LOCAL_HOUSEHOLD_ID);
-  }
-
   // Everything that exists today predates accounts, so it is device-local and
   // active. Both writes are idempotent: a replayed migration changes nothing.
   await database.runAsync(
@@ -338,6 +328,26 @@ async function ensureHouseholdAccountOwnership(database: DatabaseConnection): Pr
      VALUES (1, ?, CURRENT_TIMESTAMP);`,
     LOCAL_HOUSEHOLD_ID,
   );
+}
+
+/**
+ * Adopts rows the old inserts left without a household.
+ *
+ * Migration 9 backfilled `household_id` once, but the INSERT statements were
+ * never updated to populate it, so every row created since then carries NULL
+ * and belongs to nobody. That was invisible while nothing filtered on the
+ * column. It stops being invisible the moment scoping is enforced: 'local' does
+ * not match NULL, so an existing family would open the app after upgrading and
+ * watch part of their library be gone.
+ *
+ * This is a separate migration rather than an addition to 14 because 14 may
+ * already have run — a device that took it before this fix existed would never
+ * see the backfill otherwise. Migrations that have shipped are not edited.
+ */
+async function ensureHouseholdBackfill(database: DatabaseConnection): Promise<void> {
+  for (const table of ['rooms', 'storage_spots', 'toys', 'child_profiles', 'play_sessions']) {
+    await database.runAsync(`UPDATE "${table}" SET household_id = ? WHERE household_id IS NULL;`, LOCAL_HOUSEHOLD_ID);
+  }
 }
 
 const migrations: readonly Migration[] = [
@@ -488,6 +498,10 @@ const migrations: readonly Migration[] = [
   {
     version: 14,
     apply: ensureHouseholdAccountOwnership,
+  },
+  {
+    version: 15,
+    apply: ensureHouseholdBackfill,
   },
 ];
 

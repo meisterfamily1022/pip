@@ -139,7 +139,7 @@ describe('household ownership', () => {
   });
 });
 
-describe('migration 14', () => {
+describe('household migrations', () => {
   it('adopts rows the old inserts left without a household, so nothing vanishes', async () => {
     const database = new RealSqliteConnection();
     await runMigrations(database, 13);
@@ -163,6 +163,26 @@ describe('migration 14', () => {
     expect(orphans).toHaveLength(0);
     const toys = await database.getAllAsync<{ household_id: string }>('SELECT household_id FROM toys;');
     expect(toys[0]!.household_id).toBe(LOCAL_HOUSEHOLD_ID);
+  });
+
+  it('repairs a device that already took migration 14 before the backfill existed', async () => {
+    const database = new RealSqliteConnection();
+    await runMigrations(database, 14);
+    await database.runAsync(
+      `INSERT INTO rooms (name, created_at, updated_at) VALUES ('Playroom', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+    await database.runAsync(
+      `INSERT INTO storage_spots (room_id, name, created_at, updated_at) VALUES (1, 'Shelf', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+    await database.runAsync(
+      `INSERT INTO toys (name, image_uri, room_id, storage_spot_id, is_available, is_archived, created_at, updated_at)
+       VALUES ('Orphan', NULL, 1, 1, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+
+    await runMigrations(database);
+
+    const toys = await database.getAllAsync<{ household_id: string | null }>('SELECT household_id FROM toys;');
+    expect(toys.every((row) => row.household_id === LOCAL_HOUSEHOLD_ID)).toBe(true);
   });
 
   it('is idempotent and leaves existing libraries device-local', async () => {
