@@ -317,6 +317,16 @@ async function ensureHouseholdAccountOwnership(database: DatabaseConnection): Pr
     );
   `);
 
+  // Migration 9 backfilled household_id once, but the inserts were never
+  // updated to populate it — so every row created since then has a NULL
+  // household and belongs to nobody. That was invisible while nothing filtered
+  // on the column. It stops being invisible the moment scoping is enforced, as
+  // a library that silently empties itself on upgrade, so those rows are
+  // adopted by the device-local household before any filter can hide them.
+  for (const table of ['rooms', 'storage_spots', 'toys', 'child_profiles', 'play_sessions']) {
+    await database.runAsync(`UPDATE "${table}" SET household_id = ? WHERE household_id IS NULL;`, LOCAL_HOUSEHOLD_ID);
+  }
+
   // Everything that exists today predates accounts, so it is device-local and
   // active. Both writes are idempotent: a replayed migration changes nothing.
   await database.runAsync(

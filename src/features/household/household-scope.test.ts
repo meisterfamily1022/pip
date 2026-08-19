@@ -140,6 +140,31 @@ describe('household ownership', () => {
 });
 
 describe('migration 14', () => {
+  it('adopts rows the old inserts left without a household, so nothing vanishes', async () => {
+    const database = new RealSqliteConnection();
+    await runMigrations(database, 13);
+    // How createToy wrote rows between migrations 9 and 14: no household at all.
+    await database.runAsync(
+      `INSERT INTO rooms (name, created_at, updated_at) VALUES ('Playroom', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+    await database.runAsync(
+      `INSERT INTO storage_spots (room_id, name, created_at, updated_at) VALUES (1, 'Shelf', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+    await database.runAsync(
+      `INSERT INTO toys (name, image_uri, room_id, storage_spot_id, is_available, is_archived, created_at, updated_at)
+       VALUES ('Wooden train', NULL, 1, 1, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+
+    await runMigrations(database);
+
+    const orphans = await database.getAllAsync<{ name: string }>(
+      'SELECT name FROM toys WHERE household_id IS NULL UNION ALL SELECT name FROM rooms WHERE household_id IS NULL;',
+    );
+    expect(orphans).toHaveLength(0);
+    const toys = await database.getAllAsync<{ household_id: string }>('SELECT household_id FROM toys;');
+    expect(toys[0]!.household_id).toBe(LOCAL_HOUSEHOLD_ID);
+  });
+
   it('is idempotent and leaves existing libraries device-local', async () => {
     const database = new RealSqliteConnection();
     await runMigrations(database, 13);
