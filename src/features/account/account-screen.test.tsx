@@ -115,6 +115,12 @@ describe('account surface when signed out', () => {
     expect(textContent(renderer)).toContain('You do not need an account');
   });
 
+  it('offers nothing to delete when there is no account', async () => {
+    const renderer = await renderScreen();
+
+    expect(textContent(renderer)).not.toContain('Delete your account');
+  });
+
   it('never claims backup or another device works', async () => {
     const renderer = await renderScreen();
     const copy = textContent(renderer);
@@ -186,6 +192,21 @@ describe('account surface when signed in', () => {
 
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(router.replace).toHaveBeenCalledWith('/sign-in');
+  });
+
+  it('does not show a Delete button while no deletion service is deployed', async () => {
+    const renderer = await renderScreen();
+
+    // The section is present and explains itself; the control is not, because a
+    // Delete button that cannot delete would report a lie.
+    expect(textContent(renderer)).toContain('not available in this build');
+    expect(button(renderer, 'Delete my account')).toBeNull();
+  });
+
+  it('does not hedge the unavailable state with a promise of it arriving', async () => {
+    const renderer = await renderScreen();
+
+    expect(textContent(renderer)).not.toMatch(/coming soon|shortly|in a future release/i);
   });
 
   it('offers a retry in place when signing out fails', async () => {

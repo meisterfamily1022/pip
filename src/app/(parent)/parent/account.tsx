@@ -6,8 +6,10 @@ import { NoticeBanner } from '@/components/auth-ui';
 import { ParentModeHeader } from '@/components/parent-ui';
 import {
   ConfirmationDialog,
+  DestructiveButton,
   FormCard,
   PageShell,
+  PinInput,
   PrimaryButton,
   SecondaryButton,
   SkeletonRows,
@@ -20,6 +22,12 @@ import {
   switchAccountConsequence,
   type AccountStatus,
 } from '@/features/account/account-status';
+import {
+  DELETION_CONSEQUENCES,
+  DELETION_UNAVAILABLE_NOTE,
+  deleteAccountWithPin,
+  supabaseAccountDeletionGateway,
+} from '@/features/account/account-deletion';
 import { buildHouseholdExport, exportFileName, serialiseExport } from '@/features/account/export-service';
 import { signOut } from '@/features/auth/auth-client';
 import { getSessionSnapshot, subscribeSession } from '@/features/auth/session-state';
@@ -39,7 +47,7 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * particular library is linked to the account, because "your library stays on
  * this device" is true either way but seriously incomplete when it is linked.
  */
-type Pending = 'signOut' | 'switch' | null;
+type Pending = 'signOut' | 'switch' | 'delete' | null;
 
 export default function NativeAccountRoute() {
   const session = useSyncExternalStore(subscribeSession, getSessionSnapshot, getSessionSnapshot);
@@ -51,6 +59,7 @@ export default function NativeAccountRoute() {
   // way. The ref flips before the first await.
   const inFlight = useRef(false);
   const [confirming, setConfirming] = useState<Pending>(null);
+  const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -116,7 +125,29 @@ export default function NativeAccountRoute() {
     }
   };
 
+  const removeAccount = async (): Promise<void> => {
+    const accountId = session.account?.accountId;
+    if (inFlight.current || !accountId) return;
+    inFlight.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const database = await initializeDatabase();
+      await deleteAccountWithPin(database, accountId, pin, supabaseAccountDeletionGateway, signOut);
+      setConfirming(null);
+      setPin('');
+      setNotice('Your account was deleted. Your library is still on this device.');
+    } catch (caught: unknown) {
+      setPin('');
+      setError(caught instanceof Error ? caught.message : 'Pip could not delete your account.');
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  };
+
   const signedIn = status?.signedIn ?? false;
+  const deletionAvailable = supabaseAccountDeletionGateway.availability === 'available';
 
   return (
     <PageShell>
@@ -173,6 +204,33 @@ export default function NativeAccountRoute() {
         )}
       </FormCard>
 
+      {signedIn ? (
+        <FormCard tone="alert">
+          <Text style={styles.title}>Delete your account</Text>
+          {deletionAvailable ? (
+            <>
+              {DELETION_CONSEQUENCES.map((line) => (
+                <Text key={line} style={styles.body}>{line}</Text>
+              ))}
+              <DestructiveButton
+                disabled={busy}
+                label="Delete my account"
+                onPress={() => {
+                  setNotice(null);
+                  setError(null);
+                  setPin('');
+                  setConfirming('delete');
+                }}
+              />
+            </>
+          ) : (
+            // No button. A Delete control that cannot delete is worse than none:
+            // it tells a parent their account is gone when it is not.
+            <Text style={styles.body}>{DELETION_UNAVAILABLE_NOTE}</Text>
+          )}
+        </FormCard>
+      ) : null}
+
       <FormCard>
         <Text style={styles.title}>Export your data</Text>
         <Text style={styles.body}>
@@ -218,6 +276,24 @@ export default function NativeAccountRoute() {
         title="Switch to a different account?"
         visible={confirming === 'switch'}
       />
+
+      <ConfirmationDialog
+        busy={busy && confirming === 'delete'}
+        cancelLabel="Keep my account"
+        confirmLabel={busy && confirming === 'delete' ? 'Deleting…' : 'Delete my account'}
+        destructive
+        message={DELETION_CONSEQUENCES.join(' ')}
+        onCancel={() => {
+          if (inFlight.current) return;
+          setConfirming(null);
+          setPin('');
+        }}
+        onConfirm={() => void removeAccount()}
+        title="Delete your Pip account?"
+        visible={confirming === 'delete'}
+      >
+        <PinInput label="Enter your parent PIN to confirm" onChangeText={setPin} value={pin} />
+      </ConfirmationDialog>
     </PageShell>
   );
 }

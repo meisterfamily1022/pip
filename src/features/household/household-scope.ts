@@ -191,6 +191,33 @@ export async function backUpHouseholdToAccount(
 }
 
 /**
+ * Returns a library to being device-local.
+ *
+ * The inverse of `backUpHouseholdToAccount`, for when the account goes away —
+ * deletion, specifically. The rows are untouched; only the ownership is. A
+ * family that deletes their account keeps their toys, and keeps them reachable,
+ * because an unowned library is readable by whoever holds the device. Deleting
+ * the library instead is Reset Pip, which is a different action behind the PIN.
+ *
+ * Scoped to the owner: passing an account that does not own this household
+ * changes nothing and reports false, so a stale caller cannot unlink somebody
+ * else's library.
+ */
+export async function unlinkHouseholdFromAccount(
+  database: DatabaseConnection,
+  householdId: string,
+  accountId: string,
+): Promise<boolean> {
+  const result = await database.runAsync(
+    'UPDATE households SET owner_account_id = NULL, is_local_only = 1, updated_at = ? WHERE id = ? AND owner_account_id = ?;',
+    now(),
+    householdId,
+    accountId,
+  );
+  return result.changes === 1;
+}
+
+/**
  * Whether an account may read a household.
  *
  * The predicate the repositories enforce. Device-local households are readable
