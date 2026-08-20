@@ -117,7 +117,8 @@ describe('SQLite migration compatibility', () => {
 
   it('safely applies migration 2 after the checked-in migration 1 schema', async () => {
     const database = new SchemaDatabase(1, v1ToyColumns, v1SessionColumns);
-    await expect(runMigrations(database)).resolves.toBeUndefined();
+    // Migration 1 already exists here, so this is an upgrade, not a creation.
+    await expect(runMigrations(database)).resolves.toEqual({ createdDatabase: false });
     expect(cleanupDifficultyCount(database)).toBe(1);
   });
 

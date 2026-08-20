@@ -512,11 +512,27 @@ const migrations: readonly Migration[] = [
  * it to build a database as an older release left it, so the upgrade path — not
  * just the final schema — can be exercised.
  */
-export async function runMigrations(database: DatabaseConnection, upTo = Number.POSITIVE_INFINITY): Promise<void> {
+export type MigrationOutcome = {
+  /**
+   * The database did not exist before this call.
+   *
+   * Worth reporting because iOS keychain entries outlive an app's files: the
+   * parent PIN and the onboarding-started flag survive deleting Pip, while
+   * SQLite does not. A brand-new database alongside a keychain PIN is therefore
+   * proof of a reinstall, and the only reliable proof available.
+   */
+  createdDatabase: boolean;
+};
+
+export async function runMigrations(
+  database: DatabaseConnection,
+  upTo = Number.POSITIVE_INFINITY,
+): Promise<MigrationOutcome> {
   await database.execAsync('PRAGMA foreign_keys = ON;');
   await database.execAsync('PRAGMA journal_mode = WAL;');
   const versionRow = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;');
   let currentVersion = versionRow?.user_version ?? 0;
+  const createdDatabase = currentVersion === 0;
 
   for (const migration of migrations) {
     if (migration.version <= currentVersion) continue;
@@ -528,6 +544,8 @@ export async function runMigrations(database: DatabaseConnection, upTo = Number.
     });
     currentVersion = migration.version;
   }
+
+  return { createdDatabase };
 }
 
 export const LATEST_DATABASE_VERSION = migrations.at(-1)?.version ?? 0;
