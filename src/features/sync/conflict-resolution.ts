@@ -1,103 +1,155 @@
 /**
- * How two versions of the same record are reconciled.
+ * How a write conflict on a synced record is resolved.
  *
- * The governing rule from the brief: **never blindly last-write-wins for
- * destructive conflicts involving photos, toys, rooms, or active sessions.**
+ * Governing rules, agreed for this feature:
  *
- * A clock skew of a few seconds between two devices should never be enough to
- * silently delete a toy someone edited, or replace a photograph that cannot be
- * recovered. Where a decision would destroy something irreplaceable, this
- * returns `needs-review` and the parent is asked. Everywhere else, converging
- * automatically is fine.
+ * 1. Default: automatic record-level last-write-wins for ordinary,
+ *    non-destructive edits. No blocking screen — a parent must never be asked
+ *    to arbitrate before Pip is usable again.
+ * 2. A destructive outcome never silently discards the losing side:
+ *    - edit vs delete: the deletion is what a family sees, but the edited
+ *      content is archived and recoverable, never dropped;
+ *    - photo replaced on both sides: the newer photo shows normally, the
+ *      other is kept as recoverable history, not deleted from the bucket;
+ *    - two active play sessions for the same child: the newer one stays
+ *      active, the older is closed as `interrupted`, not left dangling.
+ * 3. Every automatic resolution that discarded something is logged as an
+ *    internal diagnostic and queued as one lightweight, non-blocking parent
+ *    notification — never a screen that blocks ordinary use.
+ *
+ * The part that makes rule 4 — "server-assigned revision is the final
+ * authority, not arbitrary client clocks" — actually true rather than
+ * aspirational is the protocol, not this module: every synced table carries a
+ * `revision` a Postgres trigger assigns from a shared sequence, and a client
+ * writes with `UPDATE ... WHERE id = ? AND revision = ?`. Two clients editing
+ * the same row is not "compare two timestamps from two clocks" — it is
+ * "whichever write reaches the server's sequence first gets the next
+ * revision; the other one's WHERE clause matches zero rows." A conflict is
+ * detected by that mismatch, not by comparing when either device thinks it
+ * made the edit. This module is the *pure* decision of what to do once a
+ * mismatch has been detected, given the two intents involved — it takes no
+ * timestamp as an input, because none is trustworthy, and that omission is
+ * deliberate rather than an oversight.
  */
 
 export type SyncEntity = 'room' | 'storage_spot' | 'toy' | 'child_profile' | 'play_session';
 
-export type RecordVersion = {
-  /** ISO timestamp of the last edit on that side. */
-  updatedAt: string;
-  /** Set when that side deleted the record. */
-  deletedAt?: string | null;
-  /** Photo the record points at. Changing it is treated as destructive. */
-  photoUri?: string | null;
-  /** True while a play session is open on that side. */
-  sessionActive?: boolean;
+/** What a write proposes to do, stripped to what conflict resolution needs to know. */
+export type WriteIntent =
+  | { kind: 'edit'; photoPath?: string | null; sessionActive?: boolean }
+  | { kind: 'delete' };
+
+/** The row as the server currently holds it, when a write's expected revision did not match. */
+export type ServerRecord = {
+  revision: number;
+  intent: WriteIntent;
 };
 
-export type Resolution =
-  | { kind: 'keep-local' }
-  | { kind: 'take-remote' }
-  | { kind: 'already-equal' }
-  | { kind: 'needs-review'; reason: ConflictReason };
+export type ConflictReason = 'edited-and-deleted' | 'photo-replaced' | 'competing-active-sessions';
 
-export type ConflictReason =
-  | 'edited-and-deleted'
-  | 'photo-replaced'
-  | 'both-sessions-active'
-  | 'same-timestamp';
-
-const changedSince = (version: RecordVersion, lastSyncedAt: string | null): boolean =>
-  lastSyncedAt === null || version.updatedAt > lastSyncedAt || Boolean(version.deletedAt && version.deletedAt > lastSyncedAt);
+export type WriteOutcome =
+  /** No conflict: expected revision matched, or the record did not exist yet. Apply as proposed. */
+  | { kind: 'applied' }
+  /**
+   * A conflict existed but nothing destructive was at stake — two ordinary
+   * edits landed close together. The incoming write is applied as the new
+   * current state; nothing is archived because nothing is lost, only
+   * superseded, which is what "last write wins" means for a non-destructive
+   * field.
+   */
+  | { kind: 'applied-over-conflict' }
+  /**
+   * A conflict where one side is applied and the other is preserved rather
+   * than discarded. `archive` describes what must be written to
+   * `conflict_archive` (or `toy_image_history` for a photo) so the losing
+   * side is recoverable, and `notify` is the one line a parent may see.
+   */
+  | { kind: 'resolved-with-archive'; reason: ConflictReason; winner: 'incoming' | 'server'; archive: WriteIntent; notify: string }
+  /**
+   * Both sides are the same play session going stale in the same way (e.g.
+   * both already completed). Converges with nothing to archive and nothing to
+   * tell anyone.
+   */
+  | { kind: 'converged' };
 
 /**
- * Reconciles one record.
- *
- * `lastSyncedAt` is the point both sides agreed. A side that has not changed
- * since then has nothing to contribute, so the other side simply wins without
- * being a conflict at all.
+ * Resolves one detected conflict. Called only after a CAS write's WHERE
+ * clause matched zero rows — `server` is what actually won the race.
  */
 export function resolveConflict(
   entity: SyncEntity,
-  local: RecordVersion,
-  remote: RecordVersion,
-  lastSyncedAt: string | null,
-): Resolution {
-  const localChanged = changedSince(local, lastSyncedAt);
-  const remoteChanged = changedSince(remote, lastSyncedAt);
+  server: ServerRecord | null,
+  incoming: WriteIntent,
+): WriteOutcome {
+  if (!server) return { kind: 'applied' };
 
-  if (!localChanged && !remoteChanged) return { kind: 'already-equal' };
-  if (localChanged && !remoteChanged) return { kind: 'keep-local' };
-  if (!localChanged && remoteChanged) return { kind: 'take-remote' };
+  const serverDeleted = server.intent.kind === 'delete';
+  const incomingDeleted = incoming.kind === 'delete';
 
-  // Both sides changed from here on.
+  // Both sides agree the record is gone. Deletion is idempotent, so this is
+  // not a conflict worth telling anyone about.
+  if (serverDeleted && incomingDeleted) return { kind: 'converged' };
 
-  const localDeleted = Boolean(local.deletedAt);
-  const remoteDeleted = Boolean(remote.deletedAt);
-
-  // Both removed it. Deletion is idempotent, so this converges safely.
-  if (localDeleted && remoteDeleted) return { kind: 'take-remote' };
-
-  // One deleted while the other edited. Applying either answer destroys real
-  // work, so a person decides.
-  if (localDeleted !== remoteDeleted) return { kind: 'needs-review', reason: 'edited-and-deleted' };
-
-  // A photograph cannot be regenerated. If both sides moved it, ask.
-  if (local.photoUri !== undefined && remote.photoUri !== undefined && local.photoUri !== remote.photoUri) {
-    return { kind: 'needs-review', reason: 'photo-replaced' };
+  // One side deleted, the other holds real content. The deletion is what the
+  // family sees — reappearing records look like a bug, not a recovery — but
+  // the content that would otherwise vanish is archived, not dropped.
+  if (serverDeleted !== incomingDeleted) {
+    const edited = serverDeleted ? incoming : server.intent;
+    return {
+      kind: 'resolved-with-archive',
+      reason: 'edited-and-deleted',
+      winner: serverDeleted ? 'server' : 'incoming',
+      archive: edited,
+      notify: describeEntity(entity, 'was deleted on another device. The edited version was kept and can be recovered from history.'),
+    };
   }
 
-  // Two devices each believe a child is mid-play. Picking one silently ends a
-  // session someone is actually in.
-  if (entity === 'play_session' && local.sessionActive && remote.sessionActive) {
-    return { kind: 'needs-review', reason: 'both-sessions-active' };
+  // Both sides are edits. A photo changed on both sides is destructive in a
+  // way an ordinary field edit is not — a photograph cannot be regenerated —
+  // so the losing one is archived instead of silently overwritten.
+  const serverPhoto = server.intent.kind === 'edit' ? server.intent.photoPath : undefined;
+  const incomingPhoto = incoming.kind === 'edit' ? incoming.photoPath : undefined;
+  if (serverPhoto !== undefined && incomingPhoto !== undefined && serverPhoto !== incomingPhoto) {
+    return {
+      kind: 'resolved-with-archive',
+      reason: 'photo-replaced',
+      winner: 'incoming',
+      archive: server.intent,
+      notify: describeEntity(entity, 'photo was changed on another device too. The other photo was kept in history.'),
+    };
   }
 
-  // Identical timestamps give no basis to choose, and guessing would be
-  // arbitrary rather than correct.
-  if (local.updatedAt === remote.updatedAt) return { kind: 'needs-review', reason: 'same-timestamp' };
+  // Two devices each believe a child is mid-play with an active session.
+  // Ending one silently would look like Pip forgot a child was playing, so the
+  // older one is explicitly closed as interrupted rather than just discarded.
+  if (
+    entity === 'play_session'
+    && server.intent.kind === 'edit' && server.intent.sessionActive
+    && incoming.kind === 'edit' && incoming.sessionActive
+  ) {
+    return {
+      kind: 'resolved-with-archive',
+      reason: 'competing-active-sessions',
+      winner: 'incoming',
+      archive: server.intent,
+      notify: 'A play session open on two devices was recovered — the older one was closed automatically.',
+    };
+  }
 
-  // Non-destructive edits on both sides: the newer one wins.
-  return remote.updatedAt > local.updatedAt ? { kind: 'take-remote' } : { kind: 'keep-local' };
+  // An ordinary field edit on both sides. The incoming write is what is
+  // happening *now*, in server-arrival order — that is the entire content of
+  // "last write wins" once no client clock is allowed to decide it.
+  return { kind: 'applied-over-conflict' };
 }
 
-/** Human-readable explanation, for the review screen. */
-export const CONFLICT_EXPLANATIONS: Record<ConflictReason, string> = {
-  'edited-and-deleted': 'This was removed on one device and changed on another. Choose which to keep.',
-  'photo-replaced': 'Two devices have different photos for this. Choose which photo to keep.',
-  'both-sessions-active': 'Two devices both show this as being played with right now.',
-  'same-timestamp': 'Two devices changed this at the same moment. Choose which to keep.',
+const ENTITY_LABEL: Record<SyncEntity, string> = {
+  room: 'A room',
+  storage_spot: 'A storage spot',
+  toy: 'A toy',
+  child_profile: 'A child profile',
+  play_session: 'A play session',
 };
 
-export function isDestructive(resolution: Resolution): boolean {
-  return resolution.kind === 'needs-review';
+function describeEntity(entity: SyncEntity, suffix: string): string {
+  return `${ENTITY_LABEL[entity]} ${suffix}`;
 }
