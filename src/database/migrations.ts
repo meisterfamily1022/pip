@@ -350,6 +350,53 @@ async function ensureHouseholdBackfill(database: DatabaseConnection): Promise<vo
   }
 }
 
+/**
+ * Local plumbing for remote sync, added alongside the account-scoped backup
+ * schema. None of this makes backup work by itself — it is what the sync
+ * service needs on the device to track progress and give a parent something
+ * honest to look at.
+ *
+ * `household_sync_state` is the device's high-water mark: the highest
+ * server-assigned revision this household has pulled. Restore and incremental
+ * pull both read from here rather than from any local clock.
+ *
+ * `sync_recovery_events` is the lightweight, non-blocking notification queue
+ * the agreed conflict policy calls for: a record is written only when an
+ * automatic resolution actually discarded something and archived it, never
+ * for an ordinary converging edit. The UI reads unacknowledged rows to show
+ * one line, not a screen.
+ *
+ * `toys.image_synced_fingerprint` lets an upload be skipped when a toy's photo
+ * has not changed since the last successful sync, and lets a photo conflict be
+ * detected precisely — comparing this against the fingerprint at upload time
+ * says whether the *local* image actually changed, independent of whatever the
+ * server holds.
+ */
+async function ensureSyncPlumbing(database: DatabaseConnection): Promise<void> {
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS household_sync_state (
+      household_id TEXT PRIMARY KEY NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      last_synced_revision INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_recovery_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      entity TEXT NOT NULL,
+      entity_local_id INTEGER,
+      reason TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      acknowledged_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS sync_recovery_events_household_index
+      ON sync_recovery_events(household_id, acknowledged_at);
+  `);
+
+  await addColumnIfMissing(database, 'toys', 'image_synced_fingerprint', 'TEXT');
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -502,6 +549,10 @@ const migrations: readonly Migration[] = [
   {
     version: 15,
     apply: ensureHouseholdBackfill,
+  },
+  {
+    version: 16,
+    apply: ensureSyncPlumbing,
   },
 ];
 
