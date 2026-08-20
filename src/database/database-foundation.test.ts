@@ -124,6 +124,11 @@ class TestDatabase implements DatabaseConnection {
     // migration's add-column-if-missing helper run without needing a schema
     // model here; migrations.test.ts and migration-integrity.test.ts cover that.
     if (source.startsWith('PRAGMA table_info')) return [];
+    // The rooms rebuild (migration 17) checks the whole database for
+    // foreign-key inconsistencies after it runs. This fake has no real
+    // referential integrity to check — real-SQLite coverage for that lives in
+    // migrations.test.ts — so reporting none lets the migration proceed.
+    if (source.startsWith('PRAGMA foreign_key_check')) return [];
     throw new Error(`Unhandled SQL: ${source}`);
   }
 }

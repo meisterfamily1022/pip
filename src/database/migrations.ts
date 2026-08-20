@@ -4,6 +4,22 @@ type Migration = {
   version: number;
   source?: string;
   apply?: (database: DatabaseConnection) => Promise<void>;
+  /**
+   * Opts this migration out of the runner's own transaction.
+   *
+   * SQLite refuses `PRAGMA foreign_keys = OFF` from inside a transaction, so a
+   * migration that needs to relax a column-level constraint SQLite has no
+   * ALTER for (rebuilding a table under foreign-key checks disabled, then
+   * re-enabling them) cannot do that work inside the wrapper every other
+   * migration runs in. A migration that sets this is solely responsible for
+   * its own BEGIN/COMMIT, for turning foreign key enforcement back on before
+   * it returns, and for verifying the result with `PRAGMA foreign_key_check`
+   * — the runner does none of that for it. Reserved for the rare migration
+   * that genuinely needs it; everything else stays inside the shared
+   * transaction, which is what makes a mid-migration failure roll back
+   * cleanly.
+   */
+  managesOwnTransaction?: boolean;
 };
 
 type TableInfoRow = {
@@ -397,6 +413,103 @@ async function ensureSyncPlumbing(database: DatabaseConnection): Promise<void> {
   await addColumnIfMissing(database, 'toys', 'image_synced_fingerprint', 'TEXT');
 }
 
+/**
+ * Relaxes `rooms.name` from a device-wide UNIQUE to one scoped per household.
+ *
+ * The constraint dates from migration 1, before accounts existed, and was
+ * never revisited when migration 9 gave every row a household. It went
+ * unnoticed because nothing exercised two households' rows coexisting in the
+ * same local tables until restore did — at which point a second household
+ * with an ordinarily-named room ("Playroom", "Bedroom") collides with
+ * whatever the device's own household already has, and a valid restore would
+ * either fail outright or have to skip a room that did nothing wrong.
+ *
+ * SQLite has no ALTER TABLE for dropping a column-level UNIQUE, so this is a
+ * full rebuild — and the specific ordering matters. The naive approach is to
+ * rename `rooms` out of the way, create a fresh `rooms`, copy data, and drop
+ * the renamed original; that fails, because SQLite's ALTER TABLE RENAME
+ * rewrites *every other table's* REFERENCES clause to follow the rename, so
+ * `storage_spots.room_id` and `toys.room_id` end up pointing at the
+ * now-dropped renamed table instead of the new one. The correct order never
+ * renames the original away: build the replacement under a temporary name,
+ * copy into it, drop the *original*, then rename the replacement into the
+ * vacated final name. Nothing else's schema is ever touched, because nothing
+ * else was ever renamed — `storage_spots` and `toys` still just say
+ * `REFERENCES rooms(id)`, which resolves correctly once a table by that name
+ * exists again.
+ *
+ * `PRAGMA foreign_keys = OFF` has to happen before BEGIN — SQLite refuses to
+ * change it inside a transaction — which is why this migration manages its
+ * own transaction instead of running inside the runner's shared one. It is
+ * switched back on and the whole database is checked with
+ * `PRAGMA foreign_key_check` before this returns; a single inconsistency
+ * throws rather than lets a broken schema reach `PRAGMA user_version`.
+ */
+async function ensureRoomsHouseholdScopedUniqueness(database: DatabaseConnection): Promise<void> {
+  await database.execAsync('PRAGMA foreign_keys = OFF;');
+  try {
+    await database.execAsync('BEGIN;');
+    try {
+      await database.execAsync(`
+        CREATE TABLE rooms_rebuild (
+          id INTEGER PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL COLLATE NOCASE CHECK (length(trim(name)) > 0),
+          household_id TEXT REFERENCES households(id) ON DELETE RESTRICT,
+          is_sample INTEGER NOT NULL DEFAULT 0 CHECK (is_sample IN (0, 1)),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        INSERT INTO rooms_rebuild (id, name, household_id, is_sample, created_at, updated_at)
+          SELECT id, name, household_id, is_sample, created_at, updated_at FROM rooms;
+
+        DROP TABLE rooms;
+        ALTER TABLE rooms_rebuild RENAME TO rooms;
+
+        -- Re-declares the index migration 9 created on the dropped table, and
+        -- replaces the old device-wide uniqueness with one scoped per
+        -- household. NOCASE on the column already makes comparisons
+        -- case-insensitive, so the index needs no separate collation.
+        CREATE INDEX IF NOT EXISTS rooms_household_index ON rooms(household_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS rooms_household_name_unique ON rooms(household_id, name);
+      `);
+      await database.execAsync('COMMIT;');
+    } catch (error) {
+      await database.execAsync('ROLLBACK;');
+      throw error;
+    }
+  } finally {
+    await database.execAsync('PRAGMA foreign_keys = ON;');
+  }
+
+  const problems = await database.getAllAsync<{ table: string; rowid: number }>('PRAGMA foreign_key_check;');
+  if (problems.length > 0) {
+    throw new Error(
+      `Rebuilding rooms left ${problems.length} foreign-key inconsistency(ies): ${JSON.stringify(problems)}.`,
+    );
+  }
+}
+
+/**
+ * Scopes the one-active-Guest-session-at-a-time rule to a household.
+ *
+ * `COALESCE(child_id, -1)` was how migration 12 made Guest share one reserved
+ * key so two Guest sessions could not both be active — correct when a device
+ * held one household, wrong now that two can coexist. A device-local
+ * household and a restored household must each be able to run their own
+ * Guest session; nothing about one blocks the other from actually playing.
+ *
+ * A plain index swap, unlike the rooms rebuild above: no column-level
+ * constraint is involved, so this runs in the runner's ordinary transaction.
+ */
+async function ensurePlaySessionGuestIndexScoped(database: DatabaseConnection): Promise<void> {
+  await database.execAsync(`
+    DROP INDEX IF EXISTS active_play_session_per_participant;
+    CREATE UNIQUE INDEX IF NOT EXISTS active_play_session_per_household_participant
+      ON play_sessions(household_id, COALESCE(child_id, -1)) WHERE status = 'active';
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -554,6 +667,15 @@ const migrations: readonly Migration[] = [
     version: 16,
     apply: ensureSyncPlumbing,
   },
+  {
+    version: 17,
+    apply: ensureRoomsHouseholdScopedUniqueness,
+    managesOwnTransaction: true,
+  },
+  {
+    version: 18,
+    apply: ensurePlaySessionGuestIndexScoped,
+  },
 ];
 
 /**
@@ -588,11 +710,20 @@ export async function runMigrations(
   for (const migration of migrations) {
     if (migration.version <= currentVersion) continue;
     if (migration.version > upTo) break;
-    await database.withTransactionAsync(async () => {
+    if (migration.managesOwnTransaction) {
+      // No wrapper here — the migration owns BEGIN/COMMIT and the
+      // foreign_keys pragma itself, and is expected to leave both the
+      // transaction and foreign-key enforcement closed out before returning.
       if (migration.source) await database.execAsync(migration.source);
       if (migration.apply) await migration.apply(database);
       await database.execAsync(`PRAGMA user_version = ${migration.version};`);
-    });
+    } else {
+      await database.withTransactionAsync(async () => {
+        if (migration.source) await database.execAsync(migration.source);
+        if (migration.apply) await migration.apply(database);
+        await database.execAsync(`PRAGMA user_version = ${migration.version};`);
+      });
+    }
     currentVersion = migration.version;
   }
 

@@ -136,11 +136,16 @@ export type RestoreSummary = {
 /**
  * Applies pulled rows into the local database.
  *
- * Each row is written in its own attempt so one bad row — most plausibly a
- * room name colliding with something already on the device from a different
- * household — does not abort the rest of a family's library. A skip is
- * reported, never silent: `RestoreSkip` is what a parent-facing recovery
- * screen reads to say precisely what did not come back and why.
+ * Two different households sharing an ordinary room name is not an error —
+ * `rooms` is uniquely constrained per household (migration 17), so that case
+ * restores normally and produces no skip. What lands in `RestoreSkip` now is
+ * only what it should always have meant: a row this device genuinely could
+ * not write — a foreign key the rest of the payload never supplied, a value
+ * that fails a check constraint, truly corrupt data. Each row is written in
+ * its own attempt so one such row does not abort the rest of a family's
+ * library, and a skip is reported, never silent: `RestoreSkip` is what a
+ * parent-facing recovery screen reads to say precisely what did not come back
+ * and why.
  *
  * Applied in dependency order: a storage spot needs its room to exist, a toy
  * needs both, a play session needs its toy.
@@ -160,11 +165,7 @@ export async function applyRestoredRows(
         await applyOneRow(database, householdId, row);
         incrementSummary(summary, entity);
       } catch (caught: unknown) {
-        summary.skipped.push({
-          entity,
-          localId: row.localId,
-          reason: caught instanceof Error ? caught.message : 'Could not be restored.',
-        });
+        summary.skipped.push({ entity, localId: row.localId, reason: skipReason(caught) });
       }
     }
   }
@@ -178,6 +179,23 @@ function incrementSummary(summary: RestoreSummary, entity: SyncEntity): void {
   else if (entity === 'toy') summary.toys += 1;
   else if (entity === 'child_profile') summary.childProfiles += 1;
   else if (entity === 'play_session') summary.playSessions += 1;
+}
+
+/**
+ * `instanceof Error` is not reliable here: a native SQLite binding's error,
+ * carried through Babel's regenerator-transformed async/await, can cross a
+ * realm boundary and fail that check even though it is a completely ordinary
+ * error with a real `.message` — losing the actual reason a row could not be
+ * restored is exactly the kind of silent downgrade a skip report exists to
+ * avoid, so the message is read structurally rather than trusting the
+ * prototype chain.
+ */
+function skipReason(caught: unknown): string {
+  if (caught instanceof Error) return caught.message;
+  if (typeof caught === 'object' && caught !== null && 'message' in caught && typeof caught.message === 'string') {
+    return caught.message;
+  }
+  return 'Could not be restored.';
 }
 
 async function applyOneRow(database: DatabaseConnection, householdId: string, row: RemoteRow): Promise<void> {

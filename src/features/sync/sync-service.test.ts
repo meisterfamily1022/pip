@@ -254,11 +254,12 @@ describe('restore', () => {
     expect(await listRooms(database)).toHaveLength(0);
   });
 
-  it('reports a colliding room by name as an actionable skip rather than aborting the whole restore', async () => {
+  it('restores a room whose name collides with a different household on the device — not a conflict at all', async () => {
     const database = await freshDatabase();
-    // A different household on this device already has a room named "Playroom" —
-    // the pre-existing global uniqueness on rooms.name (see the sync report)
-    // collides. Restore must not silently lose the rest of the library over it.
+    // A different household on this device already has a room named
+    // "Playroom". Migration 17 scopes room-name uniqueness per household, so
+    // this is not a collision — restoring this room must succeed normally,
+    // not be treated as something to skip.
     await database.runAsync(
       `INSERT INTO households (id, name, is_local_only, created_at, updated_at) VALUES ('some-other-household', 'Other', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
     );
@@ -272,10 +273,34 @@ describe('restore', () => {
 
     const summary = await applyRestoredRows(database, HOUSEHOLD, rows);
 
-    expect(summary.rooms).toBe(0);
-    expect(summary.skipped).toContainEqual(expect.objectContaining({ entity: 'room', localId: 1 }));
-    // The rest of the restore proceeded — one bad row did not take the family's
-    // children down with it.
+    expect(summary.rooms).toBe(1);
+    expect(summary.skipped).toHaveLength(0);
+    expect(summary.childProfiles).toBe(1);
+    const restored = await database.getFirstAsync<{ name: string; household_id: string }>(
+      'SELECT name, household_id FROM rooms WHERE id = 1;',
+    );
+    expect(restored).toEqual({ name: 'Playroom', household_id: HOUSEHOLD });
+    // The other household's room, sharing the same name, is untouched.
+    const other = await database.getFirstAsync<{ name: string }>('SELECT name FROM rooms WHERE id = 999;');
+    expect(other?.name).toBe('Playroom');
+  });
+
+  it('still reports a row-level skip for genuinely corrupt remote data, without aborting the rest of the restore', async () => {
+    const database = await freshDatabase();
+    // A storage spot referencing a room that was never included in this
+    // payload at all — not a name collision, an actually malformed row: the
+    // foreign key it needs simply does not exist.
+    const rows: RemoteRow[] = [
+      row({ entity: 'child_profile', localId: 1, data: { name: 'Ari' } }),
+      row({ entity: 'storage_spot', localId: 1, data: { name: 'Shelf', roomLocalId: 9999 } }),
+    ];
+
+    const summary = await applyRestoredRows(database, HOUSEHOLD, rows);
+
+    expect(summary.storageSpots).toBe(0);
+    expect(summary.skipped).toContainEqual(expect.objectContaining({ entity: 'storage_spot', localId: 1 }));
+    // The rest of the restore proceeded — one genuinely bad row did not take
+    // the family's children down with it.
     expect(summary.childProfiles).toBe(1);
   });
 
