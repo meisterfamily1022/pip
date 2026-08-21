@@ -3,6 +3,7 @@ import { RealSqliteConnection } from '@/database/real-sqlite-connection.test-hel
 import type { DatabaseConnection } from '@/database/types';
 
 import { backUpHousehold, BackupNotYoursError, isTransient, restoreHousehold } from './backup-service';
+import { describeBackupStatus, loadBackupStatus } from './backup-status';
 import type { RemoteHouseholdGateway } from './remote-gateway';
 import { FakeHouseholdGateway, FakeToyImageStorage } from './test-fakes';
 
@@ -260,6 +261,32 @@ describe('restoring onto a clean device', () => {
     expect(rooms).toEqual([{ name: 'Bedroom' }, { name: 'Playroom' }]);
     const children = await device.getAllAsync<{ name: string }>('SELECT name FROM child_profiles;');
     expect(children).toEqual([{ name: 'Maya' }]);
+  });
+
+  it('reports the restored library as backed up, not as nothing', async () => {
+    const { gateway, storage } = await backedUpLibrary();
+    const device = await freshDatabase();
+
+    const outcome = await restoreHousehold(deps(device, gateway, storage));
+    expect(outcome.restored).toBe(true);
+
+    // The Account screen counts the queue rather than trusting a flag, so an
+    // empty queue on a device whose library just came back from the server
+    // reads as "Everything is backed up — 0 records".
+    const status = await loadBackupStatus(device, LOCAL_HOUSEHOLD_ID);
+    expect(status).toMatchObject({ linked: true, sent: 7, waiting: 0, failed: 0 });
+    expect(describeBackupStatus(status)).toBe('Everything is backed up — 7 records.');
+  });
+
+  it('does not resend a restored library on the next backup', async () => {
+    const { gateway, storage } = await backedUpLibrary();
+    const device = await freshDatabase();
+    await restoreHousehold(deps(device, gateway, storage));
+
+    const again = await backUpHousehold(deps(device, gateway, storage));
+
+    expect(again.sent).toBe(0);
+    expect(again.photosUploaded).toBe(0);
   });
 
   it('says plainly when the account has no backup rather than reporting an empty success', async () => {

@@ -235,6 +235,12 @@ export async function unlinkHouseholdFromAccount(
  *   server. They describe this family's toys and what they removed, so keeping
  *   them after the account is deleted also keeps data the parent asked to be
  *   rid of.
+ * - `toys.image_synced_fingerprint` is a claim that a photograph is already in
+ *   a bucket that no longer holds anything for this device. Left behind, the
+ *   next backup skips the upload as unchanged and writes a toy row with no
+ *   image_path at all — so the photo is not merely stale, it is silently
+ *   absent from the backup, and a later restore brings the toy back without
+ *   its picture.
  *
  * What is deliberately *not* removed is the library itself. A parent deleting
  * an account is ending a login, not asking for their children's toys to be
@@ -264,6 +270,10 @@ export async function clearRemoteLinkageAndSyncState(
     await database.runAsync('DELETE FROM household_sync_state WHERE household_id = ?;', householdId);
     await database.runAsync('DELETE FROM sync_operations WHERE household_id = ?;', householdId);
     await database.runAsync('DELETE FROM deleted_records WHERE household_id = ?;', householdId);
+    await database.runAsync(
+      'UPDATE toys SET image_synced_fingerprint = NULL WHERE household_id = ?;',
+      householdId,
+    );
   });
   return unlinked;
 }

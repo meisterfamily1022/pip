@@ -326,5 +326,42 @@ export async function restoreHousehold(
 
   const summary = await applyRestoredRows(database, householdId, prepared);
   await markSyncedRevision(database, householdId, latestRevision);
+  await markRestoredRowsAsBackedUp(database, householdId, prepared);
   return { restored: true, summary, photosRestored, photosMissing };
+}
+
+/**
+ * Records everything a restore brought back as already backed up.
+ *
+ * Without this the queue is empty on a restored device, and the Account screen
+ * — which reports what is outstanding, deliberately, rather than trusting a
+ * flag — reads "Everything is backed up — 0 records" to a parent looking at a
+ * library that has just come back from the server. Every row is demonstrably on
+ * the server at the revision just pulled, so `done` is the honest entry, and it
+ * also stops the next backup resending a library it did not change.
+ *
+ * Tombstoned rows are skipped for the same reason they are skipped on the way
+ * in: there is nothing on this device for them to describe.
+ */
+async function markRestoredRowsAsBackedUp(
+  database: DatabaseConnection,
+  householdId: string,
+  rows: readonly RemoteRow[],
+): Promise<void> {
+  const timestamp = new Date().toISOString();
+  await database.withTransactionAsync(async () => {
+    for (const row of rows) {
+      if (row.deletedAt) continue;
+      await database.runAsync(
+        `INSERT INTO sync_operations (entity, entity_id, household_id, status, attempts, created_at, updated_at)
+         VALUES (?, ?, ?, 'done', 0, ?, ?)
+         ON CONFLICT (entity, entity_id, household_id) DO UPDATE SET status = 'done', updated_at = excluded.updated_at;`,
+        row.entity,
+        String(row.localId),
+        householdId,
+        timestamp,
+        timestamp,
+      );
+    }
+  });
 }

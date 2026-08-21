@@ -8,6 +8,7 @@ import { PrimaryButton } from '@/components/onboarding-controls';
 import { QuietButton, RoundedTextInput } from '@/components/playmap-ui';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { AuthRequestError, resendVerification, verifyEmail } from './auth-client';
+import { otpSendLog } from './otp-send-log';
 import { readSupportContact, resendState, sentConfirmation } from './resend-cooldown';
 import { pendingVerification } from './sign-up-form';
 
@@ -26,7 +27,25 @@ export function VerifyEmailScreen() {
   const submittingRef = useRef(false);
   const resendingRef = useRef(false);
 
-  useEffect(() => { void pendingVerification.get().then(setEmail); }, []);
+  // The address and the code already sent to it are read together: the first
+  // code was requested on the previous screen, so starting from "nothing sent
+  // yet" left the cooldown off for exactly the press most likely to hit the
+  // server's per-address limit.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const pending = await pendingVerification.get();
+      if (cancelled) return;
+      setEmail(pending);
+      if (!pending) return;
+      const sent = await otpSendLog.forEmail(pending);
+      if (cancelled || !sent) return;
+      setLastSentAt(sent.sentAt);
+      setAttempts(sent.attempts);
+      setNow(Date.now());
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (lastSentAt === null) return undefined;
@@ -54,13 +73,14 @@ export function VerifyEmailScreen() {
     setResending(true); setError(null); setNotice(null); setCode('');
     try {
       await resendVerification(email);
-      const sent = attempts + 1;
-      setAttempts(sent);
-      // Only a send the server accepted starts the cooldown, so a failed one
-      // does not lock the parent out of retrying.
-      setLastSentAt(Date.now());
+      // Read back rather than incremented locally: the log is the one place a
+      // send is recorded, and only a send the server accepted appears in it, so
+      // a failed one cannot lock the parent out of retrying.
+      const sent = (await otpSendLog.forEmail(email)) ?? { sentAt: Date.now(), attempts: attempts + 1 };
+      setAttempts(sent.attempts);
+      setLastSentAt(sent.sentAt);
       setNow(Date.now());
-      setNotice(sentConfirmation(email, sent));
+      setNotice(sentConfirmation(email, sent.attempts));
     } catch (caught: unknown) {
       setError(caught instanceof AuthRequestError ? caught.message : 'We could not reach the server. Try again shortly.');
     } finally { resendingRef.current = false; setResending(false); }

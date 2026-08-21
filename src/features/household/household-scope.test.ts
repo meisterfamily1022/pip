@@ -227,6 +227,12 @@ describe('clearing a device after the account behind it was deleted', () => {
       "INSERT INTO deleted_records (entity, entity_id, household_id, deleted_at) VALUES ('toy', '9', ?, CURRENT_TIMESTAMP);",
       LOCAL_HOUSEHOLD_ID,
     );
+    await database.execAsync(`
+      INSERT INTO rooms (id, name, household_id, created_at, updated_at) VALUES (9, 'Backed-up room', '${LOCAL_HOUSEHOLD_ID}', 'x', 'x');
+      INSERT INTO storage_spots (id, room_id, name, household_id, created_at, updated_at) VALUES (9, 9, 'Bin', '${LOCAL_HOUSEHOLD_ID}', 'x', 'x');
+      INSERT INTO toys (id, name, image_uri, image_synced_fingerprint, room_id, storage_spot_id, household_id, created_at, updated_at)
+        VALUES (9, 'Tiles', 'file:///t.jpg', 'md5-abc', 9, 9, '${LOCAL_HOUSEHOLD_ID}', 'x', 'x');
+    `);
   }
 
   it('removes every trace of the deleted remote household', async () => {
@@ -239,6 +245,14 @@ describe('clearing a device after the account behind it was deleted', () => {
     expect(household?.ownerAccountId).toBeNull();
     expect(household?.remoteId).toBeNull();
     expect(household?.isLocalOnly).toBe(true);
+
+    // A photo the device still believes is uploaded would be skipped by the
+    // next backup, leaving the remote toy with no image_path at all.
+    const toys = await database.getAllAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM toys WHERE household_id = ? AND image_synced_fingerprint IS NOT NULL;',
+      LOCAL_HOUSEHOLD_ID,
+    );
+    expect(toys[0].count).toBe(0);
 
     for (const table of ['household_sync_state', 'sync_operations', 'deleted_records']) {
       const rows = await database.getAllAsync<{ count: number }>(
@@ -259,8 +273,12 @@ describe('clearing a device after the account behind it was deleted', () => {
 
     await clearRemoteLinkageAndSyncState(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
 
-    const rooms = await database.getAllAsync<{ name: string }>('SELECT name FROM rooms;');
-    expect(rooms).toEqual([{ name: 'Playroom' }]);
+    const rooms = await database.getAllAsync<{ name: string }>('SELECT name FROM rooms ORDER BY name;');
+    // Both the seeded room and the one this test added: unlinking touches
+    // linkage and sync bookkeeping, never the library itself.
+    expect(rooms).toEqual([{ name: 'Backed-up room' }, { name: 'Playroom' }]);
+    const toys = await database.getAllAsync<{ name: string; image_uri: string }>('SELECT name, image_uri FROM toys;');
+    expect(toys).toEqual([{ name: 'Tiles', image_uri: 'file:///t.jpg' }]);
   });
 
   it('refuses to unlink a household owned by somebody else, and keeps their queue intact', async () => {
