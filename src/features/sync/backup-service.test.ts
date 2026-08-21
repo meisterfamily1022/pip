@@ -223,14 +223,41 @@ describe('restoring onto a clean device', () => {
     expect(toy?.image_uri).toBeNull();
   });
 
-  it('refuses to merge into a device that already has a library', async () => {
+  it('refuses outright when the device already has toys of its own', async () => {
     const { gateway, storage } = await backedUpLibrary();
     const device = await freshDatabase();
     await seedLibrary(device);
 
     const outcome = await restoreHousehold(deps(device, gateway, storage));
 
-    expect(outcome).toEqual({ restored: false, reason: expect.stringContaining('clean install') });
+    expect(outcome).toMatchObject({ restored: false, reason: expect.stringContaining('toys of its own') });
+    expect(outcome).not.toMatchObject({ needsConfirmation: true });
+  });
+
+  it('asks before replacing what setup created, and replaces it once told to', async () => {
+    const { gateway, storage } = await backedUpLibrary();
+    const device = await freshDatabase();
+    // Exactly what setup leaves behind: a room, a spot and a child, no toys.
+    await device.execAsync(`
+      INSERT INTO rooms (id, name, household_id, created_at, updated_at) VALUES (1, 'Setup Room', '${LOCAL_HOUSEHOLD_ID}', 'x', 'x');
+      INSERT INTO storage_spots (id, room_id, name, household_id, created_at, updated_at) VALUES (1, 1, 'Setup Shelf', '${LOCAL_HOUSEHOLD_ID}', 'x', 'x');
+      INSERT INTO child_profiles (id, name, household_id, created_at, updated_at) VALUES (1, 'Temp', '${LOCAL_HOUSEHOLD_ID}', 'x', 'x');
+    `);
+
+    const asked = await restoreHousehold(deps(device, gateway, storage));
+    expect(asked).toMatchObject({ restored: false, needsConfirmation: true });
+    // Nothing touched while the answer is still pending.
+    expect(await device.getAllAsync('SELECT id FROM rooms;')).toHaveLength(1);
+
+    const done = await restoreHousehold(deps(device, gateway, storage), { replaceSetup: true });
+    expect(done.restored).toBe(true);
+    if (!done.restored) return;
+    expect(done.summary).toMatchObject({ rooms: 2, storageSpots: 1, toys: 2, childProfiles: 1 });
+
+    const rooms = await device.getAllAsync<{ name: string }>('SELECT name FROM rooms ORDER BY name;');
+    expect(rooms).toEqual([{ name: 'Bedroom' }, { name: 'Playroom' }]);
+    const children = await device.getAllAsync<{ name: string }>('SELECT name FROM child_profiles;');
+    expect(children).toEqual([{ name: 'Maya' }]);
   });
 
   it('says plainly when the account has no backup rather than reporting an empty success', async () => {

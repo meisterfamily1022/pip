@@ -194,7 +194,7 @@ describe('pullChanges', () => {
 describe('restore eligibility', () => {
   it('allows restoring into an empty household', async () => {
     const database = await freshDatabase();
-    expect(await checkRestoreEligibility(database, HOUSEHOLD)).toEqual({ eligible: true });
+    expect(await checkRestoreEligibility(database, HOUSEHOLD)).toEqual({ eligible: true, replacesSetup: false });
   });
 
   it('refuses to restore into a household that already has toys, to avoid an id collision', async () => {

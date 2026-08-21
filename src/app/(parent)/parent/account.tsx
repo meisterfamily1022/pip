@@ -52,7 +52,7 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * particular library is linked to the account, because "your library stays on
  * this device" is true either way but seriously incomplete when it is linked.
  */
-type Pending = 'signOut' | 'switch' | 'delete' | null;
+type Pending = 'signOut' | 'switch' | 'delete' | 'restore' | null;
 
 export default function NativeAccountRoute() {
   const session = useSyncExternalStore(subscribeSession, getSessionSnapshot, getSessionSnapshot);
@@ -69,6 +69,7 @@ export default function NativeAccountRoute() {
   const [notice, setNotice] = useState<string | null>(null);
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
 
   // Reloaded on focus as well as on session change: returning from sign-in
   // should never leave a stale "Not signed in" behind.
@@ -191,7 +192,7 @@ export default function NativeAccountRoute() {
     }
   };
 
-  const runRestore = async (): Promise<void> => {
+  const runRestore = async (replaceSetup = false): Promise<void> => {
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(true); setError(null); setNotice(null); setProgress('Looking for your backup…');
@@ -203,10 +204,13 @@ export default function NativeAccountRoute() {
         gateway: supabaseHouseholdGateway,
         storage: expoToyImageStorage,
         householdId,
-      });
+      }, { replaceSetup });
       if (!outcome.restored) {
-        setError(outcome.reason);
+        // A device fresh out of setup is not a refusal, it is a question.
+        if (outcome.needsConfirmation) { setConfirming('restore'); setRestoreNote(outcome.reason); }
+        else setError(outcome.reason);
       } else {
+        setConfirming(null);
         const { summary, photosRestored, photosMissing } = outcome;
         const missing = photosMissing > 0 ? ` ${photosMissing} photo${photosMissing === 1 ? '' : 's'} could not be downloaded.` : '';
         const skipped = summary.skipped.length > 0 ? ` ${summary.skipped.length} record${summary.skipped.length === 1 ? '' : 's'} could not be restored.` : '';
@@ -355,6 +359,17 @@ export default function NativeAccountRoute() {
         <SecondaryButton label="Manage children" onPress={() => router.push('/parent/children')} />
         <SecondaryButton label="Open settings" onPress={() => router.push('/parent/settings')} />
       </FormCard>
+
+      <ConfirmationDialog
+        busy={busy && confirming === 'restore'}
+        cancelLabel="Keep this setup"
+        confirmLabel={busy && confirming === 'restore' ? 'Restoring…' : 'Replace and restore'}
+        message={restoreNote ?? ''}
+        onCancel={() => { setConfirming(null); setRestoreNote(null); }}
+        onConfirm={() => void runRestore(true)}
+        title="Replace what you just set up?"
+        visible={confirming === 'restore'}
+      />
 
       <ConfirmationDialog
         busy={busy && confirming === 'signOut'}

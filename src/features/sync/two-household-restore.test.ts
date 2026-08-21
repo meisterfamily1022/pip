@@ -45,7 +45,7 @@ describe('two households, same room name, one device', () => {
     await backUpHouseholdToAccount(database, 'local', ACCOUNT_A);
     const householdB = await activateHouseholdForAccount(database, ACCOUNT_B);
     expect(householdB).not.toBe('local');
-    expect(await checkRestoreEligibility(database, householdB)).toEqual({ eligible: true });
+    expect(await checkRestoreEligibility(database, householdB)).toEqual({ eligible: true, replacesSetup: false });
 
     // Household B's remote backup: a room named "Playroom", a real photo.
     const gateway = new FakeHouseholdGateway();

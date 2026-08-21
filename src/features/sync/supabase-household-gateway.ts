@@ -208,17 +208,24 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
     const { data: signed, error: signError } = await supabase.storage
       .from('toy-images')
       .createSignedUrl(path, SIGNATURE_SECONDS);
-    if (signError || !signed?.signedUrl) throw new Error('This photo could not be restored.');
-    const signedResponse = await fetch(signed.signedUrl);
-    if (!signedResponse.ok) throw new Error('This photo could not be restored.');
-    const data = await signedResponse.blob();
-    if (!data) throw new Error('This photo could not be restored.');
+    if (signError || !signed?.signedUrl) {
+      throw new Error(`This photo could not be restored: ${signError?.message ?? 'no signed URL was issued'}`);
+    }
+
     const { Directory, File, Paths } = await import('expo-file-system');
     const directory = new Directory(Paths.cache, 'pip-restore');
     if (!directory.exists) directory.create({ intermediates: true, idempotent: true });
+
+    // Straight to disk, for the same reason the upload side reads from it:
+    // React Native's Blob does not reliably produce an ArrayBuffer, and going
+    // through one wrote an empty file — which restore then counted as a photo
+    // that could not be downloaded, on a download that had actually succeeded.
     const destination = new File(directory, `${Date.now()}-${path.replace(/\//g, '-')}`);
-    const buffer = await data.arrayBuffer();
-    destination.write(new Uint8Array(buffer));
-    return { tempUri: destination.uri };
+    try {
+      const downloaded = await File.downloadFileAsync(signed.signedUrl, destination);
+      return { tempUri: downloaded.uri };
+    } catch (caught: unknown) {
+      throw new Error(`This photo could not be restored: ${caught instanceof Error ? caught.message : 'the download failed'}`);
+    }
   },
 };

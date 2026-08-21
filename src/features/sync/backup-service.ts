@@ -8,6 +8,7 @@ import type { RemoteHouseholdGateway, RemoteRow } from './remote-gateway';
 import {
   applyRestoredRows,
   checkRestoreEligibility,
+  clearSetupPlaceholders,
   ensureRemoteHousehold,
   getSyncedRevision,
   markSyncedRevision,
@@ -237,7 +238,7 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
 }
 
 export type RestoreOutcome =
-  | { restored: false; reason: string }
+  | { restored: false; reason: string; needsConfirmation?: boolean }
   | { restored: true; summary: RestoreSummary; photosRestored: number; photosMissing: number };
 
 /**
@@ -250,11 +251,22 @@ export type RestoreOutcome =
  * is still restored — a library missing one picture is worth far more to a
  * family than no library at all.
  */
-export async function restoreHousehold(deps: BackupDeps): Promise<RestoreOutcome> {
+export async function restoreHousehold(
+  deps: BackupDeps,
+  /**
+   * Set once the parent has agreed to replace what setup created. Without it a
+   * device that has been through setup is reported as needing confirmation
+   * rather than quietly having its room and child replaced.
+   */
+  options: { replaceSetup?: boolean } = {},
+): Promise<RestoreOutcome> {
   const { database, gateway, storage, householdId } = deps;
 
   const eligibility = await checkRestoreEligibility(database, householdId);
   if (!eligibility.eligible) return { restored: false, reason: eligibility.message };
+  if (eligibility.replacesSetup && !options.replaceSetup) {
+    return { restored: false, needsConfirmation: true, reason: eligibility.message };
+  }
 
   const remoteHouseholdId = await ensureRemoteHousehold(database, gateway, householdId);
   const since = await getSyncedRevision(database, householdId);
@@ -281,6 +293,11 @@ export async function restoreHousehold(deps: BackupDeps): Promise<RestoreOutcome
       prepared.push(row);
     }
   }
+
+  // Last possible moment, and only after every photograph is already on disk:
+  // if the download stage had thrown, the device would still have what setup
+  // gave it rather than nothing at all.
+  if (eligibility.replacesSetup) await clearSetupPlaceholders(database, householdId);
 
   const summary = await applyRestoredRows(database, householdId, prepared);
   await markSyncedRevision(database, householdId, latestRevision);

@@ -88,7 +88,14 @@ export async function pullChanges(
 const now = (): string => new Date().toISOString();
 
 export type RestoreEligibility =
-  | { eligible: true }
+  /** Nothing on the device; restore can simply proceed. */
+  | { eligible: true; replacesSetup: false }
+  /**
+   * Only what setup itself just created: a room, a spot and a child profile,
+   * and no toys and no play. Restoring replaces those, with the parent's
+   * explicit say-so.
+   */
+  | { eligible: true; replacesSetup: true; message: string }
   | { eligible: false; reason: 'not-empty'; message: string };
 
 /**
@@ -97,29 +104,68 @@ export type RestoreEligibility =
  * Local integer ids are only unique within the device that assigned them —
  * restoring a second household's rows onto a device that already holds
  * unrelated local content would need every id remapped, and nothing here does
- * that yet. So restore is offered only into a household with nothing in it,
- * which is exactly the "clean install" scenario the backup feature is proven
- * against. Merging a restore into an already-populated household is refused
- * rather than attempted unsafely.
+ * that yet. So a device with a real library is refused rather than merged
+ * unsafely.
+ *
+ * "Real library", though, is not the same as "not empty", and treating them as
+ * the same made restore unreachable in the shipped app. Setup requires a room,
+ * a storage spot and a child before Account & data can be opened at all, so by
+ * the time a parent can ask to restore, the device is never empty and the
+ * answer was always no — on the one device that most needs it, a new iPhone.
+ *
+ * What the guard is really protecting is a family's own work. A room and a
+ * child typed thirty seconds ago on a phone with no toys and no play history is
+ * not that, so it is offered as a replacement the parent confirms, and anything
+ * with a single toy or a single play session in it is still refused outright.
  */
 export async function checkRestoreEligibility(
   database: DatabaseConnection,
   householdId: string,
 ): Promise<RestoreEligibility> {
-  const existing = await database.getFirstAsync<{ id: number }>(
-    'SELECT id FROM toys WHERE household_id = ? UNION ALL SELECT id FROM rooms WHERE household_id = ? UNION ALL SELECT id FROM child_profiles WHERE household_id = ? LIMIT 1;',
-    householdId,
+  const invested = await database.getFirstAsync<{ id: number }>(
+    'SELECT id FROM toys WHERE household_id = ? UNION ALL SELECT id FROM play_sessions WHERE household_id = ? LIMIT 1;',
     householdId,
     householdId,
   );
-  if (existing) {
+  if (invested) {
     return {
       eligible: false,
       reason: 'not-empty',
-      message: 'This device already has toys, rooms or children. Restore is only available onto a clean install.',
+      message: 'This device already has toys of its own. Restore is only available onto a device that has not been used yet.',
     };
   }
-  return { eligible: true };
+
+  const fromSetup = await database.getFirstAsync<{ id: number }>(
+    'SELECT id FROM rooms WHERE household_id = ? UNION ALL SELECT id FROM child_profiles WHERE household_id = ? LIMIT 1;',
+    householdId,
+    householdId,
+  );
+  if (fromSetup) {
+    return {
+      eligible: true,
+      replacesSetup: true,
+      message: 'The room and child you just set up will be replaced by the ones in your backup. No toys or play history exist on this device yet, so nothing else is lost.',
+    };
+  }
+
+  return { eligible: true, replacesSetup: false };
+}
+
+/**
+ * Clears the rows setup created, so a restore's own ids cannot collide.
+ *
+ * Only ever reached when `checkRestoreEligibility` has already established
+ * there are no toys and no play sessions, which is what makes this safe: there
+ * is nothing here a family would miss, and the foreign keys that would make a
+ * partial delete dangerous have nothing pointing at them.
+ */
+export async function clearSetupPlaceholders(database: DatabaseConnection, householdId: string): Promise<void> {
+  await database.withTransactionAsync(async () => {
+    await database.runAsync('DELETE FROM storage_spots WHERE household_id = ?;', householdId);
+    await database.runAsync('DELETE FROM rooms WHERE household_id = ?;', householdId);
+    await database.runAsync('UPDATE settings SET active_child_id = NULL WHERE id = 1;');
+    await database.runAsync('DELETE FROM child_profiles WHERE household_id = ?;', householdId);
+  });
 }
 
 export type RestoreSkip = { entity: SyncEntity; localId: number; reason: string };
