@@ -81,7 +81,33 @@ describe('email OTP verification interactions', () => {
 
     expect(resendVerification).toHaveBeenCalledWith('parent@example.com');
     expect(control(renderer, 'Six-digit code').props.value).toBe('');
-    expect(JSON.stringify(renderer.toJSON())).toContain('A new code is on its way. Use the newest code in your email.');
+    // Names the address, so an inbox that stays empty is unambiguous.
+    expect(JSON.stringify(renderer.toJSON())).toContain('A new code is on its way to parent@example.com.');
+  });
+
+  it('counts the cooldown down instead of letting the parent hit the send rate limit', async () => {
+    const renderer = await renderScreen();
+
+    expect(control(renderer, 'Send another code').props.accessibilityState.disabled).toBe(false);
+    await act(async () => control(renderer, 'Send another code').props.onPress());
+
+    // The server allows one code per address per minute; the button says so
+    // rather than letting the next press come back as over_email_send_rate_limit.
+    const cooling = control(renderer, 'Send another code in 60s');
+    expect(cooling.props.accessibilityState.disabled).toBe(true);
+    expect(resendVerification).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start a cooldown when the send itself failed', async () => {
+    (resendVerification as jest.Mock).mockRejectedValueOnce(
+      new AuthRequestError('NETWORK_ERROR', 'You appear to be offline. Check your connection and try again.'),
+    );
+    const renderer = await renderScreen();
+
+    await act(async () => control(renderer, 'Send another code').props.onPress());
+
+    // Nothing was sent, so nothing should stop the parent trying again.
+    expect(control(renderer, 'Send another code').props.accessibilityState.disabled).toBe(false);
   });
 
   it.each([
