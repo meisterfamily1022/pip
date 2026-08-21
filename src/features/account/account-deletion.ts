@@ -1,6 +1,6 @@
 import type { DatabaseConnection } from '@/database/types';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
-import { getActiveHouseholdId, unlinkHouseholdFromAccount } from '@/features/household/household-scope';
+import { clearRemoteLinkageAndSyncState, getActiveHouseholdId } from '@/features/household/household-scope';
 import { verifyParentPin } from '@/features/child/parent-access';
 import { pinStorage, type PinStorage } from '@/services/pin-storage';
 
@@ -108,7 +108,10 @@ export async function deleteAccountAndSettleDevice(
   await gateway.deleteAuthenticatedAccount();
 
   const householdId = await getActiveHouseholdId(database);
-  const householdUnlinked = await unlinkHouseholdFromAccount(database, householdId, accountId);
+  // Not just unlinked: everything that described the now-deleted remote
+  // household goes too, so nothing on this device still points at it or holds
+  // work queued for it.
+  const householdUnlinked = await clearRemoteLinkageAndSyncState(database, householdId, accountId);
 
   // Last: the session going away re-scopes the device, and it must do so with
   // the household already unlinked or the library would be hidden from the very

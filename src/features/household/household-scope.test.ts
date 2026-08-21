@@ -11,6 +11,7 @@ import {
   findHouseholdForAccount,
   getActiveHouseholdId,
   HouseholdScopeError,
+  clearRemoteLinkageAndSyncState,
 } from './household-scope';
 
 const PARENT_A = 'account-a';
@@ -200,5 +201,77 @@ describe('household migrations', () => {
     expect(await getActiveHouseholdId(database)).toBe(LOCAL_HOUSEHOLD_ID);
     const rooms = await database.getAllAsync<{ name: string }>('SELECT name FROM rooms;');
     expect(rooms).toHaveLength(1);
+  });
+});
+
+describe('clearing a device after the account behind it was deleted', () => {
+  /** A household mid-backup: linked to a remote, with a cursor and queued work. */
+  async function seedBackedUpHousehold(database: DatabaseConnection): Promise<void> {
+    await database.runAsync(
+      `UPDATE households
+          SET owner_account_id = ?, remote_id = 'remote-household-1', is_local_only = 0
+        WHERE id = ?;`,
+      PARENT_A,
+      LOCAL_HOUSEHOLD_ID,
+    );
+    await database.runAsync(
+      "INSERT INTO household_sync_state (household_id, last_synced_revision, updated_at) VALUES (?, 4200, CURRENT_TIMESTAMP);",
+      LOCAL_HOUSEHOLD_ID,
+    );
+    await database.runAsync(
+      `INSERT INTO sync_operations (entity, entity_id, household_id, status, attempts, created_at, updated_at)
+       VALUES ('toy', '7', ?, 'pending', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+      LOCAL_HOUSEHOLD_ID,
+    );
+    await database.runAsync(
+      "INSERT INTO deleted_records (entity, entity_id, household_id, deleted_at) VALUES ('toy', '9', ?, CURRENT_TIMESTAMP);",
+      LOCAL_HOUSEHOLD_ID,
+    );
+  }
+
+  it('removes every trace of the deleted remote household', async () => {
+    const database = await freshDatabase();
+    await seedBackedUpHousehold(database);
+
+    expect(await clearRemoteLinkageAndSyncState(database, LOCAL_HOUSEHOLD_ID, PARENT_A)).toBe(true);
+
+    const household = await getHousehold(database, LOCAL_HOUSEHOLD_ID);
+    expect(household?.ownerAccountId).toBeNull();
+    expect(household?.remoteId).toBeNull();
+    expect(household?.isLocalOnly).toBe(true);
+
+    for (const table of ['household_sync_state', 'sync_operations', 'deleted_records']) {
+      const rows = await database.getAllAsync<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM "${table}" WHERE household_id = ?;`,
+        LOCAL_HOUSEHOLD_ID,
+      );
+      expect({ table, count: rows[0].count }).toEqual({ table, count: 0 });
+    }
+  });
+
+  it('leaves the family library alone, because deleting a login is not deleting toys', async () => {
+    const database = await freshDatabase();
+    await seedBackedUpHousehold(database);
+    await database.runAsync(
+      "INSERT INTO rooms (name, household_id, created_at, updated_at) VALUES ('Playroom', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);",
+      LOCAL_HOUSEHOLD_ID,
+    );
+
+    await clearRemoteLinkageAndSyncState(database, LOCAL_HOUSEHOLD_ID, PARENT_A);
+
+    const rooms = await database.getAllAsync<{ name: string }>('SELECT name FROM rooms;');
+    expect(rooms).toEqual([{ name: 'Playroom' }]);
+  });
+
+  it('refuses to unlink a household owned by somebody else, and keeps their queue intact', async () => {
+    const database = await freshDatabase();
+    await seedBackedUpHousehold(database);
+
+    expect(await clearRemoteLinkageAndSyncState(database, LOCAL_HOUSEHOLD_ID, PARENT_B)).toBe(false);
+
+    const household = await getHousehold(database, LOCAL_HOUSEHOLD_ID);
+    expect(household?.ownerAccountId).toBe(PARENT_A);
+    const queued = await database.getAllAsync<{ count: number }>('SELECT COUNT(*) AS count FROM sync_operations;');
+    expect(queued[0].count).toBe(1);
   });
 });

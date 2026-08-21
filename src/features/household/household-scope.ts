@@ -218,6 +218,57 @@ export async function unlinkHouseholdFromAccount(
 }
 
 /**
+ * Severs every trace of a remote account from this device's household.
+ *
+ * `unlinkHouseholdFromAccount` returns the household to local-only ownership,
+ * which is the right answer when a parent signs out. Deletion needs more: the
+ * remote household it pointed at no longer exists, so anything still
+ * describing it is not merely stale but actively wrong.
+ *
+ * - `remote_id` would otherwise keep addressing a deleted remote household, and
+ *   a later backup to a *different* account would try to reattach to it.
+ * - `household_sync_state` is a high-water revision mark from a server that is
+ *   gone. Left behind, the next backup would pull "everything above revision
+ *   N" from a fresh household whose revisions start below N, and silently
+ *   restore nothing.
+ * - `sync_operations` and `deleted_records` are instructions addressed to that
+ *   server. They describe this family's toys and what they removed, so keeping
+ *   them after the account is deleted also keeps data the parent asked to be
+ *   rid of.
+ *
+ * What is deliberately *not* removed is the library itself. A parent deleting
+ * an account is ending a login, not asking for their children's toys to be
+ * destroyed; that is Reset Pip, which is a separate and separately confirmed
+ * action.
+ *
+ * One transaction, so a device can never come back up unlinked but still
+ * carrying the queue, or the reverse.
+ */
+export async function clearRemoteLinkageAndSyncState(
+  database: DatabaseConnection,
+  householdId: string,
+  accountId: string,
+): Promise<boolean> {
+  let unlinked = false;
+  await database.withTransactionAsync(async () => {
+    const result = await database.runAsync(
+      `UPDATE households
+          SET owner_account_id = NULL, remote_id = NULL, is_local_only = 1, updated_at = ?
+        WHERE id = ? AND owner_account_id = ?;`,
+      now(),
+      householdId,
+      accountId,
+    );
+    unlinked = result.changes === 1;
+    if (!unlinked) return;
+    await database.runAsync('DELETE FROM household_sync_state WHERE household_id = ?;', householdId);
+    await database.runAsync('DELETE FROM sync_operations WHERE household_id = ?;', householdId);
+    await database.runAsync('DELETE FROM deleted_records WHERE household_id = ?;', householdId);
+  });
+  return unlinked;
+}
+
+/**
  * Whether an account may read a household.
  *
  * The predicate the repositories enforce. Device-local households are readable

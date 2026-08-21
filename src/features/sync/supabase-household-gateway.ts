@@ -17,6 +17,15 @@ import type { CasResult, RemoteHouseholdGateway, RemoteRow } from './remote-gate
  * is what stands behind that contract once a project exists to deploy it to.
  */
 
+/**
+ * How long a photo's download signature stays valid.
+ *
+ * Long enough for one download on a slow connection, short enough that it is
+ * the whole window in which a deleted photo could still be served from a CDN
+ * edge. See `downloadImage`.
+ */
+const SIGNATURE_SECONDS = 60;
+
 const TABLES: Record<SyncEntity, string> = {
   room: 'rooms',
   storage_spot: 'storage_spots',
@@ -146,14 +155,44 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
     const blob = await response.blob();
     const extension = localUri.split('.').pop()?.split('?')[0] ?? 'jpg';
     const path = `${remoteHouseholdId}/${toyLocalId}-${Date.now()}.${extension}`;
-    const { error } = await supabase.storage.from('toy-images').upload(path, blob, { upsert: false });
+    // `no-store` keeps the object out of the CDN's edge cache. Measured against
+    // staging: with the default cache lifetime, a photo stayed retrievable
+    // through a previously issued signed URL after it had been deleted. It is
+    // the deletion path, not page speed, that decides this value.
+    const { error } = await supabase.storage
+      .from('toy-images')
+      .upload(path, blob, { upsert: false, cacheControl: 'no-store' });
     if (error) throw new Error('This photo could not be backed up. Please try again.');
     return { path };
   },
 
   async downloadImage(_remoteHouseholdId, path) {
-    const { data, error } = await supabase.storage.from('toy-images').download(path);
-    if (error || !data) throw new Error('This photo could not be restored.');
+    // Deliberately a freshly signed URL rather than `.download(path)`.
+    //
+    // Measured against staging: the CDN keeps serving whichever URL was
+    // fetched before an object was deleted — for the caller that fetched it,
+    // never for anyone else — and no cacheControl value on upload reliably
+    // prevents that. Across three trials the stale response survived deletion
+    // twice and was refused once, so it cannot be designed around.
+    //
+    // What is deterministic, and what this relies on, is that a *newly minted*
+    // signature is a URL nothing has fetched yet, so it always reaches the
+    // origin — and once the row is gone the mint itself fails. Fetching by a
+    // fresh signature is therefore the only read path that observes a deletion
+    // immediately.
+    //
+    // SIGNATURE_SECONDS is the residual exposure window, not a convenience: a
+    // signature already fetched and cached stays servable until it expires, at
+    // which point the edge refuses it with InvalidJWT (three trials of three).
+    // Deletion is bounded by this number, so keep it small.
+    const { data: signed, error: signError } = await supabase.storage
+      .from('toy-images')
+      .createSignedUrl(path, SIGNATURE_SECONDS);
+    if (signError || !signed?.signedUrl) throw new Error('This photo could not be restored.');
+    const signedResponse = await fetch(signed.signedUrl);
+    if (!signedResponse.ok) throw new Error('This photo could not be restored.');
+    const data = await signedResponse.blob();
+    if (!data) throw new Error('This photo could not be restored.');
     const { Directory, File, Paths } = await import('expo-file-system');
     const directory = new Directory(Paths.cache, 'pip-restore');
     if (!directory.exists) directory.create({ intermediates: true, idempotent: true });

@@ -1,4 +1,4 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { authenticateCaller, CallerRejected } from '../_shared/authenticate-caller.ts';
 
 /**
  * Deletes the calling user's Pip account and everything it owns.
@@ -36,20 +36,17 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceRoleKey) return json({ error: 'Function is not configured.' }, 500);
-
-  const authorization = request.headers.get('Authorization') ?? '';
-  const token = authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) return json({ error: 'Sign in to delete your account.' }, 401);
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-
-  // The only place the account under deletion is decided.
-  const { data: caller, error: callerError } = await admin.auth.getUser(token);
-  const userId = caller?.user?.id;
-  if (callerError || !userId) return json({ error: 'Sign in to delete your account.' }, 401);
+  // The only place the account under deletion is decided. Checked against the
+  // auth server, so an account deleted a moment ago cannot delete again.
+  let admin, userId;
+  try {
+    const caller = await authenticateCaller(request, 'Sign in to delete your account.');
+    ({ admin } = caller);
+    userId = caller.accountId;
+  } catch (rejected) {
+    if (rejected instanceof CallerRejected) return json(rejected.body, rejected.status);
+    throw rejected;
+  }
 
   const { data: households, error: householdError } = await admin
     .from('households')
