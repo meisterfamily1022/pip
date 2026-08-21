@@ -58,7 +58,19 @@ export async function pushRecord(
       return pushRecord(gateway, remoteHouseholdId, entity, localId, result.server.revision, intent, data, attempt + 1);
 
     case 'resolved-with-archive': {
-      await gateway.archiveConflict(remoteHouseholdId, entity, localId, resolution.reason, resolution.archive);
+      // Two different homes, as the schema intends. conflict_archive holds the
+      // *content* that lost — and its CHECK constraint accepts only the two
+      // reasons that produce content. A replaced photograph is a path, kept in
+      // toy_image_history so the file stays referenced in the bucket rather
+      // than orphaned. Sending it to conflict_archive violated that CHECK and
+      // failed the whole record, which is how a toy whose photo had been
+      // replaced on two devices became unbackupable.
+      if (resolution.reason === 'photo-replaced') {
+        const losing = resolution.archive.kind === 'edit' ? resolution.archive.photoPath ?? null : null;
+        if (losing) await gateway.archiveImagePath(remoteHouseholdId, localId, losing);
+      } else {
+        await gateway.archiveConflict(remoteHouseholdId, entity, localId, resolution.reason, resolution.archive);
+      }
       if (resolution.winner === 'server') {
         // The server's existing row is what stands; there is nothing further
         // to write, only to report.

@@ -86,8 +86,11 @@ describe('photo replaced on both sides — rule 2b', () => {
     const result = await pushRecord(gateway, 'remote-1', 'toy', 9, created.revision, { kind: 'edit', photoPath: 'from-this-device.jpg' });
 
     expect(result).toMatchObject({ outcome: 'recovered', reason: 'photo-replaced' });
-    expect(gateway.archivedImages).toHaveLength(0); // archiveImagePath is a separate call the orchestrator makes; see image-pipeline integration below.
-    expect(gateway.archivedConflicts[0]).toMatchObject({ reason: 'photo-replaced', archived: { kind: 'edit', photoPath: 'from-other-device.jpg' } });
+    // A replaced photo is a path, not content, so it goes to toy_image_history
+    // and never to conflict_archive — whose CHECK constraint accepts only the
+    // two reasons that actually carry content.
+    expect(gateway.archivedConflicts).toHaveLength(0);
+    expect(gateway.archivedImages).toEqual([{ toyLocalId: 9, imagePath: 'from-other-device.jpg' }]);
     const current = await gateway.fetchChangesSince('remote-1', 0);
     // `imagePath` — the object's key in the bucket. `imageUri` is the local
     // file a restore writes after importing those bytes, and asserting it here
