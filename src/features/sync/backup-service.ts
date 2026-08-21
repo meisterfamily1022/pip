@@ -1,6 +1,8 @@
 import type { DatabaseConnection } from '@/database/types';
 import type { ToyImageStorage } from '@/features/toys/toy-image-storage';
 
+import { backUpHouseholdToAccount } from '@/features/household/household-scope';
+
 import type { SyncEntity } from './conflict-resolution';
 import { downloadAndImportToyImage, uploadToyImageIfChanged } from './image-pipeline';
 import { markOperation, planLibraryImport, requeueInterrupted } from './library-connection';
@@ -40,6 +42,14 @@ export type BackupDeps = {
   gateway: RemoteHouseholdGateway;
   storage: ToyImageStorage;
   householdId: string;
+  /**
+   * The signed-in account. Backing up is the one deliberate act by which a
+   * library acquires an owner, and recording that is not bookkeeping: without
+   * it the device cannot tell whose library this is, the sign-out warning tells
+   * a parent their library is not linked when it is, and account deletion
+   * cannot find the linkage it is supposed to clear.
+   */
+  accountId: string;
   onProgress?: (progress: BackupProgress) => void;
 };
 
@@ -156,7 +166,12 @@ async function recordFor(database: DatabaseConnection, entity: SyncEntity, row: 
  * than stalling on rows stuck `in_flight` forever.
  */
 export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
-  const { database, gateway, storage, householdId, onProgress } = deps;
+  const { database, gateway, storage, householdId, accountId, onProgress } = deps;
+
+  // Claimed before the network is touched: it refuses outright if this device's
+  // library already belongs to somebody else, which is a better answer than
+  // discovering the same thing one refused write at a time.
+  await backUpHouseholdToAccount(database, householdId, accountId);
 
   const remoteHouseholdId = await ensureRemoteHousehold(database, gateway, householdId);
   // Asked once, before anything is attempted. Otherwise a parent who has since

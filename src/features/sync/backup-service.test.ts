@@ -58,8 +58,10 @@ function gatewayWith(
   return Object.assign(Object.create(base) as RemoteHouseholdGateway, overrides);
 }
 
+const ACCOUNT = 'account-parent-a';
+
 const deps = (database: DatabaseConnection, gateway: RemoteHouseholdGateway, storage: FakeToyImageStorage) =>
-  ({ database, gateway, storage, householdId: LOCAL_HOUSEHOLD_ID });
+  ({ database, gateway, storage, householdId: LOCAL_HOUSEHOLD_ID, accountId: ACCOUNT });
 
 describe('backing a household up', () => {
   it('sends every record once and uploads only the toys that have a photo', async () => {
@@ -290,5 +292,39 @@ describe('a device linked to somebody else\'s account', () => {
       LOCAL_HOUSEHOLD_ID,
     );
     expect(rows.every((row) => row.status === 'pending')).toBe(true);
+  });
+});
+
+describe('what a backup records on the device', () => {
+  it('claims the household for the account, so the device knows whose library it is', async () => {
+    const database = await freshDatabase();
+    await seedLibrary(database);
+
+    await backUpHousehold(deps(database, new FakeHouseholdGateway(), new FakeToyImageStorage()));
+
+    const household = await database.getFirstAsync<{ owner_account_id: string | null; remote_id: string | null; is_local_only: number }>(
+      'SELECT owner_account_id, remote_id, is_local_only FROM households WHERE id = ?;',
+      LOCAL_HOUSEHOLD_ID,
+    );
+    // All three together: a remote id without an owner left the device unable
+    // to say whose library it was, which broke both the sign-out warning and
+    // the cleanup that account deletion depends on.
+    expect(household?.owner_account_id).toBe(ACCOUNT);
+    expect(household?.remote_id).toEqual(expect.any(String));
+    expect(household?.is_local_only).toBe(0);
+  });
+
+  it('refuses before touching the network when the library belongs to another parent', async () => {
+    const database = await freshDatabase();
+    await seedLibrary(database);
+    await database.runAsync(
+      "UPDATE households SET owner_account_id = 'someone-else' WHERE id = ?;",
+      LOCAL_HOUSEHOLD_ID,
+    );
+    const gateway = new FakeHouseholdGateway();
+
+    await expect(backUpHousehold(deps(database, gateway, new FakeToyImageStorage())))
+      .rejects.toThrow(/already backed up to a different account/i);
+    expect(gateway.rows.size).toBe(0);
   });
 });

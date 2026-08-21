@@ -168,11 +168,14 @@ export default function NativeAccountRoute() {
     try {
       const database = await initializeDatabase();
       const householdId = await getActiveHouseholdId(database);
+      const accountId = session.account?.accountId;
+      if (!accountId) throw new Error('Sign in before backing up your library.');
       const result = await backUpHousehold({
         database,
         gateway: supabaseHouseholdGateway,
         storage: expoToyImageStorage,
         householdId,
+        accountId,
         onProgress: ({ completed, total }) => setProgress(`Backing up ${completed} of ${total}…`),
       });
       // Reported separately, because "sent 58" and "4 could not be sent" are
@@ -199,11 +202,14 @@ export default function NativeAccountRoute() {
     try {
       const database = await initializeDatabase();
       const householdId = await getActiveHouseholdId(database);
+      const accountId = session.account?.accountId;
+      if (!accountId) throw new Error('Sign in before restoring your library.');
       const outcome = await restoreHousehold({
         database,
         gateway: supabaseHouseholdGateway,
         storage: expoToyImageStorage,
         householdId,
+        accountId,
       }, { replaceSetup });
       if (!outcome.restored) {
         // A device fresh out of setup is not a refusal, it is a question.
