@@ -169,39 +169,96 @@ Staging `jwt_exp` is therefore cut from 3600 to 900, and the auth-server
 existence check lives in `supabase/functions/_shared/authenticate-caller.ts` so a
 new Edge Function inherits it by import rather than by remembering.
 
-## Email delivery: still an open defect
+## Email delivery: correcting an earlier conclusion
 
-Sender alignment is correct and is not the cause: DKIM at
-`resend._domainkey.mail.piptoys.app`, SPF and the SES feedback MX on Resend's
-`send.mail.piptoys.app` return-path domain, DMARC `p=quarantine` with relaxed
-alignment at the org domain, so both mechanisms align.
+An earlier version of this document stated that delivery "stopped entirely" at
+~05:36 UTC, based on messages no longer appearing in the connected Gmail
+mailbox. **That conclusion was wrong.** The account holder confirmed, while the
+run was still going, that the codes were arriving. What stopped was the
+mailbox connector surfacing new mail — an observation channel, not the mail
+service.
 
-The failure is after SMTP acceptance. GoTrue recorded every send, and delivery
-stopped: messages to `sarah+pipapp1@…` arrived at 05:17 UTC, and from ~05:36
-onwards nothing arrived at all — a send to `pipapp2` at 05:36, a resend at 05:40,
-and a simultaneous probe pair at 05:41 to `pipapp2` **and to a never-used
-address**, all accepted with HTTP 200 and none delivered. Two out of roughly nine
-messages were dropped earlier in the run, one of which arrived on retry ninety
-seconds later.
+Two consequences worth stating plainly, because they change what is and is not
+known:
 
-That it hit a brand-new address at the same moment rules out per-address
-suppression and points at an account-level limit or pause on the Resend side.
-**This needs the Resend dashboard, which is not reachable from here:** the
-project's `smtp_pass` is returned by the Management API as a fingerprint, not the
-`re_…` key, so Resend's logs, suppression list and quota cannot be queried.
+- The "delivery stopped" claim is withdrawn. It described the instrument.
+- The earlier intermittent drops — two of roughly nine messages, one of which
+  arrived on a retry ninety seconds later — were observed through that same
+  channel, so they are no longer solid evidence of a Resend-side problem
+  either. They may have been the same indexing gap.
 
-Mitigated in the app rather than papered over: the confirm-code screen now counts
-the 60-second cooldown down instead of letting the only affordance on screen
-produce `over_email_send_rate_limit`; a failed send does not start a cooldown;
-the confirmation names the address so an empty inbox is unambiguous; and after
-three sends the screen stops implying another press will help and says what to
-check instead. It names a support channel only when
-`EXPO_PUBLIC_PIP_SUPPORT_CONTACT` is set, because this repository configures none
-and inventing one would be the same dishonesty in a different place.
+What is still true and independently verified:
+
+- Sender alignment is correct. DKIM at `resend._domainkey.mail.piptoys.app`,
+  SPF and the SES feedback MX on Resend's `send.mail.piptoys.app` return-path
+  domain, DMARC `p=quarantine` with relaxed alignment at the org domain, so
+  both mechanisms align. This was read from DNS, not from a mailbox.
+- Every send in this run was accepted by GoTrue and recorded
+  (`confirmation_sent_at` / `recovery_sent_at`).
+- Codes read from the real inbox completed sign-up and sign-in through the
+  app's own confirm screen.
+
+**Open, and needing the Resend dashboard:** whether any message was genuinely
+dropped. That cannot be settled from here — the project's `smtp_pass` comes back
+from the Management API as a fingerprint rather than the `re_…` key, so Resend's
+delivery log, suppression list and quota are unreachable. This is the one item
+the QA run cannot close on its own.
+
+A separate, self-inflicted note for anyone repeating this QA: calling
+`admin/generate_link` regenerates the account's token and silently invalidates
+whatever code was already emailed. Doing that while someone is reading the code
+out of their inbox makes a valid code look wrong. Either read the emailed code
+or generate one, never both.
+
+The app-side mitigations stand on their own regardless of what the Resend log
+says, because they address what a parent experiences when a code does not
+arrive: the confirm-code screen counts the 60-second cooldown down instead of
+letting the only affordance on screen produce `over_email_send_rate_limit`; a
+failed send does not start a cooldown; the confirmation names the address so an
+empty inbox is unambiguous; and after three sends the screen stops implying
+another press will help and says what to check instead. It names a support
+channel only when `EXPO_PUBLIC_PIP_SUPPORT_CONTACT` is set, because this
+repository configures none.
+
+## Final UX pass, verified on the device
+
+Two fixes requested after the main run, both confirmed in the app against
+staging:
+
+1. **A restored library now reports itself as backed up.** The Account card
+   counts the queue rather than trusting a flag — right, because a flag can read
+   "backed up" while sixty toys sit unsent — but a restored device has an empty
+   queue, so a parent whose library had just come back was told "Everything is
+   backed up — 0 records". A restore now records each applied row as `done`;
+   every one is demonstrably on the server at the revision just pulled. Verified:
+   immediately after restoring, the card reads **"Everything is backed up — 4
+   records"**, and a subsequent backup sends nothing rather than resending a
+   library nothing changed.
+2. **The cooldown covers the first code, not just resends.** The first code is
+   requested on the sign-in screen, one screen earlier, so screen-local state
+   began at "nothing sent yet" and left the button enabled for the press most
+   likely to hit the server's per-address limit. The send is now recorded in
+   `otp-send-log` where it is known to have been accepted, and the confirm screen
+   reads it on mount. Verified: arriving at the confirm screen after a single
+   send shows **"Send another code in 42s"**, disabled. The attempt count is
+   persisted alongside it, so the escalating guidance counts every code sent to
+   the address rather than only those sent from the mounted screen.
+
+A third defect surfaced while verifying the first two and is fixed with them:
+unlinking cleared the queue and the cursor but left `toys.image_synced_fingerprint`
+— a claim that a photograph is already in a bucket that no longer holds anything
+for this device. The next backup skipped the upload as unchanged and wrote a toy
+row with **no `image_path` at all**, so the photo was not stale but silently
+absent, and a later restore would have brought the toy back without its picture.
+Reproduced against staging before the fix (`image_path: null`, zero storage
+objects), and confirmed fixed after (`image_path` set, one object).
+
+Suite after this pass: **659 tests across 77 suites**, tsc clean, eslint 0 errors.
 
 ## Still open
 
-- **Resend delivery** — above. Needs the dashboard.
+- **Whether any email was genuinely dropped** — above. Needs the Resend
+  dashboard; not answerable from here.
 - **Sync is one-way from the app.** `pullChanges` and the conflict engine are
   implemented and tested, and the UI drives push and a full restore. Incremental
   pull, background sync and the recovery-notification surface are not wired to
@@ -210,9 +267,6 @@ and inventing one would be the same dishonesty in a different place.
   household's rooms, spots and children after eligibility has established there
   are no toys and no play. That is safe today; it would need revisiting if a
   device ever holds two live households at once.
-- **The "0 records" wording after a restore.** A restored device has an empty
-  `sync_operations` queue, so the card reads "Everything is backed up — 0
-  records" until the next backup. True but unhelpful.
-- **The first code's cooldown.** The countdown starts from the first *resend*;
-  the send that happens on the previous screen is not recorded, so the button is
-  briefly enabled when the confirm screen first appears.
+- **Photo reads stay servable for up to 60 seconds after deletion.** Bounded by
+  `SIGNATURE_SECONDS` and enforced by signature expiry, as measured above. Lower
+  the constant to shrink the window; it cannot be driven to zero from the client.
