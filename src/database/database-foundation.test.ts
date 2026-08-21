@@ -112,6 +112,10 @@ class TestDatabase implements DatabaseConnection {
     // migration's add-column-if-missing helper run without needing a schema
     // model here; migrations.test.ts and migration-integrity.test.ts cover that.
     if (source.startsWith('PRAGMA table_info')) return [];
+    // Likewise: this fake has no referential model, so a rebuild migration's
+    // integrity check can only report "nothing orphaned" here. The real engine
+    // in migration-integrity.test.ts is what proves the check has teeth.
+    if (source.startsWith('PRAGMA foreign_key_check')) return [];
     throw new Error(`Unhandled SQL: ${source}`);
   }
 }
