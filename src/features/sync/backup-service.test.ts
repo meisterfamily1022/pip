@@ -2,7 +2,7 @@ import { LOCAL_HOUSEHOLD_ID, runMigrations } from '@/database/migrations';
 import { RealSqliteConnection } from '@/database/real-sqlite-connection.test-helper';
 import type { DatabaseConnection } from '@/database/types';
 
-import { backUpHousehold, isTransient, restoreHousehold } from './backup-service';
+import { backUpHousehold, BackupNotYoursError, isTransient, restoreHousehold } from './backup-service';
 import type { RemoteHouseholdGateway } from './remote-gateway';
 import { FakeHouseholdGateway, FakeToyImageStorage } from './test-fakes';
 
@@ -266,5 +266,29 @@ describe('restoring onto a clean device', () => {
     const outcome = await restoreHousehold(deps(device, new FakeHouseholdGateway(), new FakeToyImageStorage()));
 
     expect(outcome).toEqual({ restored: false, reason: 'There is no backup for this account yet.' });
+  });
+});
+
+describe('a device linked to somebody else\'s account', () => {
+  it('says so once, instead of failing every record separately', async () => {
+    const database = await freshDatabase();
+    await seedLibrary(database);
+    const gateway = new FakeHouseholdGateway();
+    // First run links the device and succeeds.
+    await backUpHousehold(deps(database, gateway, new FakeToyImageStorage()));
+
+    // The parent signs in as somebody else; the remote household is not theirs.
+    gateway.owned = false;
+    await database.runAsync("UPDATE sync_operations SET status = 'pending' WHERE household_id = ?;", LOCAL_HOUSEHOLD_ID);
+
+    await expect(backUpHousehold(deps(database, gateway, new FakeToyImageStorage())))
+      .rejects.toThrow(BackupNotYoursError);
+
+    // And nothing was touched on the way to finding out.
+    const rows = await database.getAllAsync<{ status: string }>(
+      'SELECT status FROM sync_operations WHERE household_id = ?;',
+      LOCAL_HOUSEHOLD_ID,
+    );
+    expect(rows.every((row) => row.status === 'pending')).toBe(true);
   });
 });

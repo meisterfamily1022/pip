@@ -70,6 +70,16 @@ export interface RemoteHouseholdGateway {
   /** Records a photo path a conflict resolution replaced. The object itself is left in the bucket. */
   archiveImagePath(remoteHouseholdId: string, toyLocalId: number, imagePath: string): Promise<void>;
 
+  /**
+   * Whether the signed-in account owns this remote household.
+   *
+   * A device keeps the remote id it was linked to, and the parent may since
+   * have signed in as somebody else. Without asking, every write in the run is
+   * refused one at a time by row-level security, and the parent is shown a
+   * pile of failures instead of the one fact that explains them.
+   */
+  ownsHousehold(remoteHouseholdId: string): Promise<boolean>;
+
   /** Everything with a higher revision than the household has already pulled, oldest first. */
   fetchChangesSince(remoteHouseholdId: string, revision: number): Promise<RemoteRow[]>;
 

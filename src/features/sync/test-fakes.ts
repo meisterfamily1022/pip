@@ -80,6 +80,13 @@ export class FakeHouseholdGateway implements RemoteHouseholdGateway {
     this.archivedImages.push({ toyLocalId, imagePath });
   }
 
+  /** Overridable in a test that needs to model somebody else's household. */
+  owned = true;
+
+  async ownsHousehold(_remoteHouseholdId: string): Promise<boolean> {
+    return this.owned;
+  }
+
   async fetchChangesSince(_remoteHouseholdId: string, revision: number): Promise<RemoteRow[]> {
     return [...this.rows.values()]
       .filter((row) => row.revision > revision)

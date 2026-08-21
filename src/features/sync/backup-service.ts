@@ -43,6 +43,8 @@ export type BackupDeps = {
   onProgress?: (progress: BackupProgress) => void;
 };
 
+export class BackupNotYoursError extends Error {}
+
 export type BackupProgress = { completed: number; total: number; photosUploaded: number };
 
 export type BackupFailure = { entity: SyncEntity; localId: number; reason: string };
@@ -157,6 +159,14 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
   const { database, gateway, storage, householdId, onProgress } = deps;
 
   const remoteHouseholdId = await ensureRemoteHousehold(database, gateway, householdId);
+  // Asked once, before anything is attempted. Otherwise a parent who has since
+  // signed in as somebody else watches every record fail separately and is
+  // told nothing that explains it.
+  if (!(await gateway.ownsHousehold(remoteHouseholdId))) {
+    throw new BackupNotYoursError(
+      'This library is already backed up to a different Pip account. Sign in with that account to back it up, or use Reset Pip to start this device fresh.',
+    );
+  }
   await requeueInterrupted(database, householdId);
   await planLibraryImport(database, householdId);
 

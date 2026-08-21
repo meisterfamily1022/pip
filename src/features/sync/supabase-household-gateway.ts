@@ -111,7 +111,14 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
       .eq('household_id', remoteHouseholdId)
       .eq('local_id', localId)
       .maybeSingle<RemoteRecordRow>();
-    if (fetchError || !current) throw new Error(`Could not resolve a sync conflict for ${entity} ${localId}.`);
+    if (fetchError || !current) {
+      // Not a conflict: the write was refused and there is nothing to compare
+      // against. Saying "conflict" here sent three row-level-security denials
+      // to the parent disguised as merge trouble.
+      throw new Error(
+        `${entity} ${localId} could not be saved to your account${fetchError?.message ? `: ${fetchError.message}` : '.'}`,
+      );
+    }
     return { outcome: 'conflict', server: { revision: current.revision, intent: toIntent(entity, current) } };
   },
 
@@ -133,6 +140,16 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
       image_path: imagePath,
     });
     if (error) throw new Error('A replaced photo could not be kept in history.');
+  },
+
+  async ownsHousehold(remoteHouseholdId) {
+    // households is owner-only under RLS, so "no row" is exactly "not yours".
+    const { data, error } = await supabase
+      .from('households')
+      .select('id')
+      .eq('id', remoteHouseholdId)
+      .maybeSingle();
+    return !error && data !== null;
   },
 
   async fetchChangesSince(remoteHouseholdId, revision) {
