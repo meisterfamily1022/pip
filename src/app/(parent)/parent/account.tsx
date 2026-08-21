@@ -29,6 +29,11 @@ import {
   supabaseAccountDeletionGateway,
 } from '@/features/account/account-deletion';
 import { buildHouseholdExport, exportFileName, serialiseExport } from '@/features/account/export-service';
+import { backUpHousehold, restoreHousehold } from '@/features/sync/backup-service';
+import { canOfferRestore, describeBackupStatus, loadBackupStatus, type BackupStatus } from '@/features/sync/backup-status';
+import { supabaseHouseholdGateway } from '@/features/sync/supabase-household-gateway';
+import { getActiveHouseholdId } from '@/features/household/household-scope';
+import { expoToyImageStorage } from '@/features/toys/toy-image-storage';
 import { signOut } from '@/features/auth/auth-client';
 import { getSessionSnapshot, subscribeSession } from '@/features/auth/session-state';
 import { parentBackTargets } from '@/features/navigation/parent-navigation';
@@ -62,6 +67,8 @@ export default function NativeAccountRoute() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [backup, setBackup] = useState<BackupStatus | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
 
   // Reloaded on focus as well as on session change: returning from sign-in
   // should never leave a stale "Not signed in" behind.
@@ -71,7 +78,9 @@ export default function NativeAccountRoute() {
       void (async () => {
         const database = await initializeDatabase();
         const next = await loadAccountStatus(database, getSessionSnapshot());
-        if (!cancelled) setStatus(next);
+        const householdId = await getActiveHouseholdId(database);
+        const backupStatus = await loadBackupStatus(database, householdId);
+        if (!cancelled) { setStatus(next); setBackup(backupStatus); }
       })();
       return () => {
         cancelled = true;
@@ -143,6 +152,74 @@ export default function NativeAccountRoute() {
     } finally {
       inFlight.current = false;
       setBusy(false);
+    }
+  };
+
+  const refreshBackup = async (): Promise<void> => {
+    const database = await initializeDatabase();
+    setBackup(await loadBackupStatus(database, await getActiveHouseholdId(database)));
+  };
+
+  const runBackup = async (): Promise<void> => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true); setError(null); setNotice(null); setProgress('Starting…');
+    try {
+      const database = await initializeDatabase();
+      const householdId = await getActiveHouseholdId(database);
+      const result = await backUpHousehold({
+        database,
+        gateway: supabaseHouseholdGateway,
+        storage: expoToyImageStorage,
+        householdId,
+        onProgress: ({ completed, total }) => setProgress(`Backing up ${completed} of ${total}…`),
+      });
+      // Reported separately, because "sent 58" and "4 could not be sent" are
+      // different facts and rolling them into one number hides the second.
+      const photos = result.photosUploaded === 1 ? '1 photo' : `${result.photosUploaded} photos`;
+      setNotice(
+        result.failures.length === 0
+          ? `Backed up ${result.sent} records and ${photos}.`
+          : `Backed up ${result.sent} records and ${photos}. ${result.failures.length} could not be sent yet — tap Back up now again when you have a connection.`,
+      );
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Pip could not back up your library.');
+    } finally {
+      setProgress(null);
+      await refreshBackup();
+      inFlight.current = false; setBusy(false);
+    }
+  };
+
+  const runRestore = async (): Promise<void> => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true); setError(null); setNotice(null); setProgress('Looking for your backup…');
+    try {
+      const database = await initializeDatabase();
+      const householdId = await getActiveHouseholdId(database);
+      const outcome = await restoreHousehold({
+        database,
+        gateway: supabaseHouseholdGateway,
+        storage: expoToyImageStorage,
+        householdId,
+      });
+      if (!outcome.restored) {
+        setError(outcome.reason);
+      } else {
+        const { summary, photosRestored, photosMissing } = outcome;
+        const missing = photosMissing > 0 ? ` ${photosMissing} photo${photosMissing === 1 ? '' : 's'} could not be downloaded.` : '';
+        const skipped = summary.skipped.length > 0 ? ` ${summary.skipped.length} record${summary.skipped.length === 1 ? '' : 's'} could not be restored.` : '';
+        setNotice(
+          `Restored ${summary.toys} toys, ${summary.rooms} rooms and ${summary.childProfiles} children, with ${photosRestored} photo${photosRestored === 1 ? '' : 's'}.${missing}${skipped}`,
+        );
+      }
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Pip could not restore your library.');
+    } finally {
+      setProgress(null);
+      await refreshBackup();
+      inFlight.current = false; setBusy(false);
     }
   };
 
@@ -228,6 +305,36 @@ export default function NativeAccountRoute() {
             // it tells a parent their account is gone when it is not.
             <Text style={styles.body}>{DELETION_UNAVAILABLE_NOTE}</Text>
           )}
+        </FormCard>
+      ) : null}
+
+      {signedIn && backup ? (
+        <FormCard>
+          <Text style={styles.title}>Back up your library</Text>
+          <Text style={styles.body}>{describeBackupStatus(backup)}</Text>
+          <Text style={styles.body}>
+            A backup copies your rooms, toys, children, play history and photos to your Pip account, so a new iPhone
+            can bring them back. Your library stays on this device either way.
+          </Text>
+          {progress ? <Text style={styles.body}>{progress}</Text> : null}
+          <PrimaryButton
+            disabled={busy || !backup.hasLibrary}
+            label={busy && progress ? 'Backing up…' : 'Back up now'}
+            onPress={() => void runBackup()}
+          />
+          {canOfferRestore(backup) ? (
+            <>
+              <SecondaryButton
+                disabled={busy}
+                label={busy && progress ? 'Restoring…' : 'Restore from backup'}
+                onPress={() => void runRestore()}
+              />
+              <Text style={styles.body}>
+                Restoring is only offered on a device with no library of its own, so it can never merge two families
+                together.
+              </Text>
+            </>
+          ) : null}
         </FormCard>
       ) : null}
 
