@@ -1,0 +1,5 @@
+# Supabase CLI local state. Holds the linked project ref, cached service
+# versions, and local secrets — none of it belongs in the repository.
+.branches
+.temp
+.env
