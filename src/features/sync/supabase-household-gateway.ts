@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
 import type { ConflictReason, SyncEntity, WriteIntent } from './conflict-resolution';
+import { toColumns, toFields } from './record-columns';
 import type { CasResult, RemoteHouseholdGateway, RemoteRow } from './remote-gateway';
 
 /**
@@ -67,9 +68,12 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
 
   async writeRecord(remoteHouseholdId, entity, localId, expectedRevision, intent, data = {}) {
     const table = TABLES[entity];
+    // Translated, not spread: the service names fields in camelCase and this
+    // schema names columns in snake_case. Spreading sent PostgREST columns that
+    // do not exist.
     const body: Record<string, unknown> = intent.kind === 'delete'
       ? { deleted_at: new Date().toISOString() }
-      : { ...data, deleted_at: null };
+      : { ...toColumns(entity, data), deleted_at: null };
 
     if (expectedRevision === null) {
       // First write for this record: insert. A concurrent first write from
@@ -143,7 +147,10 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
           revision: row.revision,
           deletedAt: row.deleted_at,
           intent: toIntent(entity, row),
-          data: row,
+          // The raw Postgres row carries snake_case columns; applyRestoredRows
+          // reads camelCase fields. Handing the row over untranslated made
+          // every restored spot, toy and session fail its insert.
+          data: toFields(entity, row),
         });
       }
     }

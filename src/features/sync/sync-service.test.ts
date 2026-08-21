@@ -89,7 +89,10 @@ describe('photo replaced on both sides — rule 2b', () => {
     expect(gateway.archivedImages).toHaveLength(0); // archiveImagePath is a separate call the orchestrator makes; see image-pipeline integration below.
     expect(gateway.archivedConflicts[0]).toMatchObject({ reason: 'photo-replaced', archived: { kind: 'edit', photoPath: 'from-other-device.jpg' } });
     const current = await gateway.fetchChangesSince('remote-1', 0);
-    expect(current.find((row) => row.localId === 9)?.data.imageUri).toBe('from-this-device.jpg');
+    // `imagePath` — the object's key in the bucket. `imageUri` is the local
+    // file a restore writes after importing those bytes, and asserting it here
+    // was what let the two stay confused with each other.
+    expect(current.find((row) => row.localId === 9)?.data.imagePath).toBe('from-this-device.jpg');
     // The losing photo was never deleted anywhere — nothing in this fake calls
     // delete, and the archived record preserves its path for recovery.
     expect(gateway.deletedImages).toHaveLength(0);

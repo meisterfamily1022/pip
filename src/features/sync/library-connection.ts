@@ -99,13 +99,18 @@ export type SyncOperation = {
 const now = (): string => new Date().toISOString();
 
 /** Entities queued for upload, in the order they must be applied. */
-const IMPORT_ORDER = ['room', 'storage_spot', 'toy', 'child_profile'] as const;
+const IMPORT_ORDER = ['room', 'child_profile', 'storage_spot', 'toy', 'play_session'] as const;
 
 const SOURCE_TABLES: Record<(typeof IMPORT_ORDER)[number], string> = {
   room: 'rooms',
+  child_profile: 'child_profiles',
   storage_spot: 'storage_spots',
   toy: 'toys',
-  child_profile: 'child_profiles',
+  // Play history is part of a family's library, not incidental: "Ari played
+  // with this two days ago" is what the home screen is built around. Leaving
+  // sessions out of the queue meant a restore brought back the toys and none
+  // of the story attached to them.
+  play_session: 'play_sessions',
 };
 
 /**
@@ -127,7 +132,7 @@ export async function planLibraryImport(
     for (const entity of IMPORT_ORDER) {
       const table = SOURCE_TABLES[entity];
       // child_profiles carries no sample flag; only inventory tables do.
-      const sampleClause = entity === 'child_profile' ? '' : 'AND is_sample = 0';
+      const sampleClause = entity === 'child_profile' || entity === 'play_session' ? '' : 'AND is_sample = 0';
       const rows = await database.getAllAsync<{ id: number }>(
         `SELECT id FROM "${table}" WHERE household_id = ? ${sampleClause};`,
         householdId,

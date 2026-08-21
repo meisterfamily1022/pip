@@ -39,6 +39,11 @@ export class FakeHouseholdGateway implements RemoteHouseholdGateway {
     localId: number,
     expectedRevision: number | null,
     intent: WriteIntent,
+    // Stored rather than ignored. While this was dropped, no test could see
+    // whether the record a push sends is the record a restore reads back, and
+    // the real gateway's field-name mismatch stayed invisible behind a fake
+    // that echoed the intent instead of the row.
+    data: Record<string, unknown> = {},
   ): Promise<CasResult> {
     const key = this.key(entity, localId);
     const current = this.rows.get(key) ?? null;
@@ -49,14 +54,14 @@ export class FakeHouseholdGateway implements RemoteHouseholdGateway {
     }
     const revision = this.nextRevision;
     this.nextRevision += 1;
-    const data = intent.kind === 'edit' ? extractData(intent) : {};
+    const stored = intent.kind === 'edit' ? { ...extractData(intent), ...data } : {};
     this.rows.set(key, {
       entity,
       localId,
       revision,
       deletedAt: intent.kind === 'delete' ? new Date(revision).toISOString() : null,
       intent,
-      data,
+      data: stored,
     });
     return { outcome: 'applied', revision };
   }
@@ -95,7 +100,11 @@ export class FakeHouseholdGateway implements RemoteHouseholdGateway {
 
 function extractData(intent: Extract<WriteIntent, { kind: 'edit' }>): Record<string, unknown> {
   const data: Record<string, unknown> = {};
-  if (intent.photoPath !== undefined) data.imageUri = intent.photoPath;
+  // `imagePath`, not `imageUri`: the intent carries the object's key in the
+  // bucket, while `imageUri` is the local file a restore writes after importing
+  // the bytes. Conflating them here made a restore appear to succeed while
+  // leaving every toy pointing at a remote path it could never open.
+  if (intent.photoPath !== undefined) data.imagePath = intent.photoPath;
   if (intent.sessionActive !== undefined) data.status = intent.sessionActive ? 'active' : 'completed';
   return data;
 }
