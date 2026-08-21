@@ -1,129 +1,218 @@
-# PiP Staging deployment and live QA
+# PiP Staging: deployment, app integration, and live QA
 
-Project: **PiP Staging**, ref `jghynqqzqgdzcyhgfhsw` (us-west-2).
-Run on 2026-08-21 UTC. Production (`owfpxnbyzuohygxlqgrg`) was not touched:
-nothing in this run read or wrote it, and its configuration is unchanged.
+Branch `claude/pip-staging-schema-qa-b5f72d`. Project **PiP Staging**, ref
+`jghynqqzqgdzcyhgfhsw`. Production (`owfpxnbyzuohygxlqgrg`) was never linked,
+read, written, or reconfigured.
 
-## What was deployed
+## Where the earlier work went
 
-| Item | Result |
+Nothing was lost, overwritten, or misreported. The sync service, image
+pipeline, remote gateway, CAS protocol, restore orchestration and the ~587-test
+suite are all committed on **`claude/pip-completion-prompt-pack-663f83`**, in
+its own worktree at `.claude/worktrees/pip-completion-prompt-pack-663f83`, 13
+commits ahead of `main` and clean.
+
+This branch was cut from `main`, which does not contain those 13 commits.
+Working only from what `main` held, an earlier pass in this session concluded
+that backup and restore "did not exist" and rebuilt two pieces of them. That
+conclusion was true of this branch and wrong about the project — sibling
+branches were never checked before concluding a feature was absent.
+
+The two lineages are now merged (`83741c4`). Everywhere they overlapped the
+prompt-pack implementation was kept and the duplicate dropped:
+
+| Overlap | Kept | Why |
+| --- | --- | --- |
+| household-scoped uniqueness | their migrations 17–18 | also covers rollback when a rebuild fails partway |
+| `delete-account` function | theirs | resolves households by `owner_id`, cleans `toy-images` — the real schema |
+| photo bucket | their `toy-images` | the duplicate `toy-photos` bucket was removed from staging |
+| household-scope tests | their `room-household-scope.test.ts` | strictly wider than the duplicate block, which was deleted |
+
+### Test counts
+
+| Ref | Test files | Tests |
+| --- | --- | --- |
+| `main` | 58 | 480 |
+| this branch before the merge | 59 | 490 |
+| `claude/pip-completion-prompt-pack-663f83` | 72 | 599 |
+| this branch now | 76 | 647 |
+
+480 → 490 was `main` plus ten tests written here. 599 was the other lineage.
+Neither number was ever a reduction of the other; they are different ancestors.
+
+No coverage was silently removed. Every `*.test.ts(x)` present on `main` and on
+the prompt-pack branch is still present here — verified by set difference, both
+empty. One deliberate deletion: the ten-test `household-scoped uniqueness` block
+written here was dropped in favour of `room-household-scope.test.ts`, which
+covers the same two defects plus partial-rebuild rollback. That is why the merged
+total is 647 rather than 599 + 10 + later work.
+
+## Deployed to staging
+
+Six migrations, `local == remote` for every one:
+`20260811000000`, `20260812000000`, `20260812010000`, `20260812020000`,
+`20260819000000` (household backup schema), `20260821000000` (retires the
+duplicate bucket's policies).
+
+`delete-account` Edge Function: ACTIVE, `verify_jwt: true`, version 3.
+
+Two statements in the backup migration could not run as the migration role and
+were fixed rather than worked around: `alter table storage.objects enable row
+level security` (owned by `supabase_storage_admin` — now asserts instead of
+sets, so a project without RLS still fails the deploy loudly), and deleting a
+`storage.buckets` row (blocked by a trigger — the bucket goes through the
+Storage API, and the migration drops the policies, which is the part that makes
+it unreachable).
+
+## App integration
+
+The sync layer had **no callers**: nothing in `src/app` or `src/features`
+outside `src/features/sync/` imported the service, the gateway or the image
+pipeline. Account & data now has a *Back up your library* card that runs the
+real thing. Wiring it up surfaced seven defects that no unit test could have
+caught, because every one of them lives in a seam a fake had been standing in
+for:
+
+1. **camelCase vs snake_case.** The service names record fields one way and the
+   backup schema names columns the other. The gateway spread records straight
+   into PostgREST and handed raw rows straight back, so a push sent columns that
+   do not exist and a restore read fields that are not there — `Number(undefined)`
+   is `NaN`, so every storage spot, toy and play session would have failed its
+   insert as an unexplained skip. `record-columns.ts` translates both ways,
+   against an allowlist checked against the columns actually deployed.
+2. **Play sessions were never queued.** `planLibraryImport` omitted them, so a
+   restore brought back the toys and none of the play history the home screen is
+   built around.
+3. **Photo upload sent nothing.** `fetch(file://).blob()` produces a Blob that
+   supabase-js uploads as an empty body. Bytes now come from expo-file-system.
+4. **Photo download wrote nothing.** The same Blob problem on the read side, via
+   `arrayBuffer()`. `File.downloadFileAsync` writes the response to disk.
+5. **Restore was unreachable.** Setup requires a room, a spot and a child before
+   Account & data can be opened, and eligibility refused any household that had
+   any of them — so on a new iPhone, the one device the feature exists for, the
+   answer was always no. It now refuses only a device with toys or play history
+   of its own, and offers to replace a setup-created room and child behind an
+   explicit confirmation, clearing them only after every photo is already on disk.
+6. **A backup never recorded who it belonged to.** `remote_id` was set and
+   `owner_account_id` left null, so the sign-out warning told a parent their
+   library was not linked immediately after they had backed it up, and account
+   deletion's local cleanup — which matches on `owner_account_id` — silently did
+   nothing.
+7. **A replaced photo went to the wrong table.** `conflict_archive`'s CHECK
+   accepts only the two reasons that carry content; a replaced photograph is a
+   path and belongs in `toy_image_history`. Sending it to `conflict_archive`
+   failed the whole record, so a toy whose photo had been replaced on two devices
+   could not be backed up at all.
+
+## What was run on the device
+
+iPhone 17 Pro simulator, iOS 26.5, app built from this branch against staging.
+
+- **Setup from a clean install** — PIN, child, room, spot; one toy added from the
+  photo library with a real 2.6 MB photograph.
+- **Sign-up by emailed code** — code read out of the real inbox, typed into the
+  app's confirm screen. Sign-out, then a second account signed in the same way.
+- **Backup** — four records and the photograph, verified in staging: the toy row
+  with correct snake_case columns and `{pretend}` categories, and a 2,654,055-byte
+  `image/jpeg` in `toy-images` under the household id.
+- **Restore onto an emptied device** — the confirmation appeared, the setup room
+  and child were replaced, and Playroom / White shelf / Maya / Baby Doll came back
+  with the photograph rendering on the home screen as a byte-identical JPEG.
+- **Two-account isolation** — signed in as the second parent on a device linked
+  to the first, every write was refused by RLS and staging was unchanged. The app
+  now says so once, before attempting anything, instead of reporting four
+  unexplained failures.
+- **Deletion from the UI** — PIN gate refused a wrong PIN with "Your account was
+  not deleted" and the account survived. With the right PIN: staging went to zero
+  users, zero households, zero rows and **zero storage objects**; the device
+  cleared `remote_id`, `owner_account_id`, `household_sync_state`,
+  `sync_operations` and `deleted_records`; and the family's toy, room and child
+  stayed on the phone.
+- **Resend UX** — the new cooldown was exercised live: "A new code is on its way
+  to …" and a disabled *Send another code in 36s*.
+
+Staging currently holds zero users, zero households and zero objects.
+
+## Photo deletion and token residual, measured
+
+**Photos.** The CDN keeps serving whichever URL was fetched before an object was
+deleted — to the caller that fetched it, never to anyone else, and never to an
+anonymous request (both answered `400 / cf-cache BYPASS` throughout). No
+`cacheControl` value on upload prevents it: across three trials the stale
+response survived deletion twice and was refused once, so it cannot be designed
+around. What *is* deterministic:
+
+- a **newly minted** signature is a URL nothing has fetched, so it always reaches
+  the origin — and once the row is gone the mint itself fails (`404 NoSuchKey`);
+- `list` after deletion returns `[]`;
+- a cached signature is refused with `InvalidJWT` the moment it expires, three
+  trials of three.
+
+So downloads go through a fresh 60-second signature and uploads set `no-store`.
+Sixty seconds is the entire residual window, and it is a number in the code
+(`SIGNATURE_SECONDS`) rather than a property of the CDN.
+
+**Tokens.** Deleting a user does not revoke tokens already issued, and "RLS
+returns nothing" is not revocation. Measured on the orphaned access token:
+
+| Surface | Result |
 | --- | --- |
-| `20260811000000_profiles.sql` | applied |
-| `20260812000000_analytics_entitlements.sql` | applied |
-| `20260812010000_staff_analytics_reporting.sql` | applied |
-| `20260812020000_analytics_data_rights.sql` | applied |
-| `20260820000000_toy_photo_storage.sql` (new) | applied |
-| `delete-account` Edge Function (new) | deployed, ACTIVE, `verify_jwt: true` |
+| `/auth/v1/user` | 403 `user_not_found` |
+| `delete-account` | 401 |
+| refresh-token grant | 400 `refresh_token_not_found` — the session cannot be renewed |
+| PostgREST | **200 `[]`** — accepted, matching nothing |
+| Storage list | **200 `[]`** — accepted, matching nothing |
 
-Staging held no migrations at all before this run — all five rows in
-`supabase_migrations.schema_migrations` were created here.
+Nothing leaks today because no policy is broader than owner-only, but a future
+table with a wider policy would be exposed for the remainder of the token's life.
+Staging `jwt_exp` is therefore cut from 3600 to 900, and the auth-server
+existence check lives in `supabase/functions/_shared/authenticate-caller.ts` so a
+new Edge Function inherits it by import rather than by remembering.
 
-## Verified against the live project
+## Email delivery: still an open defect
 
-Every check below was run against staging through the Management API or the
-public REST/Storage/Functions endpoints, not against a local copy.
+Sender alignment is correct and is not the cause: DKIM at
+`resend._domainkey.mail.piptoys.app`, SPF and the SES feedback MX on Resend's
+`send.mail.piptoys.app` return-path domain, DMARC `p=quarantine` with relaxed
+alignment at the org domain, so both mechanisms align.
 
-- **Schema.** All five migrations recorded. Nine tables in `public`.
-- **RLS.** Enabled on all nine. `profiles` has owner-only select and update;
-  `analytics_consents`, `analytics_profiles` and `household_entitlements` have
-  owner-scoped policies. `telemetry_events`, `analytics_installations`,
-  `analytics_deletion_audits`, `staff_report_audits` and `product_configuration`
-  carry no policies, so they are deny-all to `anon` and `authenticated` and are
-  reachable only through the `security definer` functions. That is the intended
-  shape, confirmed rather than assumed.
-- **Bucket.** `toy-photos`, private, 10 MB limit, MIME allow-list of
-  jpeg/png/webp/heic/heif, with four owner-scoped policies on `storage.objects`
-  keyed on the first path segment.
-- **Function.** Rejects an unauthenticated call at the gateway (401) and a
-  non-POST method in the handler (405).
-- **Triggers.** Creating a user produced its `profiles` row and a `free`
-  `household_entitlements` row.
+The failure is after SMTP acceptance. GoTrue recorded every send, and delivery
+stopped: messages to `sarah+pipapp1@…` arrived at 05:17 UTC, and from ~05:36
+onwards nothing arrived at all — a send to `pipapp2` at 05:36, a resend at 05:40,
+and a simultaneous probe pair at 05:41 to `pipapp2` **and to a never-used
+address**, all accepted with HTTP 200 and none delivered. Two out of roughly nine
+messages were dropped earlier in the run, one of which arrived on retry ninety
+seconds later.
 
-## Live QA
+That it hit a brand-new address at the same moment rules out per-address
+suppression and points at an account-level limit or pause on the Resend side.
+**This needs the Resend dashboard, which is not reachable from here:** the
+project's `smtp_pass` is returned by the Management API as a fingerprint, not the
+`re_…` key, so Resend's logs, suppression list and quota cannot be queried.
 
-Three real accounts were created on staging, driven through the public API with
-the publishable key — the same endpoints the app calls. All three were deleted
-at the end; staging now holds zero users, zero profiles and zero objects.
+Mitigated in the app rather than papered over: the confirm-code screen now counts
+the 60-second cooldown down instead of letting the only affordance on screen
+produce `over_email_send_rate_limit`; a failed send does not start a cooldown;
+the confirmation names the address so an empty inbox is unambiguous; and after
+three sends the screen stops implying another press will help and says what to
+check instead. It names a support channel only when
+`EXPO_PUBLIC_PIP_SUPPORT_CONTACT` is set, because this repository configures none
+and inventing one would be the same dishonesty in a different place.
 
-**Email OTP through Resend SMTP.** Seven messages were sent from
-`no-reply@mail.piptoys.app` and six arrived in a real inbox. Sign-up and sign-in
-were both completed end to end using the six-digit code read out of the
-delivered email, not a code obtained out of band.
+## Still open
 
-- sign-up: code from the delivered email → `/auth/v1/verify` → confirmed user,
-  access and refresh tokens issued.
-- sign-in for a returning account: same, on a separate account.
-- reusing a consumed code, and a wrong code, both return
-  `Token has expired or is invalid` — the response `authError` maps to
-  `OTP_INVALID_OR_EXPIRED`, so that mapping is now confirmed against the live
-  service rather than inferred.
-- the 60-second per-address send limit returned `over_email_send_rate_limit`,
-  which `authError` maps to `RATE_LIMITED`.
-
-**Sign out, then into a second account.** Sign-out returned 204 and the old
-access token was rejected with 403 immediately afterwards. A second account was
-then signed in and its session issued normally.
-
-**Image upload, download, deletion, and isolation.**
-
-- upload 200; download 200 and byte-identical to the file uploaded.
-- anonymous download refused.
-- upload under another account's prefix refused by RLS.
-- `text/plain` refused by the bucket's MIME allow-list (415).
-- the second account could not download, list or delete the first account's
-  photo, and saw only its own row through PostgREST.
-- owner delete returned 200 and removed the row from `storage.objects`.
-
-**Account deletion.** The deployed function deleted the caller's account and its
-two photos in one call (`{"deleted":true,"removedPhotos":2}`). Afterwards the
-account's token was rejected by the auth API (403 `user_not_found`) and by the
-function itself (401); its photo returned `NoSuchKey`; and `auth.users`,
-`profiles` and `household_entitlements` were all empty of it while the other
-account was untouched.
-
-## Defects found and fixed during the run
-
-1. **OTP length did not match the app.** Staging issued eight-digit codes while
-   the app's confirm screen accepts exactly six (`maxLength={6}`), so a real
-   parent could not have entered the code at all. Staging's `mailer_otp_length`
-   was set to 6. **Production almost certainly has the same mismatch and should
-   be checked** — it was deliberately not inspected here.
-2. **The email carried a link, not a code.** Staging was on the stock
-   confirmation template, which sends `{{ .ConfirmationURL }}`. The app never
-   reads a link; it asks for a typed code. The confirmation and magic-link
-   templates were replaced with ones that render `{{ .Token }}`. Note the auth
-   service took several minutes to pick the new templates up, while
-   `mailer_otp_length` propagated immediately.
-
-## Defects found and not fixed
-
-3. **A deleted photo stays downloadable from the CDN.** After a successful
-   delete the row is gone from `storage.objects`, but a subsequent fetch
-   returned the file with `cf-cache-status: HIT`. Anyone who fetched a photo
-   before it was deleted can keep fetching it until the edge copy expires. This
-   also weakens account deletion. When photo upload is built, set a short or
-   absent `cacheControl` on upload rather than relying on the default.
-4. **A deleted account's JWT is still structurally accepted.** PostgREST
-   answered `200 []` rather than 401 for a token belonging to a deleted user,
-   because the token stays cryptographically valid until it expires. Nothing
-   leaked, since RLS matched no rows, but a table with a permissive policy would
-   leak for up to the token lifetime.
-5. **One message in seven was silently dropped.** A sign-up mail that GoTrue
-   recorded as sent (`confirmation_sent_at` was written, so SMTP accepted it)
-   never arrived; a retry ninety seconds later arrived in two seconds. Worth
-   watching in the Resend dashboard before relying on first-attempt delivery.
-
-## Not tested, because it does not exist yet
-
-The brief asked for QA of backup and restore. There is no backup or restore in
-this codebase, and no "skip collision" fallback to remove. `src/features/sync/`
-implements eligibility, a durable per-record import queue, tombstones and a
-conflict policy, but states plainly that no remote transport ships yet, and the
-landing copy is tested to never claim otherwise. Photo upload and download were
-exercised directly against the bucket for the same reason: the app stores photos
-as local `file://` URIs and has no upload path.
-
-Account deletion is likewise not reachable from the app —
-`deleteAccount()` in `src/features/auth/auth-client.ts` still throws
-`UNSUPPORTED`. The Edge Function it needs now exists and is verified, so wiring
-that call up is the remaining work.
+- **Resend delivery** — above. Needs the dashboard.
+- **Sync is one-way from the app.** `pullChanges` and the conflict engine are
+  implemented and tested, and the UI drives push and a full restore. Incremental
+  pull, background sync and the recovery-notification surface are not wired to
+  any screen yet.
+- **`clearSetupPlaceholders` assumes a single device household.** It deletes the
+  household's rooms, spots and children after eligibility has established there
+  are no toys and no play. That is safe today; it would need revisiting if a
+  device ever holds two live households at once.
+- **The "0 records" wording after a restore.** A restored device has an empty
+  `sync_operations` queue, so the card reads "Everything is backed up — 0
+  records" until the next backup. True but unhelpful.
+- **The first code's cooldown.** The countdown starts from the first *resend*;
+  the send that happens on the previous screen is not recorded, so the button is
+  briefly enabled when the confirm screen first appears.
