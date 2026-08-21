@@ -70,19 +70,31 @@ class TestDatabase implements DatabaseConnection {
     // which this fake does not model, so they are accepted and ignored.
     if (source.startsWith('INSERT OR IGNORE INTO households')) return { lastInsertRowId: 0, changes: 1 };
     if (/^UPDATE "\w+" SET household_id/.test(source)) return { lastInsertRowId: 0, changes: 0 };
+    // Version 14 gives households an owner and records which one this device is
+    // showing. Ownership is exercised against real SQLite in
+    // features/household/household-scope.test.ts; here the statements only have
+    // to be accepted so the migration runner reaches the end.
+    if (source.startsWith('UPDATE households SET owner_account_id')) return { lastInsertRowId: 0, changes: 1 };
+    if (source.startsWith('INSERT OR IGNORE INTO device_household_state')) return { lastInsertRowId: 0, changes: 1 };
     throw new Error(`Unhandled SQL: ${source}`);
   }
 
   async getFirstAsync<T>(source: string, ...params: SqlParameters): Promise<T | null> {
+    // The active household. This fake holds a single library, so it is always
+    // the device-local one; scoping is proven against real SQLite in
+    // features/household/household-scope.test.ts.
+    if (source.includes('FROM device_household_state')) return { active_household_id: 'local' } as T;
     if (source.startsWith('PRAGMA user_version')) return { user_version: this.version } as T;
-    if (source.includes('FROM rooms WHERE name')) {
-      const name = String(params[0]).trim().toLowerCase();
-      const excluded = params.length > 1 ? params[1] : null;
+    // Name-uniqueness is now scoped: the household parameter leads, so these
+    // read one position further along than they used to.
+    if (source.includes('FROM rooms WHERE household_id') && source.includes('name =')) {
+      const name = String(params[1]).trim().toLowerCase();
+      const excluded = params.length > 2 ? params[2] : null;
       const found = [...this.rooms.values()].find((row) => String(row.name).toLowerCase() === name && row.id !== excluded);
       return (found ?? null) as T | null;
     }
     if (source.includes('FROM storage_spots WHERE room_id') && source.includes('name =')) {
-      const roomId = params[0]; const name = String(params[1]).trim().toLowerCase(); const excluded = params.length > 2 ? params[2] : null;
+      const roomId = params[0]; const name = String(params[2]).trim().toLowerCase(); const excluded = params.length > 3 ? params[3] : null;
       const found = [...this.spots.values()].find((row) => row.room_id === roomId && String(row.name).toLowerCase() === name && row.id !== excluded);
       return (found ?? null) as T | null;
     }
@@ -112,9 +124,10 @@ class TestDatabase implements DatabaseConnection {
     // migration's add-column-if-missing helper run without needing a schema
     // model here; migrations.test.ts and migration-integrity.test.ts cover that.
     if (source.startsWith('PRAGMA table_info')) return [];
-    // Likewise: this fake has no referential model, so a rebuild migration's
-    // integrity check can only report "nothing orphaned" here. The real engine
-    // in migration-integrity.test.ts is what proves the check has teeth.
+    // The rooms rebuild (migration 17) checks the whole database for
+    // foreign-key inconsistencies after it runs. This fake has no real
+    // referential integrity to check — real-SQLite coverage for that lives in
+    // migrations.test.ts — so reporting none lets the migration proceed.
     if (source.startsWith('PRAGMA foreign_key_check')) return [];
     throw new Error(`Unhandled SQL: ${source}`);
   }

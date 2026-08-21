@@ -1,75 +1,76 @@
-// Permanently deletes the calling account.
-//
-// Account deletion has to be done with the service role — a signed-in user
-// cannot remove their own auth record — but it must only ever delete the
-// caller. So the request's own JWT is validated first and the id it yields is
-// the only id used afterwards; nothing is taken from the request body.
-//
-// Order matters: photographs are removed before the auth record. Every table
-// referencing auth.users cascades on delete, but storage objects do not, so
-// deleting the user first would leave the photos behind with no owner able to
-// reach them.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const PHOTO_BUCKET = 'toy-photos';
+/**
+ * Deletes the calling user's Pip account and everything it owns.
+ *
+ * Removing an auth user needs the service-role key, which cannot ship in a
+ * mobile bundle — hence this function. Its whole security posture rests on one
+ * rule: the account to delete comes from the verified JWT and never from the
+ * request. There is no user id in the body, no admin override, and no path
+ * parameter, so there is nothing for a caller to tamper with.
+ *
+ * Order matters. Storage objects are removed first, because deleting the
+ * household rows loses the only record of which objects belonged to whom and
+ * would strand the photographs in the bucket forever. Database rows follow via
+ * the cascade from auth.users, and the user last.
+ *
+ * Deploy:
+ *   supabase functions deploy delete-account --project-ref <ref>
+ * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by the platform.
+ */
 
-const corsHeaders = {
+const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const json = (body: unknown, status: number): Response =>
-  new Response(JSON.stringify(body), {
+function json(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   });
+}
 
 Deno.serve(async (request: Request): Promise<Response> => {
-  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
-
-  const authorization = request.headers.get('Authorization') ?? '';
-  const accessToken = authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : '';
-  if (!accessToken) return json({ error: 'authentication_required' }, 401);
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceRoleKey) return json({ error: 'service_misconfigured' }, 500);
+  if (!supabaseUrl || !serviceRoleKey) return json({ error: 'Function is not configured.' }, 500);
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const authorization = request.headers.get('Authorization') ?? '';
+  const token = authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : '';
+  if (!token) return json({ error: 'Sign in to delete your account.' }, 401);
 
-  // Validated against the auth server rather than merely decoded, so an expired
-  // or forged token cannot delete anyone.
-  const { data: caller, error: callerError } = await admin.auth.getUser(accessToken);
-  if (callerError || !caller.user) return json({ error: 'authentication_required' }, 401);
-  const accountId = caller.user.id;
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-  // Storage has no cascade, so the account's photos are listed and removed
-  // explicitly. Paged, because an established library can exceed one page.
-  let removedPhotos = 0;
-  for (let page = 0; ; page += 1) {
-    const { data: objects, error: listError } = await admin.storage
-      .from(PHOTO_BUCKET)
-      .list(accountId, { limit: 100, offset: page * 100 });
-    if (listError) return json({ error: 'photo_cleanup_failed', detail: listError.message }, 500);
-    if (!objects || objects.length === 0) break;
+  // The only place the account under deletion is decided.
+  const { data: caller, error: callerError } = await admin.auth.getUser(token);
+  const userId = caller?.user?.id;
+  if (callerError || !userId) return json({ error: 'Sign in to delete your account.' }, 401);
 
-    const paths = objects.map((object) => `${accountId}/${object.name}`);
-    const { error: removeError } = await admin.storage.from(PHOTO_BUCKET).remove(paths);
-    if (removeError) return json({ error: 'photo_cleanup_failed', detail: removeError.message }, 500);
-    removedPhotos += paths.length;
+  const { data: households, error: householdError } = await admin
+    .from('households')
+    .select('id')
+    .eq('owner_id', userId);
+  if (householdError) return json({ error: 'Your account was not deleted. Please try again.' }, 500);
 
-    // Removing from the front shifts the remaining objects back into this page.
-    if (objects.length < 100) break;
-    page -= 1;
+  // Photographs first: after the rows are gone, nothing records which objects
+  // belonged to this account and they could never be found again.
+  for (const household of households ?? []) {
+    const { data: objects } = await admin.storage.from('toy-images').list(household.id, { limit: 1000 });
+    const paths = (objects ?? []).map((object) => `${household.id}/${object.name}`);
+    if (paths.length > 0) {
+      const { error: removeError } = await admin.storage.from('toy-images').remove(paths);
+      if (removeError) return json({ error: 'Your account was not deleted. Please try again.' }, 500);
+    }
   }
 
-  // Every public table keyed on the account cascades from here.
-  const { error: deleteError } = await admin.auth.admin.deleteUser(accountId);
-  if (deleteError) return json({ error: 'account_deletion_failed', detail: deleteError.message }, 500);
+  // Cascades from auth.users through households to every descendant row.
+  const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
+  if (deleteError) return json({ error: 'Your account was not deleted. Please try again.' }, 500);
 
-  return json({ deleted: true, accountId, removedPhotos }, 200);
+  return json({ deleted: true }, 200);
 });

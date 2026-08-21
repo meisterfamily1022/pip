@@ -17,6 +17,10 @@ class SettingsTestDatabase implements DatabaseConnection {
     throw new Error(`Unhandled SQL: ${source}`);
   }
   async getFirstAsync<T>(source: string): Promise<T | null> {
+    // The active household, which these fakes do not model: they each hold a
+    // single library, so it is always the device-local one. Scoping itself is
+    // proven against real SQLite in features/household/household-scope.test.ts.
+    if (source.includes('FROM device_household_state')) return { active_household_id: 'local' } as T;
     if (source.includes('FROM settings')) return this.settings as T;
     if (source.includes('FROM child_profiles')) return this.child as T;
     throw new Error(`Unhandled SQL: ${source}`);

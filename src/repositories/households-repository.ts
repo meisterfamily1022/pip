@@ -17,11 +17,12 @@ const toHousehold = (row: HouseholdRow): Household => ({
   name: row.name,
   isLocalOnly: row.is_local_only === 1,
   remoteId: row.remote_id,
+  ownerAccountId: row.owner_account_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
 
-const COLUMNS = 'id, name, is_local_only, remote_id, created_at, updated_at';
+const COLUMNS = 'id, name, is_local_only, remote_id, owner_account_id, created_at, updated_at';
 
 export async function getHousehold(database: DatabaseConnection, id: string): Promise<Household | null> {
   const row = await database.getFirstAsync<HouseholdRow>(`SELECT ${COLUMNS} FROM households WHERE id = ?;`, id);

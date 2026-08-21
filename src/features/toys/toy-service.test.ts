@@ -107,6 +107,10 @@ class ToyTestDatabase implements DatabaseConnection {
   }
 
   async getFirstAsync<T>(source: string, ...params: SqlParameters): Promise<T | null> {
+    // The active household, which these fakes do not model: they each hold a
+    // single library, so it is always the device-local one. Scoping itself is
+    // proven against real SQLite in features/household/household-scope.test.ts.
+    if (source.includes('FROM device_household_state')) return { active_household_id: 'local' } as T;
     if (source.includes('COUNT(*) AS count FROM play_sessions')) return { count: source.includes("status = 'active'") ? this.activePlaySessionCount : this.playSessionCount } as T;
     if (source.includes('JOIN rooms') && source.includes('WHERE t.intake_key')) {
       const row = [...this.toys.values()].find((candidate) => candidate.intake_key === params[0]);
@@ -126,6 +130,9 @@ class ToyTestDatabase implements DatabaseConnection {
     if (source.includes('FROM toys t')) {
       let rows = [...this.toys.values()];
       let index = 0;
+      // This fake holds one library, so household scoping matches everything —
+      // but the parameter is positional and comes first, so it must be consumed.
+      if (source.includes('t.household_id = ?')) index += 1;
       if (source.includes('t.is_archived = ?')) { const archived = params[index++]; rows = rows.filter((row) => row.is_archived === archived); }
       if (source.includes('t.is_available = ?')) { const available = params[index++]; rows = rows.filter((row) => row.is_available === available); }
       if (source.includes('t.room_id = ?')) { const roomId = params[index++]; rows = rows.filter((row) => row.room_id === roomId); }

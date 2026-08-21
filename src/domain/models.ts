@@ -110,6 +110,12 @@ export type Household = {
   name: string;
   isLocalOnly: boolean;
   remoteId: string | null;
+  /**
+   * The account that backed this household up, or null for the device-local
+   * one. Only the owner may read an owned household; null is readable by
+   * whoever holds the device, which is what keeps account-free use working.
+   */
+  ownerAccountId: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };

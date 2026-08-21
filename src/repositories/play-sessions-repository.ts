@@ -1,4 +1,5 @@
 import type { PlaySession } from '@/domain/models';
+import { getActiveHouseholdId } from '@/features/household/household-scope';
 import type { PlaySessionRow } from '@/database/rows';
 import type { DatabaseConnection } from '@/database/types';
 import type { ChildToy } from './toys-repository';
@@ -36,8 +37,9 @@ const ACTIVE_JOIN = `SELECT ${SESSION_COLUMNS}, c.name AS child_name,
 
 export async function createPlaySession(database: DatabaseConnection, childId: number, toyId: number): Promise<PlaySession> {
   const timestamp = now();
+  const householdId = await getActiveHouseholdId(database);
   try {
-    const result = await database.runAsync('INSERT INTO play_sessions (child_id, toy_id, status, started_at, completed_at, cleanup_started_at, help_requested, parent_override_used, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', childId, toyId, 'active', timestamp, null, null, 0, 0, timestamp, timestamp);
+    const result = await database.runAsync('INSERT INTO play_sessions (child_id, toy_id, status, started_at, completed_at, cleanup_started_at, help_requested, parent_override_used, created_at, updated_at, household_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', childId, toyId, 'active', timestamp, null, null, 0, 0, timestamp, timestamp, householdId);
     const session = await getPlaySession(database, result.lastInsertRowId);
     if (!session) throw new Error('Created play session could not be loaded.');
     return session;
@@ -49,17 +51,30 @@ export async function createPlaySession(database: DatabaseConnection, childId: n
 }
 
 export async function getPlaySession(database: DatabaseConnection, id: number): Promise<PlaySession | null> {
-  const row = await database.getFirstAsync<PlaySessionRow>(`SELECT ${SESSION_COLUMNS} FROM play_sessions p WHERE p.id = ?;`, id);
+  const row = await database.getFirstAsync<PlaySessionRow>(
+    `SELECT ${SESSION_COLUMNS} FROM play_sessions p WHERE p.id = ? AND p.household_id = ?;`,
+    id,
+    await getActiveHouseholdId(database),
+  );
   return row ? toSession(row) : null;
 }
 
 export async function getActivePlaySession(database: DatabaseConnection, childId: number): Promise<ActivePlaySession | null> {
-  const row = await database.getFirstAsync<ActiveSessionRow>(`${ACTIVE_JOIN} WHERE p.status = ? AND p.child_id = ? ORDER BY p.id DESC LIMIT 1;`, 'active', childId);
+  const row = await database.getFirstAsync<ActiveSessionRow>(
+    `${ACTIVE_JOIN} WHERE p.status = ? AND p.child_id = ? AND p.household_id = ? ORDER BY p.id DESC LIMIT 1;`,
+    'active',
+    childId,
+    await getActiveHouseholdId(database),
+  );
   return row ? mapActive(row) : null;
 }
 
 export async function listActivePlaySessions(database: DatabaseConnection): Promise<ActivePlaySession[]> {
-  const rows = await database.getAllAsync<ActiveSessionRow>(`${ACTIVE_JOIN} WHERE p.status = ? ORDER BY c.name COLLATE NOCASE, p.id;`, 'active');
+  const rows = await database.getAllAsync<ActiveSessionRow>(
+    `${ACTIVE_JOIN} WHERE p.status = ? AND p.household_id = ? ORDER BY c.name COLLATE NOCASE, p.id;`,
+    'active',
+    await getActiveHouseholdId(database),
+  );
   return rows.map(mapActive);
 }
 
@@ -71,18 +86,22 @@ export async function listActivePlaySessions(database: DatabaseConnection): Prom
  * started asking the question.
  */
 export async function hasEverPlayed(database: DatabaseConnection): Promise<boolean> {
-  const row = await database.getFirstAsync<{ total: number }>('SELECT COUNT(*) AS total FROM play_sessions;');
+  const row = await database.getFirstAsync<{ total: number }>(
+    'SELECT COUNT(*) AS total FROM play_sessions WHERE household_id = ?;',
+    await getActiveHouseholdId(database),
+  );
   return (row?.total ?? 0) > 0;
 }
 
 export async function startPlaySessionIfNoneActive(database: DatabaseConnection, childId: number, toyId: number): Promise<ActivePlaySession> {
   let session: ActivePlaySession | null = null;
   await database.withTransactionAsync(async () => {
-    const child = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE id = ?;', childId);
+    const householdId = await getActiveHouseholdId(database);
+    const child = await database.getFirstAsync<{ id: number }>('SELECT id FROM child_profiles WHERE id = ? AND household_id = ?;', childId, householdId);
     if (!child) throw new Error('This child profile is no longer available.');
     session = await getActivePlaySession(database, childId);
     if (session) return;
-    const toy = await database.getFirstAsync<{ id: number }>('SELECT id FROM toys WHERE id = ? AND is_available = 1 AND is_archived = 0;', toyId);
+    const toy = await database.getFirstAsync<{ id: number }>('SELECT id FROM toys WHERE id = ? AND household_id = ? AND is_available = 1 AND is_archived = 0;', toyId, householdId);
     if (!toy) throw new Error('This toy is no longer available. Choose another toy.');
     const toyConflict = await database.getFirstAsync<{ child_name: string }>(`SELECT c.name AS child_name FROM play_sessions p JOIN child_profiles c ON c.id = p.child_id WHERE p.toy_id = ? AND p.status = 'active' LIMIT 1;`, toyId);
     if (toyConflict) throw new Error(`${toyConflict.child_name} is already playing with this toy. Choose another toy.`);
