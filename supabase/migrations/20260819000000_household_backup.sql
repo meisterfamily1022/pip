@@ -306,9 +306,27 @@ on conflict (id) do update
 
 -- Supabase enables RLS on storage.objects by default, but a policy without RLS
 -- switched on is a silent no-op rather than an error — the object would just
--- be readable by anyone. Stated explicitly so protection does not depend on an
--- assumption about the platform's default that this file cannot verify.
-alter table storage.objects enable row level security;
+-- be readable by anyone. The intent here is not to assume that default holds.
+--
+-- It cannot be set from a migration: storage.objects is owned by
+-- supabase_storage_admin, and `alter table ... enable row level security` fails
+-- with "must be owner of table objects". So this asserts instead of setting.
+-- Failing the deployment is the right outcome — a bucket whose policies are
+-- silently inert is worse than a deployment that stops and says so.
+do $$
+begin
+  if not (
+    select c.relrowsecurity
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'storage' and c.relname = 'objects'
+  ) then
+    raise exception
+      'RLS is off on storage.objects; the toy-images policies below would be inert. '
+      'Enable it as supabase_storage_admin before deploying.';
+  end if;
+end
+$$;
 
 drop policy if exists toy_images_owner_all on storage.objects;
 create policy toy_images_owner_all on storage.objects
