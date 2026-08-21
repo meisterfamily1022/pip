@@ -180,11 +180,12 @@ export default function NativeAccountRoute() {
       });
       // Reported separately, because "sent 58" and "4 could not be sent" are
       // different facts and rolling them into one number hides the second.
+      const records = result.sent === 1 ? '1 record' : `${result.sent} records`;
       const photos = result.photosUploaded === 1 ? '1 photo' : `${result.photosUploaded} photos`;
       setNotice(
         result.failures.length === 0
-          ? `Backed up ${result.sent} records and ${photos}.`
-          : `Backed up ${result.sent} records and ${photos}. ${result.failures.length} could not be sent yet — tap Back up now again when you have a connection.`,
+          ? `Backed up ${records} and ${photos}.`
+          : `Backed up ${records} and ${photos}. ${result.failures.length} could not be sent yet — tap Back up now again when you have a connection.`,
       );
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'Pip could not back up your library.');
