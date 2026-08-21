@@ -43,6 +43,21 @@ async function seedLibrary(database: DatabaseConnection): Promise<void> {
   `);
 }
 
+
+/**
+ * The fake with one method replaced.
+ *
+ * Spreading the instance would drop everything on its prototype, so the
+ * override is layered with Object.create and the original stays reachable
+ * behind it.
+ */
+function gatewayWith(
+  base: FakeHouseholdGateway,
+  overrides: Partial<RemoteHouseholdGateway>,
+): RemoteHouseholdGateway {
+  return Object.assign(Object.create(base) as RemoteHouseholdGateway, overrides);
+}
+
 const deps = (database: DatabaseConnection, gateway: RemoteHouseholdGateway, storage: FakeToyImageStorage) =>
   ({ database, gateway, storage, householdId: LOCAL_HOUSEHOLD_ID });
 
@@ -96,9 +111,7 @@ describe('backing a household up', () => {
     const gateway = new FakeHouseholdGateway();
 
     let failuresLeft = 1;
-    const flaky: RemoteHouseholdGateway = {
-      ...gateway,
-      findOrCreateHousehold: (...args) => gateway.findOrCreateHousehold(...args),
+    const flaky = gatewayWith(gateway, {
       writeRecord: (remote, entity, localId, revision, intent, data) => {
         if (entity === 'toy' && failuresLeft > 0) {
           failuresLeft -= 1;
@@ -106,9 +119,7 @@ describe('backing a household up', () => {
         }
         return gateway.writeRecord(remote, entity, localId, revision, intent, data);
       },
-      uploadImage: (...args) => gateway.uploadImage(...args),
-      fetchChangesSince: (...args) => gateway.fetchChangesSince(...args),
-    };
+    });
 
     const first = await backUpHousehold(deps(database, flaky, storage));
     expect(first.failures).toHaveLength(1);
@@ -130,16 +141,12 @@ describe('backing a household up', () => {
     const database = await freshDatabase();
     await seedLibrary(database);
     const gateway = new FakeHouseholdGateway();
-    const rejecting: RemoteHouseholdGateway = {
-      ...gateway,
-      findOrCreateHousehold: (...args) => gateway.findOrCreateHousehold(...args),
+    const rejecting = gatewayWith(gateway, {
       writeRecord: (remote, entity, localId, revision, intent, data) =>
         entity === 'room'
           ? Promise.reject(new Error('violates check constraint "rooms_name_check"'))
           : gateway.writeRecord(remote, entity, localId, revision, intent, data),
-      uploadImage: (...args) => gateway.uploadImage(...args),
-      fetchChangesSince: (...args) => gateway.fetchChangesSince(...args),
-    };
+    });
 
     await backUpHousehold(deps(database, rejecting, new FakeToyImageStorage()));
 
@@ -202,14 +209,9 @@ describe('restoring onto a clean device', () => {
   it('restores the library even when a photograph cannot be fetched, and says so', async () => {
     const { gateway, storage } = await backedUpLibrary();
     const device = await freshDatabase();
-    const brokenPhotos: RemoteHouseholdGateway = {
-      ...gateway,
-      findOrCreateHousehold: (...args) => gateway.findOrCreateHousehold(...args),
-      writeRecord: (...args) => gateway.writeRecord(...args),
-      uploadImage: (...args) => gateway.uploadImage(...args),
-      fetchChangesSince: (...args) => gateway.fetchChangesSince(...args),
+    const brokenPhotos = gatewayWith(gateway, {
       downloadImage: () => Promise.reject(new Error('Network request failed')),
-    };
+    });
 
     const outcome = await restoreHousehold(deps(device, brokenPhotos, storage));
 
