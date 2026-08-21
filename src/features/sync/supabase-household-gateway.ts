@@ -27,6 +27,12 @@ import type { CasResult, RemoteHouseholdGateway, RemoteRow } from './remote-gate
  */
 const SIGNATURE_SECONDS = 60;
 
+/** The bucket's allow-list, keyed by the extension the local file carries. */
+const MIME_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic',
+};
+const mimeFor = (extension: string): string => MIME_TYPES[extension] ?? 'image/jpeg';
+
 const TABLES: Record<SyncEntity, string> = {
   room: 'rooms',
   storage_spot: 'storage_spots',
@@ -158,9 +164,14 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
   },
 
   async uploadImage(remoteHouseholdId, toyLocalId, localUri) {
-    const response = await fetch(localUri);
-    const blob = await response.blob();
-    const extension = localUri.split('.').pop()?.split('?')[0] ?? 'jpg';
+    // Read through expo-file-system rather than `fetch(file://).blob()`.
+    // React Native's fetch does produce a Blob for a file: URI, but
+    // supabase-js sends it as an empty body, and the upload comes back as an
+    // opaque storage failure — which is exactly what a real backup run
+    // reported for the one record that had a photograph. Bytes are explicit.
+    const { File } = await import('expo-file-system');
+    const bytes = await new File(localUri).bytes();
+    const extension = (localUri.split('.').pop()?.split('?')[0] ?? 'jpg').toLowerCase();
     const path = `${remoteHouseholdId}/${toyLocalId}-${Date.now()}.${extension}`;
     // `no-store` keeps the object out of the CDN's edge cache. Measured against
     // staging: with the default cache lifetime, a photo stayed retrievable
@@ -168,8 +179,10 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
     // the deletion path, not page speed, that decides this value.
     const { error } = await supabase.storage
       .from('toy-images')
-      .upload(path, blob, { upsert: false, cacheControl: 'no-store' });
-    if (error) throw new Error('This photo could not be backed up. Please try again.');
+      .upload(path, bytes, { upsert: false, cacheControl: 'no-store', contentType: mimeFor(extension) });
+    // The reason is kept: an opaque "could not be backed up" is what made the
+    // first real failure take a database query to explain.
+    if (error) throw new Error(`This photo could not be backed up: ${error.message}`);
     return { path };
   },
 
