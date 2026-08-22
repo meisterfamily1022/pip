@@ -5,7 +5,9 @@ import {
   ChildProfileError,
   addChildProfile,
   clearChildHistory,
+  countChildHistory,
   deleteChildProfile,
+  describeHistoryDisposition,
   loadChildProfiles,
   reorderChildren,
   saveChildProfile,
@@ -50,7 +52,7 @@ async function addToy(fixture: Fixture, name: string): Promise<number> {
   return row!.id;
 }
 
-async function startSession(fixture: Fixture, toyId: number, childId: number, status: 'active' | 'completed'): Promise<void> {
+async function startSession(fixture: Fixture, toyId: number, childId: number | null, status: 'active' | 'completed'): Promise<void> {
   await fixture.database.runAsync(
     `INSERT INTO play_sessions (child_id, toy_id, status, started_at, completed_at, household_id, created_at, updated_at)
      VALUES (?, ?, ?, '2026-01-01', ?, ?, '2026-01-01', '2026-01-01');`,
@@ -276,5 +278,115 @@ describe('deleting a profile', () => {
     expect(await loadChildProfiles(fixture.database)).toHaveLength(1);
     const remaining = await fixture.database.getAllAsync<{ status: string }>('SELECT status FROM play_sessions;');
     expect(remaining).toEqual([{ status: 'active' }]);
+  });
+});
+
+describe('choosing what happens to a deleted profile\'s play history', () => {
+  let fixture: Fixture;
+
+  beforeEach(async () => { fixture = await setUp(); });
+  afterEach(() => { fixture.database.close(); });
+
+  it('deletes the records when that is what was asked for', async () => {
+    const toyId = await addToy(fixture, 'Magnetic Tiles');
+    const maya = await addChildProfile(fixture.database, { name: 'Maya' });
+    await startSession(fixture, toyId, maya.id, 'completed');
+    await startSession(fixture, toyId, maya.id, 'completed');
+
+    const summary = await deleteChildProfile(fixture.database, maya.id, 'delete');
+
+    expect(summary).toEqual({ removedSessions: 2, anonymisedSessions: 0 });
+    expect(await fixture.database.getAllAsync('SELECT id FROM play_sessions;')).toHaveLength(0);
+  });
+
+  it('keeps the records and detaches the child when asked to anonymise', async () => {
+    const toyId = await addToy(fixture, 'Magnetic Tiles');
+    const maya = await addChildProfile(fixture.database, { name: 'Maya' });
+    await startSession(fixture, toyId, maya.id, 'completed');
+    await startSession(fixture, toyId, maya.id, 'completed');
+
+    const summary = await deleteChildProfile(fixture.database, maya.id, 'anonymise');
+
+    expect(summary).toEqual({ removedSessions: 0, anonymisedSessions: 2 });
+    const rows = await fixture.database.getAllAsync<{ child_id: number | null; toy_id: number }>(
+      'SELECT child_id, toy_id FROM play_sessions;',
+    );
+    // The household still knows the toy was played with; nobody's name survives.
+    expect(rows).toEqual([{ child_id: null, toy_id: toyId }, { child_id: null, toy_id: toyId }]);
+    expect(await fixture.database.getAllAsync('SELECT id FROM child_profiles;')).toHaveLength(0);
+  });
+
+  it('ends a session still open rather than leaving a deleted child mid-play', async () => {
+    const toyId = await addToy(fixture, 'Magnetic Tiles');
+    const maya = await addChildProfile(fixture.database, { name: 'Maya' });
+    await startSession(fixture, toyId, maya.id, 'active');
+
+    await deleteChildProfile(fixture.database, maya.id, 'anonymise');
+
+    const rows = await fixture.database.getAllAsync<{ status: string; completed_at: string | null; child_id: number | null }>(
+      'SELECT status, completed_at, child_id FROM play_sessions;',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('completed');
+    expect(rows[0].completed_at).toEqual(expect.any(String));
+    expect(rows[0].child_id).toBeNull();
+  });
+
+  it('does not collide with the household Guest slot when anonymising an open session', async () => {
+    const tiles = await addToy(fixture, 'Magnetic Tiles');
+    const blocks = await addToy(fixture, 'Wooden Blocks');
+    const maya = await addChildProfile(fixture.database, { name: 'Maya' });
+    await startSession(fixture, blocks, null, 'active'); // Guest is already playing.
+    await startSession(fixture, tiles, maya.id, 'active');
+
+    // Anonymising would make two active Guest sessions, which the household's
+    // one-Guest-at-a-time index forbids; completing first is what makes it legal.
+    await expect(deleteChildProfile(fixture.database, maya.id, 'anonymise')).resolves.toMatchObject({
+      anonymisedSessions: 1,
+    });
+    const active = await fixture.database.getAllAsync("SELECT id FROM play_sessions WHERE status = 'active';");
+    expect(active).toHaveLength(1);
+  });
+
+  it('never touches inventory, whichever disposition is chosen', async () => {
+    for (const disposition of ['delete', 'anonymise'] as const) {
+      const local = await setUp();
+      const toyId = await addToy(local, 'Magnetic Tiles');
+      const child = await addChildProfile(local.database, { name: 'Sam' });
+      await startSession(local, toyId, child.id, 'completed');
+
+      await deleteChildProfile(local.database, child.id, disposition);
+
+      expect(await local.database.getAllAsync('SELECT id FROM toys;')).toHaveLength(1);
+      expect(await local.database.getAllAsync('SELECT id FROM rooms;')).toHaveLength(1);
+      expect(await local.database.getAllAsync('SELECT id FROM storage_spots;')).toHaveLength(1);
+      local.database.close();
+    }
+  });
+
+  it('defaults to deleting, so an unspecified call cannot silently keep records', async () => {
+    const toyId = await addToy(fixture, 'Magnetic Tiles');
+    const maya = await addChildProfile(fixture.database, { name: 'Maya' });
+    await startSession(fixture, toyId, maya.id, 'completed');
+
+    const summary = await deleteChildProfile(fixture.database, maya.id);
+
+    expect(summary).toEqual({ removedSessions: 1, anonymisedSessions: 0 });
+  });
+
+  it('counts the history so the choice can be made knowing what is at stake', async () => {
+    const toyId = await addToy(fixture, 'Magnetic Tiles');
+    const maya = await addChildProfile(fixture.database, { name: 'Maya' });
+    expect(await countChildHistory(fixture.database, maya.id)).toBe(0);
+    await startSession(fixture, toyId, maya.id, 'completed');
+    expect(await countChildHistory(fixture.database, maya.id)).toBe(1);
+  });
+
+  it('describes each choice in terms of what a parent loses or keeps', () => {
+    expect(describeHistoryDisposition('delete', 0)).toBe('This profile has no play history yet.');
+    expect(describeHistoryDisposition('delete', 1)).toBe('1 play record will be deleted.');
+    expect(describeHistoryDisposition('delete', 4)).toBe('4 play records will be deleted.');
+    expect(describeHistoryDisposition('anonymise', 4))
+      .toBe("4 play records will be kept for the household, with this child's name removed.");
   });
 });

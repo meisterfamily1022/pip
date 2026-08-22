@@ -27,6 +27,8 @@ export class ChildProfileError extends Error {}
 
 const MINIMUM_NAME_LENGTH = 2;
 
+const now = (): string => new Date().toISOString();
+
 /**
  * Names are compared case- and space-insensitively.
  *
@@ -126,39 +128,100 @@ export async function reorderChildren(
   return listChildProfiles(database, { includeHidden: true, householdId });
 }
 
+/**
+ * What happens to the play records a deleted profile leaves behind.
+ *
+ * Two different families want two different things, and neither is obviously
+ * right, so the parent chooses rather than the code deciding for them:
+ *
+ * - `delete` removes the records. Everything Pip remembered about that child is
+ *   gone, which is what somebody removing a profile for privacy reasons means.
+ * - `anonymise` keeps them and detaches them from the child. The household
+ *   still knows this toy was played with on that day, which is what somebody
+ *   tidying up an outgrown profile means, and no record of *who* survives.
+ *
+ * Either way, inventory is untouched. That is not a choice.
+ */
+export type ChildHistoryDisposition = 'delete' | 'anonymise';
+
 export type ChildDeletionSummary = {
   /** Play sessions removed with the profile. */
   removedSessions: number;
+  /** Play sessions kept, with the child detached. */
+  anonymisedSessions: number;
 };
 
 /**
- * Removes a profile and its play history.
+ * Removes a profile, doing what the parent asked with its play history.
  *
  * Household inventory is deliberately untouched. `play_sessions.child_id` is
- * RESTRICT, so the history has to go first or the delete is rejected; that is
- * also the privacy-respecting choice, since the history is the only part that
- * is about the child rather than about the household.
+ * RESTRICT, so the history must be dealt with before the profile row goes,
+ * whichever disposition was chosen.
+ *
+ * A session still open is completed rather than left active. A child who no
+ * longer exists cannot still be mid-play, and an anonymised active session
+ * would collide with the household's one Guest slot — so ending it is both the
+ * truthful answer and the one the schema permits.
  *
  * If the deleted profile was the active one, the pointer is cleared so Child
- * Mode asks who is playing rather than opening a profile that no longer exists.
+ * Mode asks who is playing rather than opening a profile that is gone.
  */
 export async function deleteChildProfile(
   database: DatabaseConnection,
   id: number,
+  history: ChildHistoryDisposition = 'delete',
 ): Promise<ChildDeletionSummary> {
   const existing = await getChildProfile(database, id);
   if (!existing) throw new ChildProfileError('That profile no longer exists.');
 
   let removedSessions = 0;
+  let anonymisedSessions = 0;
+
   await database.withTransactionAsync(async () => {
-    const sessions = await database.runAsync('DELETE FROM play_sessions WHERE child_id = ?;', id);
-    removedSessions = sessions.changes;
+    if (history === 'delete') {
+      const sessions = await database.runAsync('DELETE FROM play_sessions WHERE child_id = ?;', id);
+      removedSessions = sessions.changes;
+    } else {
+      await database.runAsync(
+        `UPDATE play_sessions
+            SET status = 'completed', completed_at = COALESCE(completed_at, ?), updated_at = ?
+          WHERE child_id = ? AND status = 'active';`,
+        now(),
+        now(),
+        id,
+      );
+      const kept = await database.runAsync(
+        'UPDATE play_sessions SET child_id = NULL, updated_at = ? WHERE child_id = ?;',
+        now(),
+        id,
+      );
+      anonymisedSessions = kept.changes;
+    }
+
     await database.runAsync('UPDATE settings SET active_child_id = NULL WHERE active_child_id = ?;', id);
     const result = await database.runAsync('DELETE FROM child_profiles WHERE id = ?;', id);
     if (result.changes !== 1) throw new ChildProfileError('That profile no longer exists.');
   });
 
-  return { removedSessions };
+  return { removedSessions, anonymisedSessions };
+}
+
+/** What each disposition will actually do, for the confirmation screen. */
+export function describeHistoryDisposition(disposition: ChildHistoryDisposition, sessions: number): string {
+  const records = sessions === 1 ? '1 play record' : `${sessions} play records`;
+  if (sessions === 0) return 'This profile has no play history yet.';
+  return disposition === 'delete'
+    ? `${records} will be deleted.`
+    : `${records} will be kept for the household, with this child's name removed.`;
+}
+
+/** How many play records a profile currently has, so the choice is informed. */
+export async function countChildHistory(database: DatabaseConnection, id: number): Promise<number> {
+  const row = await database.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM play_sessions WHERE child_id = ?;',
+    id,
+  );
+  return row?.count ?? 0;
 }
 
 /**

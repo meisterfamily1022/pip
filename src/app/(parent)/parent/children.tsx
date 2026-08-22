@@ -7,7 +7,6 @@ import { PipIcon } from '@/components/pip-icon';
 import { ProfileAvatar } from '@/components/profile-ui';
 import {
   Banner,
-  ConfirmationDialog,
   EmptyStateCard,
   PrimaryButton,
   SecondaryButton,
@@ -17,7 +16,7 @@ import { initializeDatabase } from '@/database/client';
 import { parentBackTargets } from '@/features/navigation/parent-navigation';
 import { READING_SUPPORT_LABELS, isReadingSupport } from '@/domain/child-avatars';
 import type { ChildProfile } from '@/domain/models';
-import { deleteChildProfile, loadChildProfiles, reorderChildren } from '@/features/children/child-profile-service';
+import { loadChildProfiles, reorderChildren } from '@/features/children/child-profile-service';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 /**
@@ -31,7 +30,6 @@ export default function ChildrenRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<ChildProfile | null>(null);
   const [reordering, setReordering] = useState(false);
 
   const reload = useCallback(async (): Promise<void> => {
@@ -176,29 +174,6 @@ export default function ChildrenRoute() {
         tone="info"
       />
 
-      <ConfirmationDialog
-        cancelLabel="Keep the profile"
-        confirmLabel="Delete profile"
-        destructive
-        message={
-          pendingDelete
-            ? `This removes ${pendingDelete.name}'s profile and their play history. Your toys, rooms, storage spots and photos are not affected. This cannot be undone.`
-            : ''
-        }
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          const child = pendingDelete;
-          setPendingDelete(null);
-          if (child) {
-            void run(async () => {
-              const database = await initializeDatabase();
-              await deleteChildProfile(database, child.id);
-            });
-          }
-        }}
-        title={pendingDelete ? `Delete ${pendingDelete.name}?` : ''}
-        visible={pendingDelete !== null}
-      />
     </ParentDetailScreen>
   );
 }

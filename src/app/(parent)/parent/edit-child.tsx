@@ -30,7 +30,16 @@ import {
   READING_SUPPORTS,
 } from '@/domain/child-avatars';
 import type { ChoiceLimit } from '@/domain/models';
-import { addChildProfile, deleteChildProfile, loadChildProfile, saveChildProfile, setChildHidden } from '@/features/children/child-profile-service';
+import {
+  addChildProfile,
+  countChildHistory,
+  deleteChildProfile,
+  describeHistoryDisposition,
+  loadChildProfile,
+  saveChildProfile,
+  setChildHidden,
+  type ChildHistoryDisposition,
+} from '@/features/children/child-profile-service';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 
 /**
@@ -39,6 +48,8 @@ import { playmapTheme as theme } from '@/theme/playmap-theme';
  * Collects a nickname and presentation preferences only. Pip never asks for a
  * birthday, legal name, school, or anything diagnostic.
  */
+const HISTORY_CHOICES: readonly ChildHistoryDisposition[] = ['delete', 'anonymise'];
+
 export default function EditChildRoute() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -55,6 +66,10 @@ export default function EditChildRoute() {
   const [saving, setSaving] = useState(false);
   const [paused, setPaused] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
+  // Removing a profile and erasing what Pip remembers about a child are two
+  // different intentions. The parent says which; the code does not assume.
+  const [historyChoice, setHistoryChoice] = useState<ChildHistoryDisposition>('delete');
+  const [historyCount, setHistoryCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -119,7 +134,7 @@ export default function EditChildRoute() {
     setBusy(true);
     try {
       const database = await initializeDatabase();
-      await deleteChildProfile(database, childId);
+      await deleteChildProfile(database, childId, historyChoice);
       router.replace({ pathname: '/parent/children' });
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'That profile could not be deleted.');
@@ -242,9 +257,18 @@ export default function EditChildRoute() {
             <ListCard>
               <ListRow
                 accessory="none"
-                detail="Removes this profile and its play history. Toys, rooms and photos are untouched."
+                detail="Removes this profile. You choose what happens to its play history. Toys, rooms and photos are untouched."
                 icon="trash"
-                onPress={() => setPendingDelete(true)}
+                onPress={() => {
+                  setHistoryChoice('delete');
+                  setHistoryCount(null);
+                  setPendingDelete(true);
+                  // Loaded so the choice is made knowing what is actually at stake.
+                  void (async () => {
+                    const database = await initializeDatabase();
+                    setHistoryCount(await countChildHistory(database, childId ?? -1));
+                  })();
+                }}
                 title="Delete this profile"
                 tone="danger"
               />
@@ -258,14 +282,28 @@ export default function EditChildRoute() {
         cancelLabel="Keep the profile"
         confirmLabel="Delete profile"
         destructive
-        message={`This removes ${name.trim() || 'this child'}'s profile and their play history. Your toys, rooms, storage spots and photos are not affected. This cannot be undone.`}
-        onCancel={() => setPendingDelete(false)}
+        message={`This removes ${name.trim() || 'this child'}'s profile. Your toys, rooms, storage spots and photos are not affected. This cannot be undone.`}
+        onCancel={() => { setPendingDelete(false); setHistoryCount(null); }}
         onConfirm={() => {
           void remove();
         }}
         title={`Delete ${name.trim() || 'this profile'}?`}
         visible={pendingDelete}
-      />
+      >
+        {historyCount ? (
+          <View style={styles.historyChoice}>
+            <Text style={styles.historyLabel}>Their play history</Text>
+            <SegmentedControl
+              accessibilityLabel="What happens to this profile's play history"
+              getOptionLabel={(option: ChildHistoryDisposition) => (option === 'delete' ? 'Delete it' : 'Keep it, unnamed')}
+              onChange={(value) => setHistoryChoice(value)}
+              options={HISTORY_CHOICES}
+              value={historyChoice}
+            />
+            <Text style={styles.historyHint}>{describeHistoryDisposition(historyChoice, historyCount)}</Text>
+          </View>
+        ) : null}
+      </ConfirmationDialog>
     </ParentDetailScreen>
   );
 }
@@ -293,4 +331,7 @@ const styles = StyleSheet.create({
   hint: { color: theme.colors.mutedText, ...theme.typography.meta },
   danger: { gap: theme.spacing[8] },
   dangerLabel: { color: theme.colors.error, ...theme.typography.eyebrow },
+  historyChoice: { gap: theme.spacing[8] },
+  historyLabel: { color: theme.colors.text, ...theme.typography.fieldLabel },
+  historyHint: { color: theme.colors.mutedText, ...theme.typography.supporting },
 });
