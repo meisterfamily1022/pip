@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
+import { compressForManagedStorage, expoCompressionApi } from './toy-image-compression';
 
 export interface ToyImageStorage {
   copyIntoManagedStorage(sourceUri: string): Promise<string>;
@@ -15,15 +16,9 @@ export async function deleteUniqueManagedImages(storage: ToyImageStorage, uris: 
   return failures;
 }
 
-function extensionFromUri(uri: string): string {
-  const clean = uri.split('?')[0]?.split('#')[0] ?? uri;
-  const match = clean.match(/\.([a-zA-Z0-9]{1,8})$/);
-  return match?.[1]?.toLowerCase() ?? 'jpg';
-}
-
-function uniqueImageName(sourceUri: string): string {
+function uniqueImageName(extension: string): string {
   const random = Math.random().toString(36).slice(2);
-  return `toy-${Date.now()}-${random}.${extensionFromUri(sourceUri)}`;
+  return `toy-${Date.now()}-${random}.${extension}`;
 }
 
 function ensureToyDirectory(): Directory {
@@ -69,9 +64,16 @@ async function durableWebImageUri(sourceUri: string): Promise<string> {
 export const expoToyImageStorage: ToyImageStorage = {
   async copyIntoManagedStorage(sourceUri: string): Promise<string> {
     if (Platform.OS === 'web') return durableWebImageUri(sourceUri);
-    const source = new File(resolveManagedToyImageUri(sourceUri));
-    const destination = new File(ensureToyDirectory(), uniqueImageName(sourceUri));
-    await source.copy(destination);
+    // Compression re-encodes as JPEG unconditionally (see toy-image-compression.ts),
+    // so the managed copy is always .jpg regardless of what the picker handed back.
+    const compressedUri = await compressForManagedStorage(resolveManagedToyImageUri(sourceUri), expoCompressionApi);
+    const source = new File(compressedUri);
+    const destination = new File(ensureToyDirectory(), uniqueImageName('jpg'));
+    try {
+      await source.copy(destination);
+    } finally {
+      if (source.exists) source.delete();
+    }
     return destination.uri;
   },
 

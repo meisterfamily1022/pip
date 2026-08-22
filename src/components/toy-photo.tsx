@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 
 import { PipIcon } from '@/components/pip-icon';
@@ -58,10 +58,34 @@ export function ToyPhoto({
   style,
 }: ToyPhotoProps) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  // Bumped on retry so expo-image treats the next attempt as a fresh load
+  // rather than replaying whatever it cached for this URI, including a
+  // cached failure.
+  const [retryToken, setRetryToken] = useState(0);
   const shape = pipPhotoTiers[tier];
   const frame: ViewStyle = fill
     ? { borderRadius: 0, flex: 1, height: '100%', width: '100%' }
     : { aspectRatio: aspectRatio ?? shape.aspectRatio, borderRadius: shape.radius, minHeight: shape.minHeight };
+
+  // A different toy's photo reusing this same mounted component (list
+  // recycling) must not keep showing the previous photo's loaded/failed
+  // state while the new one decodes. Adjusted during render, not in an
+  // effect, per React's guidance for resetting state when a prop changes —
+  // the render is redone before anything paints, so there is no visible
+  // flash of the stale state.
+  const [trackedUri, setTrackedUri] = useState(uri);
+  if (uri !== trackedUri) {
+    setTrackedUri(uri);
+    setFailed(false);
+    setLoaded(false);
+  }
+
+  const retry = (): void => {
+    setFailed(false);
+    setLoaded(false);
+    setRetryToken((token) => token + 1);
+  };
 
   const hasPhoto = Boolean(uri) && !failed;
   const resolvedUri = uri ? resolveManagedToyImageUri(uri) : null;
@@ -84,11 +108,21 @@ export function ToyPhoto({
           cachePolicy="memory-disk"
           contentFit="cover"
           onError={() => setFailed(true)}
+          onLoad={() => setLoaded(true)}
+          recyclingKey={`${resolvedUri ?? ''}:${retryToken}`}
           source={{ uri: resolvedUri ?? undefined }}
           style={[styles.fill, dimmed && styles.dimmed]}
           // A short cross-fade covers the disk read without drawing attention.
           transition={140}
         />
+        {loaded ? null : (
+          // A cold cache still has to decode the file off disk; without this
+          // the frame was blank — just its background tint — until that
+          // finished, which read as broken rather than loading.
+          <View pointerEvents="none" style={[styles.fill, styles.loadingOverlay]}>
+            <ActivityIndicator color={theme.colors.mutedText} />
+          </View>
+        )}
       </View>
     );
   }
@@ -106,6 +140,18 @@ export function ToyPhoto({
           {category ? <Text numberOfLines={1} style={styles.fallbackMeta}>{category}</Text> : null}
         </View>
       )}
+      {failed && tier !== 'small' ? (
+        <Pressable
+          accessibilityLabel="Try loading the photo again"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={retry}
+          style={({ pressed }) => [styles.retry, pressed && styles.retryPressed]}
+        >
+          <PipIcon color={theme.colors.brandInk} name="retry" size={14} />
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -166,6 +212,17 @@ const styles = StyleSheet.create({
   fallbackCopy: { alignItems: 'center', gap: 1 },
   fallbackName: { color: theme.colors.secondaryText, textAlign: 'center', ...theme.typography.label, fontSize: 13 },
   fallbackMeta: { color: theme.colors.mutedText, textAlign: 'center', ...theme.typography.caption },
+  loadingOverlay: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
+  retry: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 2,
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: 4,
+  },
+  retryPressed: { opacity: 0.6 },
+  retryText: { color: theme.colors.brandInk, ...theme.typography.label, fontSize: 12 },
   collage: {
     aspectRatio: pipPhotoTiers.hero.aspectRatio,
     backgroundColor: theme.colors.photoFallback,
