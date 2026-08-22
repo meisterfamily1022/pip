@@ -43,6 +43,14 @@ export type Toy = {
   categories: PlayCategory[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  /**
+   * The remote storage object this toy's photo was last uploaded to, so a
+   * later replace or delete can remove exactly that object. `null` when the
+   * toy has never been backed up, or the caller's query did not select it —
+   * only `getParentToy` does, since this is a backup/deletion concern, not
+   * something Child Mode or the library list needs.
+   */
+  imageRemotePath: string | null;
 };
 
 export type ToySetupDraft = {

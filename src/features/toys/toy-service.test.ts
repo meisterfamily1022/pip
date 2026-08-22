@@ -18,6 +18,7 @@ class ToyTestDatabase implements DatabaseConnection {
   public readonly spots = new Map<number, Row>();
   public readonly toys = new Map<number, Row>();
   public readonly categories = new Map<number, PlayCategory[]>();
+  public readonly deletedRecords: { entity: string; entityId: string; householdId: string; remoteImagePath: string | null }[] = [];
 
   constructor() {
     this.seedRoom('Playroom', ['Blue Bin', 'Shelf']);
@@ -96,6 +97,13 @@ class ToyTestDatabase implements DatabaseConnection {
       if (this.failToyDelete) throw new Error('toy delete failed');
       const changes = this.toys.delete(params[0] as number) ? 1 : 0;
       return { lastInsertRowId: 0, changes };
+    }
+    // Deletion propagation to a remote household is exercised against real
+    // SQLite in features/sync/sync.test.ts; here it only needs to be accepted
+    // so permanentlyDeleteParentToy completes.
+    if (source.startsWith('INSERT INTO deleted_records')) {
+      this.deletedRecords.push({ entity: params[0] as string, entityId: params[1] as string, householdId: params[2] as string, remoteImagePath: params[3] as string | null });
+      return { lastInsertRowId: 0, changes: 1 };
     }
     throw new Error(`Unhandled SQL: ${source}`);
   }

@@ -10,7 +10,7 @@ const now = (): string => new Date().toISOString();
 function mapToy(row: ToyRow, categories: PlayCategory[]): Toy {
   const originalImageUri = row.original_image_uri ?? row.image_uri;
   const imageUri = row.preferred_image_variant === 'enhanced' && row.enhanced_image_uri ? row.enhanced_image_uri : originalImageUri;
-  return { id: row.id, name: row.name, imageUri, originalImageUri, enhancedImageUri: row.enhanced_image_uri, preferredImageVariant: row.preferred_image_variant ?? 'original', aiMetadataStatus: row.ai_metadata_status ?? 'manual', aiAnalysisId: row.ai_analysis_id, aiSchemaVersion: row.ai_schema_version, aiConsentAt: row.ai_consent_at, aiConfirmedAt: row.ai_confirmed_at, roomId: row.room_id, storageSpotId: row.storage_spot_id, cleanupDifficulty: row.cleanup_difficulty, adultHelpRequired: row.adult_help_required === 1, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, name: row.name, imageUri, originalImageUri, enhancedImageUri: row.enhanced_image_uri, preferredImageVariant: row.preferred_image_variant ?? 'original', aiMetadataStatus: row.ai_metadata_status ?? 'manual', aiAnalysisId: row.ai_analysis_id, aiSchemaVersion: row.ai_schema_version, aiConsentAt: row.ai_consent_at, aiConfirmedAt: row.ai_confirmed_at, roomId: row.room_id, storageSpotId: row.storage_spot_id, cleanupDifficulty: row.cleanup_difficulty, adultHelpRequired: row.adult_help_required === 1, isAvailable: row.is_available === 1, isArchived: row.is_archived === 1, categories, createdAt: row.created_at, updatedAt: row.updated_at, imageRemotePath: row.image_remote_path ?? null };
 }
 
 async function getCategories(database: DatabaseConnection, toyId: number): Promise<PlayCategory[]> {
@@ -213,7 +213,7 @@ export async function listParentToys(database: DatabaseConnection, filters: ToyF
 export async function getParentToy(database: DatabaseConnection, id: number): Promise<ParentToy | null> {
   const row = await database.getFirstAsync<ChildToyRow>(
     `SELECT t.id, t.name, t.image_uri, t.original_image_uri, t.enhanced_image_uri, t.preferred_image_variant, t.ai_metadata_status, t.ai_analysis_id, t.ai_schema_version, t.ai_consent_at, t.ai_confirmed_at, t.room_id, t.storage_spot_id, t.cleanup_difficulty, t.adult_help_required, t.is_available, t.is_archived,
-            t.created_at, t.updated_at, r.name AS room_name, s.name AS storage_spot_name
+            t.created_at, t.updated_at, t.image_remote_path, r.name AS room_name, s.name AS storage_spot_name
        FROM toys t
        JOIN rooms r ON r.id = t.room_id
        JOIN storage_spots s ON s.id = t.storage_spot_id AND s.room_id = t.room_id
@@ -222,6 +222,16 @@ export async function getParentToy(database: DatabaseConnection, id: number): Pr
     await scope(database),
   );
   return row ? mapChildToy(row, await getCategories(database, row.id)) : null;
+}
+
+/**
+ * Records the exact remote object a toy's photo was last uploaded to (or
+ * clears it, after that object is removed). Kept separate from `updateToy`
+ * because this is bookkeeping the backup pipeline owns, not something a
+ * parent's edit ever sets.
+ */
+export async function setToyRemoteImagePath(database: DatabaseConnection, id: number, path: string | null): Promise<void> {
+  await database.runAsync('UPDATE toys SET image_remote_path = ? WHERE id = ? AND household_id = ?;', path, id, await scope(database));
 }
 
 export async function getParentToyByIntakeKey(database: DatabaseConnection, intakeKey: string): Promise<ParentToy | null> {

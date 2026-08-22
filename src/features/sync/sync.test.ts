@@ -3,6 +3,7 @@ import { RealSqliteConnection } from '@/database/real-sqlite-connection.test-hel
 import { ensureSettings } from '@/repositories/settings-repository';
 import {
   checkConnectionEligibility,
+  clearTombstone,
   getImportProgress,
   isDeletedLocally,
   listSyncOperations,
@@ -246,13 +247,42 @@ describe('tombstones', () => {
     await recordDeletion(fixture.database, 'toy', '7');
 
     expect(await isDeletedLocally(fixture.database, 'toy', '7')).toBe(true);
-    expect(await listTombstones(fixture.database)).toEqual([{ entity: 'toy', entityId: '7' }]);
+    expect(await listTombstones(fixture.database)).toEqual([{ entity: 'toy', entityId: '7', remoteImagePath: null }]);
+  });
+
+  it('carries the photo it deleted along with it, for later remote cleanup', async () => {
+    await recordDeletion(fixture.database, 'toy', '7', LOCAL_HOUSEHOLD_ID, 'household/7-123.jpg');
+    expect(await listTombstones(fixture.database)).toEqual([
+      { entity: 'toy', entityId: '7', remoteImagePath: 'household/7-123.jpg' },
+    ]);
   });
 
   it('treats a repeated deletion as harmless', async () => {
     await recordDeletion(fixture.database, 'toy', '7');
     await expect(recordDeletion(fixture.database, 'toy', '7')).resolves.toBeUndefined();
     expect(await listTombstones(fixture.database)).toHaveLength(1);
+  });
+
+  it('clears a tombstone once its deletion is confirmed pushed', async () => {
+    await recordDeletion(fixture.database, 'toy', '7');
+    await clearTombstone(fixture.database, 'toy', '7');
+    expect(await listTombstones(fixture.database)).toHaveLength(0);
+    expect(await isDeletedLocally(fixture.database, 'toy', '7')).toBe(false);
+  });
+
+  it('keeps two households\' tombstones for the same local id apart', async () => {
+    await fixture.database.runAsync(
+      "INSERT INTO households (id, name, created_at, updated_at) VALUES ('other-household', 'Other', '2026-01-01', '2026-01-01');",
+    );
+    await recordDeletion(fixture.database, 'toy', '7', LOCAL_HOUSEHOLD_ID);
+    await recordDeletion(fixture.database, 'toy', '7', 'other-household');
+
+    expect(await listTombstones(fixture.database, LOCAL_HOUSEHOLD_ID)).toHaveLength(1);
+    expect(await listTombstones(fixture.database, 'other-household')).toHaveLength(1);
+
+    await clearTombstone(fixture.database, 'toy', '7', LOCAL_HOUSEHOLD_ID);
+    expect(await listTombstones(fixture.database, LOCAL_HOUSEHOLD_ID)).toHaveLength(0);
+    expect(await listTombstones(fixture.database, 'other-household')).toHaveLength(1);
   });
 
   it('reports nothing for a record that was never deleted', async () => {

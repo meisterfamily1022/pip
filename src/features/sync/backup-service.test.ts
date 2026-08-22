@@ -2,6 +2,9 @@ import { LOCAL_HOUSEHOLD_ID, runMigrations } from '@/database/migrations';
 import { RealSqliteConnection } from '@/database/real-sqlite-connection.test-helper';
 import type { DatabaseConnection } from '@/database/types';
 
+import { permanentlyDeleteParentToy } from '@/features/toys/toy-service';
+import { listTombstones } from './library-connection';
+
 import { backUpHousehold, BackupNotYoursError, isTransient, restoreHousehold } from './backup-service';
 import { describeBackupStatus, loadBackupStatus } from './backup-status';
 import type { RemoteHouseholdGateway } from './remote-gateway';
@@ -353,5 +356,107 @@ describe('what a backup records on the device', () => {
     await expect(backUpHousehold(deps(database, gateway, new FakeToyImageStorage())))
       .rejects.toThrow(/already backed up to a different account/i);
     expect(gateway.rows.size).toBe(0);
+  });
+});
+
+describe('deletion propagation', () => {
+  it('pushes a locally deleted toy and removes its uploaded photo, once the delete is confirmed', async () => {
+    const database = await freshDatabase();
+    await seedLibrary(database);
+    const gateway = new FakeHouseholdGateway();
+    const storage = new FakeToyImageStorage();
+
+    const first = await backUpHousehold(deps(database, gateway, storage));
+    expect(first.photosUploaded).toBe(1);
+    const uploadedPath = gateway.uploadedImages[0]!.path;
+
+    await permanentlyDeleteParentToy(database, 1, storage);
+    // Recorded the instant the toy is gone locally — no network involved yet.
+    expect(await listTombstones(database)).toEqual([
+      { entity: 'toy', entityId: '1', remoteImagePath: uploadedPath },
+    ]);
+
+    const second = await backUpHousehold(deps(database, gateway, storage));
+
+    expect(second.deleted).toBe(1);
+    expect(second.failures).toEqual([]);
+    expect(gateway.deletedImages).toEqual([uploadedPath]);
+    expect(await listTombstones(database)).toEqual([]);
+    expect(gateway.rows.get('toy:1')?.deletedAt).not.toBeNull();
+  });
+
+  it('leaves the tombstone queued when the delete cannot reach the server', async () => {
+    const database = await freshDatabase();
+    await seedLibrary(database);
+    const base = new FakeHouseholdGateway();
+    await backUpHousehold(deps(database, base, new FakeToyImageStorage()));
+    await permanentlyDeleteParentToy(database, 1, new FakeToyImageStorage());
+
+    const offline = gatewayWith(base, {
+      writeRecord: async () => { throw new Error('network unreachable'); },
+    });
+    const result = await backUpHousehold(deps(database, offline, new FakeToyImageStorage()));
+
+    expect(result.deleted).toBe(0);
+    expect(result.failures).toEqual([{ entity: 'toy', localId: 1, reason: expect.stringContaining('unreachable') }]);
+    // Still queued — the next successful run picks it back up.
+    expect(await listTombstones(database)).toEqual([
+      { entity: 'toy', entityId: '1', remoteImagePath: expect.any(String) },
+    ]);
+  });
+
+  it('still clears the tombstone when the delete is confirmed but the photo cleanup itself fails', async () => {
+    const database = await freshDatabase();
+    await seedLibrary(database);
+    const base = new FakeHouseholdGateway();
+    await backUpHousehold(deps(database, base, new FakeToyImageStorage()));
+    await permanentlyDeleteParentToy(database, 1, new FakeToyImageStorage());
+
+    const flaky = gatewayWith(base, {
+      deleteImage: async () => { throw new Error('storage momentarily unavailable'); },
+    });
+    const result = await backUpHousehold(deps(database, flaky, new FakeToyImageStorage()));
+
+    // The toy is confirmed deleted, which is the invariant that matters; a
+    // leftover bucket object is not treated as a run failure.
+    expect(result.deleted).toBe(1);
+    expect(result.failures).toEqual([]);
+    expect(await listTombstones(database)).toEqual([]);
+  });
+
+  it('removes the previous photo once a replacement upload is confirmed pushed', async () => {
+    const database = await freshDatabase();
+    await seedLibrary(database);
+    const gateway = new FakeHouseholdGateway();
+    const storage = new FakeToyImageStorage();
+
+    await backUpHousehold(deps(database, gateway, storage));
+    const originalPath = gateway.uploadedImages[0]!.path;
+
+    // An edited toy does not yet re-queue itself for another push — nothing
+    // in this codebase resets a synced record's queue status on a later local
+    // edit, which is a separate, real gap this fix does not attempt (see the
+    // evidence report). What is being proven here is backUpHousehold's own
+    // behaviour once a row IS due to be sent again with a changed photo —
+    // reached today via a retried run, modelled directly so this test does
+    // not depend on a re-queue mechanism that does not exist yet.
+    await database.runAsync(
+      "UPDATE toys SET image_uri = 'file:///photos/tiles-v2.jpg', image_synced_fingerprint = NULL WHERE id = 1;",
+    );
+    await database.runAsync(
+      "UPDATE sync_operations SET status = 'pending' WHERE entity = 'toy' AND entity_id = '1';",
+    );
+
+    const second = await backUpHousehold(deps(database, gateway, storage));
+
+    expect(second.photosUploaded).toBe(1);
+    const replacementPath = gateway.uploadedImages[1]!.path;
+    expect(replacementPath).not.toBe(originalPath);
+    expect(gateway.deletedImages).toEqual([originalPath]);
+
+    const stored = await database.getFirstAsync<{ image_remote_path: string }>(
+      'SELECT image_remote_path FROM toys WHERE id = 1;',
+    );
+    expect(stored?.image_remote_path).toBe(replacementPath);
   });
 });

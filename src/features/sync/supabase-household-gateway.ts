@@ -245,4 +245,12 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
       throw new Error(`This photo could not be restored: ${caught instanceof Error ? caught.message : 'the download failed'}`);
     }
   },
+
+  async deleteImage(_remoteHouseholdId, path) {
+    // Supabase Storage's remove() does not error for a path that is already
+    // gone — it reports an empty removed list — so a retried cleanup after a
+    // previous attempt actually succeeded is naturally a no-op, not a failure.
+    const { error } = await supabase.storage.from('toy-images').remove([path]);
+    if (error) throw new Error(`This photo could not be removed: ${error.message}`);
+  },
 };

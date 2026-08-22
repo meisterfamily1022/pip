@@ -5,7 +5,7 @@ import { backUpHouseholdToAccount } from '@/features/household/household-scope';
 
 import type { SyncEntity } from './conflict-resolution';
 import { downloadAndImportToyImage, uploadToyImageIfChanged } from './image-pipeline';
-import { markOperation, planLibraryImport, requeueInterrupted } from './library-connection';
+import { clearTombstone, listTombstones, markOperation, planLibraryImport, requeueInterrupted } from './library-connection';
 import type { RemoteHouseholdGateway, RemoteRow } from './remote-gateway';
 import {
   applyRestoredRows,
@@ -64,6 +64,8 @@ export type BackupResult = {
   sent: number;
   photosUploaded: number;
   recovered: number;
+  /** Deletions pushed and confirmed this run. */
+  deleted: number;
   /** Still outstanding: left queued, so the next run picks them up. */
   failures: BackupFailure[];
 };
@@ -158,6 +160,55 @@ async function recordFor(database: DatabaseConnection, entity: SyncEntity, row: 
 }
 
 /**
+ * Pushes every deletion recorded locally since the last backup.
+ *
+ * The tombstone, not the (now-gone) local row, is the unit of work: a delete
+ * pushed while offline stays queued here exactly like a pending edit stays
+ * queued in `sync_operations`, and is retried on the next call rather than
+ * lost. `pushRecord`'s own conflict handling makes a repeat of an
+ * already-applied delete converge with nothing further to do, so retrying a
+ * delete that actually succeeded last time but whose tombstone failed to
+ * clear is harmless.
+ *
+ * The photo is removed only after the delete itself is confirmed pushed —
+ * never the other way around, so a failure here cannot leave the remote row
+ * resurrectable while its picture is already gone.
+ */
+async function pushPendingDeletions(
+  database: DatabaseConnection,
+  gateway: RemoteHouseholdGateway,
+  remoteHouseholdId: string,
+  householdId: string,
+): Promise<{ deleted: number; failures: BackupFailure[] }> {
+  let deleted = 0;
+  const failures: BackupFailure[] = [];
+
+  for (const tombstone of await listTombstones(database, householdId)) {
+    const entity = tombstone.entity as SyncEntity;
+    const localId = Number(tombstone.entityId);
+    try {
+      await pushRecord(gateway, remoteHouseholdId, entity, localId, null, { kind: 'delete' }, {});
+      if (tombstone.remoteImagePath) {
+        try {
+          await gateway.deleteImage(remoteHouseholdId, tombstone.remoteImagePath);
+        } catch {
+          // The deletion itself succeeded and is the invariant that matters —
+          // a leftover bucket object is unwanted clutter, not a resurrection
+          // risk. Left for a future maintenance pass rather than blocking the
+          // tombstone from clearing.
+        }
+      }
+      await clearTombstone(database, tombstone.entity, tombstone.entityId, householdId);
+      deleted += 1;
+    } catch (caught: unknown) {
+      failures.push({ entity, localId, reason: messageOf(caught) });
+    }
+  }
+
+  return { deleted, failures };
+}
+
+/**
  * Sends everything in this household that is not already backed up.
  *
  * Safe to call again at any point: `planLibraryImport` only queues what is not
@@ -183,6 +234,7 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
     );
   }
   await requeueInterrupted(database, householdId);
+  const deletions = await pushPendingDeletions(database, gateway, remoteHouseholdId, householdId);
   await planLibraryImport(database, householdId);
 
   const outstanding = await database.getAllAsync<{ entity: SyncEntity; entity_id: string }>(
@@ -191,7 +243,7 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
   );
   const pending = new Set(outstanding.map((row) => `${row.entity}:${row.entity_id}`));
 
-  const failures: BackupFailure[] = [];
+  const failures: BackupFailure[] = [...deletions.failures];
   let sent = 0;
   let photosUploaded = 0;
   let recovered = 0;
@@ -206,6 +258,7 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
         const data = await recordFor(database, entity, row);
         let photoPath: string | null = null;
 
+        const previousRemotePath = typeof row.image_remote_path === 'string' ? row.image_remote_path : null;
         if (entity === 'toy' && typeof row.image_uri === 'string' && row.image_uri) {
           // The photograph goes first: a toy row that names a path whose bytes
           // never uploaded would restore as a toy with a broken picture, which
@@ -220,8 +273,9 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
             data.imagePath = upload.path;
             data.imageUploadedAt = new Date().toISOString();
             await database.runAsync(
-              'UPDATE toys SET image_synced_fingerprint = ? WHERE id = ?;',
+              'UPDATE toys SET image_synced_fingerprint = ?, image_remote_path = ? WHERE id = ?;',
               upload.fingerprint,
+              upload.path,
               row.id,
             );
           }
@@ -242,6 +296,18 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
           await recordRecoveryEvent(database, householdId, entity, row.id, outcome.reason, outcome.notify);
         }
 
+        // A new upload superseded this device's own previous object, and the
+        // record naming it is now confirmed pushed. Remove the old object —
+        // never before this point, so a failure earlier could not leave the
+        // remote row pointing at a photo that is already gone.
+        if (photoPath && previousRemotePath && previousRemotePath !== photoPath) {
+          try {
+            await gateway.deleteImage(remoteHouseholdId, previousRemotePath);
+          } catch {
+            // Left for a future maintenance pass; the record itself is correct.
+          }
+        }
+
         await markOperation(database, entity, String(row.id), { status: 'done' }, householdId);
         await markSyncedRevision(database, householdId, outcome.revision);
         sent += 1;
@@ -259,7 +325,7 @@ export async function backUpHousehold(deps: BackupDeps): Promise<BackupResult> {
     }
   }
 
-  return { remoteHouseholdId, sent, photosUploaded, recovered, failures };
+  return { remoteHouseholdId, sent, photosUploaded, recovered, deleted: deletions.deleted, failures };
 }
 
 export type RestoreOutcome =

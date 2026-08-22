@@ -18,6 +18,8 @@ import {
 import { deleteUniqueManagedImages, expoToyImageStorage, type ToyImageStorage } from './toy-image-storage';
 import { telemetry } from '@/features/analytics/telemetry-client';
 import { trackLibraryScale } from '@/features/analytics/library-scale';
+import { getActiveHouseholdId } from '@/features/household/household-scope';
+import { recordDeletion } from '@/features/sync/library-connection';
 
 export class ToyValidationError extends Error {}
 
@@ -207,7 +209,15 @@ export async function permanentlyDeleteParentToy(
   const existing = await getParentToy(database, id);
   if (!existing) throw new Error('Toy not found.');
   if (await countActivePlaySessionsForToy(database, id)) throw new Error('This toy is checked out. Finish that child’s cleanup before deleting it.');
+  const householdId = await getActiveHouseholdId(database);
   await deleteToy(database, id);
+  // Durable, not a network call: if this household is ever backed up, the
+  // next backup run pushes the delete and removes the remote photo. Recorded
+  // unconditionally, since a purely local household simply never has it
+  // consumed — cheap to keep, and correct if the household is connected
+  // later. Captured now because the toy row, and image_remote_path with it,
+  // is gone the instant deleteToy above returns.
+  await recordDeletion(database, 'toy', String(id), householdId, existing.imageRemotePath);
   try {
     const cleanupFailures = await deleteUniqueManagedImages(storage, [existing.originalImageUri, existing.enhancedImageUri, existing.imageUri]);
     if (cleanupFailures > 0) console.warn('Toy image cleanup incomplete after deletion.');

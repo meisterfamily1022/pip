@@ -18,7 +18,7 @@ export class FakeHouseholdGateway implements RemoteHouseholdGateway {
   readonly archivedConflicts: { entity: SyncEntity; localId: number; reason: ConflictReason; archived: WriteIntent }[] = [];
   readonly archivedImages: { toyLocalId: number; imagePath: string }[] = [];
   readonly uploadedImages: { toyLocalId: number; localUri: string; path: string }[] = [];
-  readonly deletedImages: string[] = []; // Never written to by this fake — asserted empty, proving archived images are kept.
+  readonly deletedImages: string[] = [];
   private households = new Map<string, string>();
 
   private key(entity: SyncEntity, localId: number): string {
@@ -102,6 +102,17 @@ export class FakeHouseholdGateway implements RemoteHouseholdGateway {
 
   async downloadImage(_remoteHouseholdId: string, path: string): Promise<{ tempUri: string }> {
     return { tempUri: `file:///tmp/downloaded/${path}` };
+  }
+
+  /** Set to make the next deleteImage call fail, so callers' error handling is exercised. */
+  failNextImageDelete = false;
+
+  async deleteImage(_remoteHouseholdId: string, path: string): Promise<void> {
+    if (this.failNextImageDelete) {
+      this.failNextImageDelete = false;
+      throw new Error('This photo could not be removed: simulated failure.');
+    }
+    this.deletedImages.push(path);
   }
 }
 

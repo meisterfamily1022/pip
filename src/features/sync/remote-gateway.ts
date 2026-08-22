@@ -88,4 +88,12 @@ export interface RemoteHouseholdGateway {
 
   /** Downloads a photo's bytes to a local temp file, for import into the canonical image pipeline. */
   downloadImage(remoteHouseholdId: string, path: string): Promise<{ tempUri: string }>;
+
+  /**
+   * Permanently removes a photo's object from remote storage — the one case
+   * where a bucket object is meant to stop existing rather than be archived,
+   * because the toy it belonged to is gone: after a delete, or after an
+   * ordinary replace once the new photo has uploaded and pushed successfully.
+   */
+  deleteImage(remoteHouseholdId: string, path: string): Promise<void>;
 }

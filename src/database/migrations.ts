@@ -577,6 +577,43 @@ async function ensureChildNormalizedName(database: DatabaseConnection): Promise<
   `);
 }
 
+/**
+ * Deleting a toy locally never told the remote side. The row (and, for a
+ * synced household, its uploaded photo) stayed on the server forever — so a
+ * future restore resurrected a toy a parent had deliberately removed, and the
+ * photo bucket accumulated objects nothing local pointed at anymore.
+ *
+ * Two pieces close that gap:
+ *
+ *  - `toys.image_remote_path` remembers the exact object a toy's photo was
+ *    last uploaded to (upload paths are timestamped, not derivable from the
+ *    toy's id), so a later replace or delete knows precisely what to remove
+ *    remotely instead of guessing or leaving it behind.
+ *  - `deleted_records` becomes the durable outbox for pending remote
+ *    deletions — mirroring how `sync_operations` already durably queues
+ *    pending edits — so a toy deleted while offline still propagates on the
+ *    next successful backup. It is rebuilt from scratch rather than altered:
+ *    nothing has ever called `recordDeletion` outside its own test, so there
+ *    is no real data to preserve, and its old primary key of just
+ *    `(entity, entity_id)` was wrong for the same reason a bare toy id is —
+ *    those are only unique within one household, not across every household
+ *    that might share a device.
+ */
+async function ensureToyDeletionPropagation(database: DatabaseConnection): Promise<void> {
+  await addColumnIfMissing(database, 'toys', 'image_remote_path', 'TEXT');
+  await database.execAsync(`
+    DROP TABLE IF EXISTS deleted_records;
+    CREATE TABLE deleted_records (
+      entity TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      household_id TEXT NOT NULL,
+      remote_image_path TEXT,
+      deleted_at TEXT NOT NULL,
+      PRIMARY KEY (entity, entity_id, household_id)
+    );
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -750,6 +787,10 @@ const migrations: readonly Migration[] = [
   {
     version: 20,
     apply: ensureChildNormalizedName,
+  },
+  {
+    version: 21,
+    apply: ensureToyDeletionPropagation,
   },
 ];
 
