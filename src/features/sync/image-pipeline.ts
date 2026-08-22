@@ -50,7 +50,16 @@ export async function downloadAndImportToyImage(
   imagePath: string,
 ): Promise<{ localUri: string; fingerprint: string | null }> {
   const { tempUri } = await gateway.downloadImage(remoteHouseholdId, imagePath);
-  const localUri = await storage.copyIntoManagedStorage(tempUri);
-  const fingerprint = (await storage.fingerprintImage?.(localUri)) ?? null;
-  return { localUri, fingerprint };
+  try {
+    const localUri = await storage.copyIntoManagedStorage(tempUri);
+    const fingerprint = (await storage.fingerprintImage?.(localUri)) ?? null;
+    return { localUri, fingerprint };
+  } finally {
+    // The raw download's job ends the moment it is imported — left otherwise,
+    // a restore of any real size accumulates one orphaned file per photo in
+    // cache indefinitely, cleared only whenever iOS/Android next decides
+    // storage pressure warrants it. Removed whether the import above
+    // succeeded or not, so a failed import cannot leave one behind either.
+    await storage.deleteTempFile?.(tempUri);
+  }
 }

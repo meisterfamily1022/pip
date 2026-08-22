@@ -6,6 +6,15 @@ export interface ToyImageStorage {
   copyIntoManagedStorage(sourceUri: string): Promise<string>;
   deleteManagedImage(uri: string | null): Promise<void>;
   fingerprintImage?(uri: string): Promise<string | null>;
+  /**
+   * Removes a file this storage did not itself manage into the toy-images
+   * directory — a raw download sitting in a temp/cache location, once
+   * whatever consumed it (successfully or not) no longer needs it there.
+   * Unlike `deleteManagedImage`, not restricted to the managed directory: the
+   * caller is the one that created the temp file and knows its path is safe
+   * to remove.
+   */
+  deleteTempFile?(uri: string): Promise<void>;
 }
 
 export async function deleteUniqueManagedImages(storage: ToyImageStorage, uris: readonly (string | null)[]): Promise<number> {
@@ -94,5 +103,11 @@ export const expoToyImageStorage: ToyImageStorage = {
       hash = Math.imul(hash, 16777619);
     }
     return `${uri.length}-${(hash >>> 0).toString(36)}`;
+  },
+
+  async deleteTempFile(uri: string): Promise<void> {
+    if (Platform.OS === 'web') return;
+    const file = new File(uri);
+    if (file.exists) file.delete();
   },
 };

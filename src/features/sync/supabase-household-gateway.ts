@@ -242,6 +242,13 @@ export const supabaseHouseholdGateway: RemoteHouseholdGateway = {
       const downloaded = await File.downloadFileAsync(signed.signedUrl, destination);
       return { tempUri: downloaded.uri };
     } catch (caught: unknown) {
+      // iOS downloads to a temp location and moves into place only on
+      // success, so nothing is left at `destination` there. Android streams
+      // straight into it, so an interruption can leave a partial file at
+      // exactly this path — cleared here rather than left for a future
+      // restore attempt to trip over a file that looks present but is not
+      // actually valid image data.
+      if (destination.exists) destination.delete();
       throw new Error(`This photo could not be restored: ${caught instanceof Error ? caught.message : 'the download failed'}`);
     }
   },

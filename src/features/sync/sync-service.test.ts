@@ -218,6 +218,36 @@ describe('restore eligibility', () => {
     const result = await checkRestoreEligibility(database, HOUSEHOLD);
     expect(result).toMatchObject({ eligible: false, reason: 'not-empty' });
   });
+
+  it('refuses to restore onto a device another household already has inventory on, even though this household is empty', async () => {
+    const database = await freshDatabase();
+    await database.runAsync(
+      `INSERT INTO households (id, name, is_local_only, created_at, updated_at) VALUES ('other-household', 'Other family', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+    await database.runAsync(
+      `INSERT INTO rooms (id, name, household_id, created_at, updated_at) VALUES (1, 'Playroom', 'other-household', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+    await database.runAsync(
+      `INSERT INTO storage_spots (id, room_id, name, household_id, created_at, updated_at) VALUES (1, 1, 'Shelf', 'other-household', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+    await database.runAsync(
+      `INSERT INTO toys (id, name, room_id, storage_spot_id, household_id, created_at, updated_at) VALUES (1, 'Another family toy', 1, 1, 'other-household', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+    );
+
+    // This household's own tables are empty — the existing checks alone
+    // would say yes, which is exactly the collision this guard exists for.
+    const result = await checkRestoreEligibility(database, HOUSEHOLD);
+    expect(result).toEqual({ eligible: false, reason: 'device-shared', message: expect.any(String) });
+  });
+
+  it('is unaffected by rows already belonging to the household being restored', async () => {
+    const database = await freshDatabase();
+    await database.runAsync(
+      `INSERT INTO rooms (id, name, household_id, created_at, updated_at) VALUES (1, 'Playroom', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+      HOUSEHOLD,
+    );
+    expect(await checkRestoreEligibility(database, HOUSEHOLD)).toMatchObject({ eligible: true, replacesSetup: true });
+  });
 });
 
 describe('restore', () => {

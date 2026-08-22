@@ -60,6 +60,25 @@ describe('restoring a toy photo — through the canonical pipeline, not a bare U
 
     expect(result.fingerprint).toBe('server-fingerprint');
   });
+
+  it('removes the raw download once it has been imported, so a restore does not accumulate one temp file per photo', async () => {
+    const gateway = new FakeHouseholdGateway();
+    const storage = new FakeToyImageStorage();
+
+    await downloadAndImportToyImage(gateway, storage, 'remote-1', '5/photo.jpg');
+
+    expect(storage.deletedTemp).toEqual(['file:///tmp/downloaded/5/photo.jpg']);
+  });
+
+  it('still removes the raw download when importing it fails, rather than leaking it', async () => {
+    const gateway = new FakeHouseholdGateway();
+    const storage = new FakeToyImageStorage();
+    storage.failNextCopy = true;
+
+    await expect(downloadAndImportToyImage(gateway, storage, 'remote-1', '5/photo.jpg')).rejects.toThrow();
+
+    expect(storage.deletedTemp).toEqual(['file:///tmp/downloaded/5/photo.jpg']);
+  });
 });
 
 describe('an image conflict never deletes the losing photo', () => {

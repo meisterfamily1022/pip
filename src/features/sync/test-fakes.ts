@@ -130,13 +130,19 @@ function extractData(intent: Extract<WriteIntent, { kind: 'edit' }>): Record<str
 export class FakeToyImageStorage implements ToyImageStorage {
   readonly copied: string[] = [];
   readonly deleted: (string | null)[] = [];
+  readonly deletedTemp: string[] = [];
   private fingerprints = new Map<string, string>();
+  failNextCopy = false;
 
   setFingerprint(uri: string, fingerprint: string): void {
     this.fingerprints.set(uri, fingerprint);
   }
 
   async copyIntoManagedStorage(sourceUri: string): Promise<string> {
+    if (this.failNextCopy) {
+      this.failNextCopy = false;
+      throw new Error('This photo could not be saved.');
+    }
     const managed = `file:///managed/${sourceUri.split('/').pop()}`;
     this.copied.push(managed);
     const fingerprint = this.fingerprints.get(sourceUri);
@@ -150,5 +156,9 @@ export class FakeToyImageStorage implements ToyImageStorage {
 
   async fingerprintImage(uri: string): Promise<string | null> {
     return this.fingerprints.get(uri) ?? uri;
+  }
+
+  async deleteTempFile(uri: string): Promise<void> {
+    this.deletedTemp.push(uri);
   }
 }

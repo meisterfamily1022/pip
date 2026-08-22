@@ -108,7 +108,46 @@ export type RestoreEligibility =
    * explicit say-so.
    */
   | { eligible: true; replacesSetup: true; message: string }
-  | { eligible: false; reason: 'not-empty'; message: string };
+  | { eligible: false; reason: 'not-empty'; message: string }
+  | { eligible: false; reason: 'device-shared'; message: string };
+
+/**
+ * Whether ANY household other than this one already has rows in the tables a
+ * restore writes to.
+ *
+ * `applyOneRow` inserts using the remote device's own local integer id —
+ * `rooms`/`storage_spots`/`toys`/`child_profiles`/`play_sessions` have no
+ * composite key, so that id is only guaranteed unique within the household
+ * that originally assigned it. Two households legitimately sharing one
+ * device (a second adult signs in, or signs out and back in as someone
+ * else) is the ordinary, designed-for case — `household-scope.ts` hands the
+ * next person an unowned household rather than the first person's, on
+ * purpose. If that second household then restores, its own row ids can
+ * collide with the first household's ids already resident in the same
+ * tables: one insert quietly fails and is skipped, or — the sharper failure —
+ * a row from the *new* household succeeds and ends up foreign-keyed to a
+ * room or spot that belongs to the *other* household, because its own row
+ * lost the id race. A row with a NULL household — a toy from before
+ * migration 9 ever populated the column — is included for the same reason:
+ * it is exactly the kind of unscoped row that can occupy an id nothing here
+ * expects to be taken.
+ */
+async function hasOtherHouseholdInventory(database: DatabaseConnection, householdId: string): Promise<boolean> {
+  const row = await database.getFirstAsync<{ id: number }>(
+    `SELECT id FROM rooms WHERE household_id IS NULL OR household_id != ?
+     UNION ALL SELECT id FROM storage_spots WHERE household_id IS NULL OR household_id != ?
+     UNION ALL SELECT id FROM toys WHERE household_id IS NULL OR household_id != ?
+     UNION ALL SELECT id FROM child_profiles WHERE household_id IS NULL OR household_id != ?
+     UNION ALL SELECT id FROM play_sessions WHERE household_id IS NULL OR household_id != ?
+     LIMIT 1;`,
+    householdId,
+    householdId,
+    householdId,
+    householdId,
+    householdId,
+  );
+  return row !== null;
+}
 
 /**
  * Whether this household may receive a restore.
@@ -117,7 +156,10 @@ export type RestoreEligibility =
  * restoring a second household's rows onto a device that already holds
  * unrelated local content would need every id remapped, and nothing here does
  * that yet. So a device with a real library is refused rather than merged
- * unsafely.
+ * unsafely. That applies whether the "real library" is this household's own
+ * (checked below) or a *different* household's already resident on this
+ * device (`hasOtherHouseholdInventory`) — either way, the physical id space
+ * a restore writes into is not empty, and nothing here remaps it.
  *
  * "Real library", though, is not the same as "not empty", and treating them as
  * the same made restore unreachable in the shipped app. Setup requires a room,
@@ -134,6 +176,14 @@ export async function checkRestoreEligibility(
   database: DatabaseConnection,
   householdId: string,
 ): Promise<RestoreEligibility> {
+  if (await hasOtherHouseholdInventory(database, householdId)) {
+    return {
+      eligible: false,
+      reason: 'device-shared',
+      message: 'This device already has another family\'s Pip library on it. Restore onto a device with just one library — set this one up fresh instead, or use a device that has not been used for Pip yet.',
+    };
+  }
+
   const invested = await database.getFirstAsync<{ id: number }>(
     'SELECT id FROM toys WHERE household_id = ? UNION ALL SELECT id FROM play_sessions WHERE household_id = ? LIMIT 1;',
     householdId,
