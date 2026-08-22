@@ -510,6 +510,28 @@ async function ensurePlaySessionGuestIndexScoped(database: DatabaseConnection): 
   `);
 }
 
+/**
+ * Child names are already checked in the service before an insert, but a
+ * check-then-insert cannot survive two taps landing at once — both reads see
+ * no clash and both inserts succeed. This index makes the database the
+ * arbiter, so the loser fails instead of producing two profiles a parent
+ * cannot tell apart.
+ *
+ * The expression mirrors the service's normalisation: case-folded, trimmed,
+ * and with runs of spaces collapsed. Three nested replaces cover up to eight
+ * consecutive spaces, which is far past anything a nickname field produces;
+ * the service still does the general check, and this is the last-resort guard.
+ */
+async function ensureChildNameUniquePerHousehold(database: DatabaseConnection): Promise<void> {
+  await database.execAsync(`
+    CREATE UNIQUE INDEX IF NOT EXISTS child_profile_name_per_household
+      ON child_profiles(
+        household_id,
+        replace(replace(replace(lower(trim(name)), '  ', ' '), '  ', ' '), '  ', ' ')
+      );
+  `);
+}
+
 const migrations: readonly Migration[] = [
   {
     version: 1,
@@ -675,6 +697,10 @@ const migrations: readonly Migration[] = [
   {
     version: 18,
     apply: ensurePlaySessionGuestIndexScoped,
+  },
+  {
+    version: 19,
+    apply: ensureChildNameUniquePerHousehold,
   },
 ];
 

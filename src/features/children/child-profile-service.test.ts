@@ -390,3 +390,92 @@ describe('choosing what happens to a deleted profile\'s play history', () => {
       .toBe("4 play records will be kept for the household, with this child's name removed.");
   });
 });
+
+describe('household isolation and rapid taps', () => {
+  const OTHER_HOUSEHOLD_ID = 'household-two';
+  let fixture: Fixture;
+
+  beforeEach(async () => {
+    fixture = await setUp();
+    await fixture.database.runAsync(
+      "INSERT INTO households (id, name, created_at, updated_at) VALUES (?, 'Next door', '2026-01-01', '2026-01-01');",
+      OTHER_HOUSEHOLD_ID,
+    );
+  });
+
+  afterEach(() => {
+    fixture.database.close();
+  });
+
+  it('lets two households each have a child with the same name', async () => {
+    await addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID);
+    await expect(
+      addChildProfile(fixture.database, { name: 'Maya' }, OTHER_HOUSEHOLD_ID),
+    ).resolves.toEqual(expect.objectContaining({ name: 'Maya' }));
+  });
+
+  it('never lists another household\'s profiles', async () => {
+    await addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID);
+    await addChildProfile(fixture.database, { name: 'Rosa' }, OTHER_HOUSEHOLD_ID);
+
+    const ours = await loadChildProfiles(fixture.database, { householdId: LOCAL_HOUSEHOLD_ID });
+    const theirs = await loadChildProfiles(fixture.database, { householdId: OTHER_HOUSEHOLD_ID });
+
+    expect(ours.map((profile) => profile.name)).toEqual(['Maya']);
+    expect(theirs.map((profile) => profile.name)).toEqual(['Rosa']);
+  });
+
+  it('leaves the other household untouched when a profile is deleted', async () => {
+    const ours = await addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID);
+    await addChildProfile(fixture.database, { name: 'Rosa' }, OTHER_HOUSEHOLD_ID);
+
+    await deleteChildProfile(fixture.database, ours.id);
+
+    const theirs = await loadChildProfiles(fixture.database, { householdId: OTHER_HOUSEHOLD_ID });
+    expect(theirs.map((profile) => profile.name)).toEqual(['Rosa']);
+  });
+
+  it('does not reorder one household using another household\'s ids', async () => {
+    const first = await addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID);
+    const second = await addChildProfile(fixture.database, { name: 'Sam' }, LOCAL_HOUSEHOLD_ID);
+    const outsider = await addChildProfile(fixture.database, { name: 'Rosa' }, OTHER_HOUSEHOLD_ID);
+
+    const reordered = await reorderChildren(
+      fixture.database,
+      [outsider.id, second.id, first.id],
+      LOCAL_HOUSEHOLD_ID,
+    );
+
+    expect(reordered.map((profile) => profile.name)).toEqual(['Sam', 'Maya']);
+  });
+
+  it('creates one profile, not two, when the same add is tapped twice at once', async () => {
+    const results = await Promise.allSettled([
+      addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID),
+      addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const profiles = await loadChildProfiles(fixture.database, { householdId: LOCAL_HOUSEHOLD_ID });
+    expect(profiles).toHaveLength(1);
+  });
+
+  it('survives a repeated delete of the same profile', async () => {
+    const profile = await addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID);
+    const toyId = await addToy(fixture, 'Blocks');
+    await startSession(fixture, toyId, profile.id, 'completed');
+
+    const first = await deleteChildProfile(fixture.database, profile.id, 'anonymise');
+    expect(first).toEqual({ removedSessions: 0, anonymisedSessions: 1 });
+
+    // A replayed delete says so rather than reporting a second anonymisation,
+    // and must not touch the records the first one detached.
+    await expect(deleteChildProfile(fixture.database, profile.id, 'anonymise')).rejects.toThrow(
+      ChildProfileError,
+    );
+    const sessions = await fixture.database.getAllAsync<{ child_id: number | null }>(
+      'SELECT child_id FROM play_sessions;',
+    );
+    expect(sessions).toEqual([{ child_id: null }]);
+  });
+});

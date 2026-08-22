@@ -48,6 +48,12 @@ async function assertNameAvailable(
   if (clash) throw new ChildProfileError('There is already a profile with that name.');
 }
 
+/** A violation of the per-household unique name index. */
+function isNameClash(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('child_profile_name_per_household');
+}
+
 export type ChildProfileDetails = {
   name: string;
   avatarId?: string;
@@ -78,7 +84,15 @@ export async function addChildProfile(
     throw new ChildProfileError(`Use at least ${MINIMUM_NAME_LENGTH} characters for a name.`);
   }
   await assertNameAvailable(database, name, householdId);
-  return createChildProfile(database, { ...details, name } as ChildProfileInput, householdId);
+  try {
+    return await createChildProfile(database, { ...details, name } as ChildProfileInput, householdId);
+  } catch (error) {
+    // Two taps landing together both pass the check above; the unique index
+    // stops the second insert. Report it as the same clash a parent would
+    // have seen had the first tap finished first.
+    if (isNameClash(error)) throw new ChildProfileError('There is already a profile with that name.');
+    throw error;
+  }
 }
 
 export async function saveChildProfile(

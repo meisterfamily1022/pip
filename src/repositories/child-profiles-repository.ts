@@ -66,11 +66,18 @@ export async function listChildProfiles(
   return rows.map(toProfile);
 }
 
-export async function getChildProfile(database: DatabaseConnection, id: number): Promise<ChildProfile | null> {
+export async function getChildProfile(
+  database: DatabaseConnection,
+  id: number,
+  // Callers that already know which household they are working in pass it,
+  // so reading back a profile just written to a non-active household does not
+  // come back empty.
+  householdId?: string,
+): Promise<ChildProfile | null> {
   const row = await database.getFirstAsync<ChildProfileRow>(
     `SELECT ${COLUMNS} FROM child_profiles WHERE id = ? AND household_id = ?;`,
     id,
-    await getActiveHouseholdId(database),
+    householdId ?? (await getActiveHouseholdId(database)),
   );
   return row ? toProfile(row) : null;
 }
@@ -108,7 +115,7 @@ export async function createChildProfile(
     timestamp,
   );
 
-  const profile = await getChildProfile(database, result.lastInsertRowId);
+  const profile = await getChildProfile(database, result.lastInsertRowId, householdId);
   if (!profile) throw new Error('Child profile could not be loaded.');
   return profile;
 }
