@@ -1,4 +1,4 @@
-import { normalizeChildName } from './child-name';
+import { collapseWhitespace, normalizeChildName } from './child-name';
 
 describe('the canonical child-name rule', () => {
   it('folds case', () => {
@@ -23,5 +23,20 @@ describe('the canonical child-name rule', () => {
 
   it('keeps genuinely different names apart', () => {
     expect(normalizeChildName('Sam')).not.toBe(normalizeChildName('Samuel'));
+  });
+});
+
+describe('the stored form of a name', () => {
+  it('collapses a run of spaces so a name cannot render as a gap', () => {
+    expect(collapseWhitespace(`Sam${' '.repeat(12)}Smith`)).toBe('Sam Smith');
+  });
+
+  it('keeps the parent\'s capitalisation', () => {
+    expect(collapseWhitespace('  saM   SMITH ')).toBe('saM SMITH');
+  });
+
+  it('agrees with the rule the unique index uses', () => {
+    const typed = 'Sam\t\t Smith  ';
+    expect(normalizeChildName(collapseWhitespace(typed))).toBe(normalizeChildName(typed));
   });
 });

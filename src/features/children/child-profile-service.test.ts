@@ -531,7 +531,7 @@ describe('the stored normalised name', () => {
     await addChildProfile(fixture.database, { name: 'Sam\tSmith' }, LOCAL_HOUSEHOLD_ID);
     await expect(
       addChildProfile(fixture.database, { name: 'SAM   SMITH' }, 'household-two'),
-    ).resolves.toEqual(expect.objectContaining({ name: 'SAM   SMITH' }));
+    ).resolves.toEqual(expect.objectContaining({ name: 'SAM SMITH' }));
   });
 
   it('is enforced by the database, not only by the service check', async () => {
@@ -545,5 +545,28 @@ describe('the stored normalised name', () => {
         LOCAL_HOUSEHOLD_ID,
       ),
     ).rejects.toThrow(/UNIQUE/i);
+  });
+});
+
+describe('what a name looks like once it is saved', () => {
+  let fixture: Fixture;
+
+  beforeEach(async () => { fixture = await setUp(); });
+  afterEach(() => { fixture.database.close(); });
+
+  it('stores a name without the gap a stray double space leaves', async () => {
+    const profile = await addChildProfile(fixture.database, { name: `Sam${' '.repeat(12)}Smith` }, LOCAL_HOUSEHOLD_ID);
+    expect(profile.name).toBe('Sam Smith');
+  });
+
+  it('collapses on rename too', async () => {
+    const profile = await addChildProfile(fixture.database, { name: 'Maya' }, LOCAL_HOUSEHOLD_ID);
+    const renamed = await saveChildProfile(fixture.database, profile.id, { name: '  Rosa   Lee ' });
+    expect(renamed.name).toBe('Rosa Lee');
+  });
+
+  it('keeps the capitalisation a parent chose', async () => {
+    const profile = await addChildProfile(fixture.database, { name: 'saM   SMITH' }, LOCAL_HOUSEHOLD_ID);
+    expect(profile.name).toBe('saM SMITH');
   });
 });

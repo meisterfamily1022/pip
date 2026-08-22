@@ -14,5 +14,18 @@
  * "  sam   smith " and "Sam\tSmith" are one name.
  */
 export function normalizeChildName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+  return collapseWhitespace(name).toLowerCase();
+}
+
+/**
+ * The form a name is stored and shown in.
+ *
+ * Case is the parent's to choose, but runs of whitespace are not meaningful in
+ * a nickname and iOS makes them easy to produce by accident — a stray repeated
+ * space renders as a gap wide enough to look like two separate names in the
+ * children list. Collapsing on save keeps what is stored equal to what is
+ * shown.
+ */
+export function collapseWhitespace(name: string): string {
+  return name.trim().replace(/\s+/g, ' ');
 }

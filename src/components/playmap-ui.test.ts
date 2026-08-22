@@ -169,6 +169,23 @@ describe('fields', () => {
     expect(hostsWhere(renderer, (node) => node.props.accessibilityLiveRegion === 'polite' && node.props.children === 'Give this room a name.').length).toBeGreaterThan(0);
   });
 
+  it('keeps iOS autocorrect away from the names a family chose', () => {
+    // On device, two spaces in a nickname became "Sam. Smith", which then
+    // reads as a different name from "Sam Smith".
+    const renderer = render(createElement(RoundedTextInput, { label: 'Name', onChangeText: jest.fn(), value: '' }));
+    const field = hostsWhere(renderer, (node) => node.props.autoCorrect === false)[0];
+    expect(field).toBeDefined();
+    expect(field?.props.spellCheck).toBe(false);
+    expect(field?.props.autoCapitalize).toBe('words');
+  });
+
+  it('still lets a field ask for different keyboard behaviour', () => {
+    const renderer = render(createElement(RoundedTextInput, {
+      autoCapitalize: 'none', label: 'Email', onChangeText: jest.fn(), value: '',
+    }));
+    expect(hostsWhere(renderer, (node) => node.props.autoCapitalize === 'none').length).toBeGreaterThan(0);
+  });
+
   it('reserves the error line so a message does not shift the layout', () => {
     const renderer = render(createElement(RoundedTextInput, { error: null, label: 'Room', onChangeText: jest.fn(), value: '' }));
     expect(hostsWhere(renderer, (node) => node.props.accessibilityLiveRegion === 'polite').length).toBe(1);

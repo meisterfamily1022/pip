@@ -390,6 +390,14 @@ export function IconButton({
 /**
  * A labelled text field. The error sits directly beneath the input and is
  * announced politely, so it is heard next rather than interrupting typing.
+ *
+ * Autocorrect is off by default. Every field in Pip holds a name a family
+ * chose — a child, a toy, a room — not prose, and iOS's substitutions rewrite
+ * those: typing two spaces in a nickname produced "Sam. Smith" on device,
+ * which then counts as a different name from "Sam Smith". Names are
+ * word-capitalised instead of sentence-capitalised for the same reason.
+ * Callers that need something else pass their own value; these are only
+ * defaults.
  */
 export function RoundedTextInput({
   label,
@@ -402,6 +410,9 @@ export function RoundedTextInput({
     <View style={styles.field}>
       {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
       <TextInput
+        autoCapitalize="words"
+        autoCorrect={false}
+        spellCheck={false}
         {...props}
         accessibilityHint={hint ?? props.accessibilityHint}
         accessibilityLabel={props.accessibilityLabel ?? label}

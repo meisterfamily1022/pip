@@ -1,7 +1,7 @@
 import { LOCAL_HOUSEHOLD_ID } from '@/database/migrations';
 import type { DatabaseConnection } from '@/database/types';
 import type { ChildProfile, ChoiceLimit } from '@/domain/models';
-import { normalizeChildName } from '@/domain/child-name';
+import { collapseWhitespace, normalizeChildName } from '@/domain/child-name';
 import {
   createChildProfile,
   getChildProfile,
@@ -79,7 +79,7 @@ export async function addChildProfile(
   details: ChildProfileDetails,
   householdId: string = LOCAL_HOUSEHOLD_ID,
 ): Promise<ChildProfile> {
-  const name = details.name.trim();
+  const name = collapseWhitespace(details.name);
   if (name.length < MINIMUM_NAME_LENGTH) {
     throw new ChildProfileError(`Use at least ${MINIMUM_NAME_LENGTH} characters for a name.`);
   }
@@ -103,15 +103,24 @@ export async function saveChildProfile(
   const existing = await getChildProfile(database, id);
   if (!existing) throw new ChildProfileError('That profile no longer exists.');
 
+  const next = { ...details } as Partial<ChildProfileInput>;
   if (details.name !== undefined) {
-    const name = details.name.trim();
+    const name = collapseWhitespace(details.name);
     if (name.length < MINIMUM_NAME_LENGTH) {
       throw new ChildProfileError(`Use at least ${MINIMUM_NAME_LENGTH} characters for a name.`);
     }
     await assertNameAvailable(database, name, existing.householdId, id);
+    // The collapsed form is what gets stored, so a rename cannot reintroduce
+    // the gap an add would have removed.
+    next.name = name;
   }
 
-  return updateChildProfile(database, id, details as Partial<ChildProfileInput>);
+  try {
+    return await updateChildProfile(database, id, next);
+  } catch (error) {
+    if (isNameClash(error)) throw new ChildProfileError('There is already a profile with that name.');
+    throw error;
+  }
 }
 
 /** Pauses a profile. Its history and preferences are kept. */
