@@ -1,4 +1,5 @@
 import type { DatabaseConnection } from './types';
+import { normalizeChildName } from '@/domain/child-name';
 
 type Migration = {
   version: number;
@@ -511,16 +512,9 @@ async function ensurePlaySessionGuestIndexScoped(database: DatabaseConnection): 
 }
 
 /**
- * Child names are already checked in the service before an insert, but a
- * check-then-insert cannot survive two taps landing at once — both reads see
- * no clash and both inserts succeed. This index makes the database the
- * arbiter, so the loser fails instead of producing two profiles a parent
- * cannot tell apart.
- *
- * The expression mirrors the service's normalisation: case-folded, trimmed,
- * and with runs of spaces collapsed. Three nested replaces cover up to eight
- * consecutive spaces, which is far past anything a nickname field produces;
- * the service still does the general check, and this is the last-resort guard.
+ * Superseded by migration 20, which replaces this index with one built on a
+ * stored `normalized_name`. Kept so a database that already applied it
+ * upgrades along the same path as a fresh one.
  */
 async function ensureChildNameUniquePerHousehold(database: DatabaseConnection): Promise<void> {
   await database.execAsync(`
@@ -529,6 +523,57 @@ async function ensureChildNameUniquePerHousehold(database: DatabaseConnection): 
         household_id,
         replace(replace(replace(lower(trim(name)), '  ', ' '), '  ', ' '), '  ', ' ')
       );
+  `);
+}
+
+/**
+ * Child names are already checked in the service before an insert, but a
+ * check-then-insert cannot survive two taps landing at once — both reads see
+ * no clash and both inserts succeed. This makes the database the arbiter, so
+ * the loser fails instead of producing two profiles a parent cannot tell
+ * apart.
+ *
+ * Migration 19 approximated the service's normalisation with nested SQL
+ * `replace()` calls, which agreed with it for ordinary names but not for tabs
+ * or long runs of spaces. Two rules that disagree anywhere are one rule too
+ * many, so this replaces it with a stored `normalized_name` written from
+ * `normalizeChildName` — the single canonical rule — and indexes that.
+ *
+ * The backfill runs through the same function rather than through SQL. If
+ * legacy rows collide under the canonical rule (only reachable through the
+ * race the old index failed to catch), this throws with the offending names
+ * instead of creating the index: refusing to start is recoverable, silently
+ * discarding a child's profile is not.
+ */
+async function ensureChildNormalizedName(database: DatabaseConnection): Promise<void> {
+  await database.execAsync('DROP INDEX IF EXISTS child_profile_name_per_household;');
+  await addColumnIfMissing(database, 'child_profiles', 'normalized_name', 'TEXT');
+
+  const rows = await database.getAllAsync<{ id: number; household_id: string; name: string }>(
+    'SELECT id, household_id, name FROM child_profiles;',
+  );
+
+  const seen = new Map<string, string>();
+  const collisions: string[] = [];
+  for (const row of rows) {
+    const normalized = normalizeChildName(row.name);
+    const key = `${row.household_id}\u0000${normalized}`;
+    const first = seen.get(key);
+    if (first) collisions.push(`"${first}" and "${row.name}" in household ${row.household_id}`);
+    else seen.set(key, row.name);
+    await database.runAsync('UPDATE child_profiles SET normalized_name = ? WHERE id = ?;', normalized, row.id);
+  }
+
+  if (collisions.length > 0) {
+    throw new Error(
+      `Cannot make child names unique per household: ${collisions.join('; ')}. ` +
+        'Rename one of each pair before upgrading; no profile has been removed.',
+    );
+  }
+
+  await database.execAsync(`
+    CREATE UNIQUE INDEX IF NOT EXISTS child_profile_normalized_name_per_household
+      ON child_profiles(household_id, normalized_name);
   `);
 }
 
@@ -701,6 +746,10 @@ const migrations: readonly Migration[] = [
   {
     version: 19,
     apply: ensureChildNameUniquePerHousehold,
+  },
+  {
+    version: 20,
+    apply: ensureChildNormalizedName,
   },
 ];
 

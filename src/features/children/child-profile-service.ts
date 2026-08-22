@@ -1,6 +1,7 @@
 import { LOCAL_HOUSEHOLD_ID } from '@/database/migrations';
 import type { DatabaseConnection } from '@/database/types';
 import type { ChildProfile, ChoiceLimit } from '@/domain/models';
+import { normalizeChildName } from '@/domain/child-name';
 import {
   createChildProfile,
   getChildProfile,
@@ -30,12 +31,11 @@ const MINIMUM_NAME_LENGTH = 2;
 const now = (): string => new Date().toISOString();
 
 /**
- * Names are compared case- and space-insensitively.
- *
- * Without this, a double tap or a replayed offline queue produces "Sam" twice
- * and the parent cannot tell the profiles apart.
+ * The same rule the stored `normalized_name` column is written from, so this
+ * pre-check and the database's unique index can never disagree about whether
+ * two names are the same name.
  */
-const nameKey = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, ' ');
+const nameKey = normalizeChildName;
 
 async function assertNameAvailable(
   database: DatabaseConnection,
@@ -51,7 +51,7 @@ async function assertNameAvailable(
 /** A violation of the per-household unique name index. */
 function isNameClash(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes('child_profile_name_per_household');
+  return message.includes('child_profile_normalized_name_per_household');
 }
 
 export type ChildProfileDetails = {

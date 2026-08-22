@@ -479,3 +479,71 @@ describe('household isolation and rapid taps', () => {
     expect(sessions).toEqual([{ child_id: null }]);
   });
 });
+
+/**
+ * The database is the final arbiter of name uniqueness, so it has to agree
+ * with the service's own check for every input the service would reject —
+ * not just for ordinary names.
+ */
+describe('the stored normalised name', () => {
+  let fixture: Fixture;
+
+  beforeEach(async () => {
+    fixture = await setUp();
+  });
+
+  afterEach(() => {
+    fixture.database.close();
+  });
+
+  const sameNameAs = (variant: string) => async () => {
+    await addChildProfile(fixture.database, { name: 'Sam Smith' }, LOCAL_HOUSEHOLD_ID);
+    await expect(addChildProfile(fixture.database, { name: variant }, LOCAL_HOUSEHOLD_ID)).rejects.toThrow(
+      'There is already a profile with that name.',
+    );
+  };
+
+  it('rejects a different casing', sameNameAs('SAM SMITH'));
+  it('rejects surrounding whitespace', sameNameAs('   Sam Smith\t'));
+  it('rejects a tab as the separator', sameNameAs('Sam\tSmith'));
+  it('rejects a run of spaces longer than eight', sameNameAs(`Sam${' '.repeat(40)}Smith`));
+
+  it('is written for every profile, including after a rename', async () => {
+    const profile = await addChildProfile(fixture.database, { name: '  Sam   Smith ' }, LOCAL_HOUSEHOLD_ID);
+    let row = await fixture.database.getFirstAsync<{ normalized_name: string }>(
+      'SELECT normalized_name FROM child_profiles WHERE id = ?;',
+      profile.id,
+    );
+    expect(row?.normalized_name).toBe('sam smith');
+
+    await saveChildProfile(fixture.database, profile.id, { name: 'Rosa\tLee' });
+    row = await fixture.database.getFirstAsync<{ normalized_name: string }>(
+      'SELECT normalized_name FROM child_profiles WHERE id = ?;',
+      profile.id,
+    );
+    expect(row?.normalized_name).toBe('rosa lee');
+  });
+
+  it('still lets two households use the same name', async () => {
+    await fixture.database.runAsync(
+      "INSERT INTO households (id, name, created_at, updated_at) VALUES ('household-two', 'Next door', '2026-01-01', '2026-01-01');",
+    );
+    await addChildProfile(fixture.database, { name: 'Sam\tSmith' }, LOCAL_HOUSEHOLD_ID);
+    await expect(
+      addChildProfile(fixture.database, { name: 'SAM   SMITH' }, 'household-two'),
+    ).resolves.toEqual(expect.objectContaining({ name: 'SAM   SMITH' }));
+  });
+
+  it('is enforced by the database, not only by the service check', async () => {
+    await addChildProfile(fixture.database, { name: 'Sam Smith' }, LOCAL_HOUSEHOLD_ID);
+    // Bypasses the service entirely, the way a concurrent insert does.
+    await expect(
+      fixture.database.runAsync(
+        `INSERT INTO child_profiles
+           (name, normalized_name, household_id, avatar_id, accent_color_id, choice_limit, reading_support, display_order, created_at, updated_at)
+         VALUES ('SAM  SMITH', 'sam smith', ?, 'circle-dot', 'mint', 3, 'pictures-words', 2, '2026-01-01', '2026-01-01');`,
+        LOCAL_HOUSEHOLD_ID,
+      ),
+    ).rejects.toThrow(/UNIQUE/i);
+  });
+});

@@ -2,6 +2,7 @@ import type { DatabaseConnection } from '@/database/types';
 import type { ChildProfileRow } from '@/database/rows';
 import type { ChildProfile, ChoiceLimit } from '@/domain/models';
 import { getActiveHouseholdId } from '@/features/household/household-scope';
+import { normalizeChildName } from '@/domain/child-name';
 import {
   DEFAULT_ACCENT_COLOR_ID,
   DEFAULT_AVATAR_ID,
@@ -101,9 +102,12 @@ export async function createChildProfile(
 
   const result = await database.runAsync(
     `INSERT INTO child_profiles
-       (name, household_id, avatar_id, accent_color_id, age_range, choice_limit, reading_support, display_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       (name, normalized_name, household_id, avatar_id, accent_color_id, age_range, choice_limit, reading_support, display_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     name,
+    // Written here, never computed in SQL, so the unique index and the
+    // service's pre-check are enforcing exactly the same rule.
+    normalizeChildName(name),
     householdId,
     details.avatarId ?? DEFAULT_AVATAR_ID,
     details.accentColorId ?? DEFAULT_ACCENT_COLOR_ID,
@@ -140,9 +144,10 @@ export async function updateChildProfile(
 
   await database.runAsync(
     `UPDATE child_profiles
-        SET name = ?, avatar_id = ?, accent_color_id = ?, age_range = ?, choice_limit = ?, reading_support = ?, updated_at = ?
+        SET name = ?, normalized_name = ?, avatar_id = ?, accent_color_id = ?, age_range = ?, choice_limit = ?, reading_support = ?, updated_at = ?
       WHERE id = ?;`,
     next.name,
+    normalizeChildName(next.name),
     next.avatarId,
     next.accentColorId,
     next.ageRange,
