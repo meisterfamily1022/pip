@@ -67,35 +67,57 @@ None introduced by Prompt 7. Carried forward, all previously disclosed:
   Type, VoiceOver, reduced motion, haptics, and physical-device camera capture.
   Camera capture specifically cannot be closed on a simulator.
 
-## Release sequence
+## Production release — executed
 
-Run in order, reading the output of each before starting the next.
+Two predictions in the earlier draft of this document were wrong, and both were
+corrected by measurement rather than left to be discovered during the release.
+They are kept here rather than quietly edited out, because each one would have
+changed what a person did next.
 
-```bash
-git checkout main && git merge --no-ff claude/pip-staging-schema-qa-b5f72d
-```
-```bash
-npx tsc --noEmit && npx eslint src --ext .ts,.tsx && npx jest
-```
-```bash
-npx supabase link --project-ref owfpxnbyzuohygxlqgrg && npx supabase db diff --linked
-```
-```bash
-npx supabase db push --linked && npx supabase functions deploy delete-account --project-ref owfpxnbyzuohygxlqgrg
-```
-```bash
-npx eas build --platform ios --profile production
-```
-```bash
-npx eas submit --platform ios --latest
-```
+**Wrong: "production has never had these migrations applied."** It already had
+all six. `supabase migration list --linked` returns a matching remote entry for
+every local migration, and `db push --dry-run` reports `Remote database is up to
+date` with nothing pending. The `db push` that this document described as the
+one genuinely hard-to-reverse step was a no-op. (`db diff --linked` could not be
+used to confirm this: it builds a shadow database and needs Docker, which is not
+installed here. The dry-run push answers the same question without it.)
 
-Two things to check before running those, both of which are easier to prevent
-than to undo:
+**Wrong: "the production build reads `.env.local`."** It does not, and could not
+— `.easignore` excludes `.env*.local`, so that file never reaches an EAS
+builder, and the `production` profile in `eas.json` carries no `env` block. What
+actually supplies the values is EAS's own stored environment, which does hold
+both `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for
+the `production` environment. Verified that the URL resolves to
+`owfpxnbyzuohygxlqgrg` and not to staging, and that the key is the publishable
+one rather than a secret.
 
-1. **Production has never had these migrations applied.** Read the `db diff`
-   output before the `db push`. It is the only genuinely hard-to-reverse step
-   in this sequence.
-2. **The production build reads `.env.local`, and the main checkout's copy
-   points at production.** This worktree's copy points at staging and must not
-   travel with the build. Confirm which project the file names before building.
+**Found and fixed: `delete-account` was not deployed to production.** The
+function list came back empty. This matters more than it looks: the app decides
+whether to show a *Delete account* control from a build-time flag, and a control
+that cannot delete would tell a parent their account is gone when it is not. Now
+deployed and ACTIVE with `verify_jwt: true`.
+
+### Production posture, measured after deployment
+
+Verified with the publishable key only, as an unauthenticated caller — 12 of 12:
+
+- every family table (`households`, `toys`, `rooms`, `storage_spots`,
+  `child_profiles`, `play_sessions`, `conflict_archive`, `toy_image_history`)
+  returns nothing anonymously;
+- an anonymous insert into `households` is refused by row-level security;
+- `toy-images` is not publicly readable (HTTP 400) and cannot be listed;
+- `delete-account` refuses an unauthenticated caller (HTTP 401).
+
+### Production auth smoke test
+
+Run end-to-end against production through Pip's real six-digit email OTP flow on
+a dedicated plus-address account, then removed:
+
+- signed in with a code read from the real inbox;
+- after sign-out, the old refresh token could not mint a session and the old
+  access token was refused by the auth server (`403 session_not_found`);
+- the account was deleted through the deployed function (`{"deleted": true}`),
+  after which it no longer resolved (`403 user_not_found`) and its session could
+  not be renewed.
+
+No test account, row, or object was left in production.
