@@ -66,6 +66,10 @@ class CleanupTestDatabase implements DatabaseConnection {
   }
 
   async getFirstAsync<T>(source: string, ...params: SqlParameters): Promise<T | null> {
+    // The active household, which these fakes do not model: they each hold a
+    // single library, so it is always the device-local one. Scoping itself is
+    // proven against real SQLite in features/household/household-scope.test.ts.
+    if (source.includes('FROM device_household_state')) return { active_household_id: 'local' } as T;
     if (source.startsWith('SELECT id FROM child_profiles')) return (this.children.has(params[0] as number) ? { id: params[0] } : null) as T | null;
     if (source.startsWith('SELECT id FROM toys')) { const toy = this.toys.get(params[0] as number); return (toy?.is_available === 1 && toy?.is_archived === 0 ? { id: toy.id } : null) as T | null; }
     if (source.startsWith('SELECT c.name AS child_name')) { const session = [...this.sessions.values()].find((row) => row.toy_id === params[0] && row.status === 'active'); return (session ? { child_name: this.children.get(session.child_id as number) } : null) as T | null; }

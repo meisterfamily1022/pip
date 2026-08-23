@@ -3,6 +3,8 @@ export type StorageSpotRow = RoomRow & { room_id: number };
 export type ToyRow = {
   id: number; name: string; image_uri: string | null; original_image_uri: string | null; enhanced_image_uri: string | null;
   intake_key?: string | null;
+  /** The exact remote storage object this toy's photo was last uploaded to, if any and if selected. */
+  image_remote_path?: string | null;
   preferred_image_variant: 'original' | 'enhanced'; ai_metadata_status: 'manual' | 'suggested' | 'confirmed';
   ai_analysis_id: string | null; ai_schema_version: string | null; ai_consent_at: string | null; ai_confirmed_at: string | null;
   room_id: number; storage_spot_id: number;
@@ -37,5 +39,7 @@ export type ChildProfileRow = {
 };
 export type HouseholdRow = {
   id: string; name: string; is_local_only: number; remote_id: string | null;
+  /** NULL marks the device-local household, which belongs to no account. */
+  owner_account_id: string | null;
   created_at: string; updated_at: string;
 };

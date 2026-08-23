@@ -182,6 +182,15 @@ export default function ParentHomeRoute() {
                 </View>
               ))
             )}
+            {/*
+              The one thing a parent asks about this section: why is that toy
+              still listed. It stays because Pip holds a choice open until the
+              child has actually tidied up — that is the whole point of the
+              flow, and nothing else on the screen says so.
+            */}
+            <Text maxFontSizeMultiplier={1.8} style={styles.sectionNote}>
+              A toy stays out for play until your child finishes tidying it up.
+            </Text>
           </View>
 
           {overview.libraryMilestone ? (
@@ -352,6 +361,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing[8],
   },
   emptyTitle: { color: theme.colors.secondaryText, ...theme.typography.meta },
+  sectionNote: { color: theme.colors.mutedText, ...theme.typography.caption },
   checkoutPhoto: { borderRadius: theme.radii.card, height: 64, minHeight: 0, width: 64 },
   checkout: {
     alignItems: 'center',

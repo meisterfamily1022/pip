@@ -12,6 +12,7 @@ import { pipBrand } from '@/brand/pip-brand';
 import { pipFontAssets } from '@/theme/fonts';
 import { createSessionRestorer } from '@/features/auth/auth-client';
 import { getSessionSnapshot, restoreSession, subscribeSession } from '@/features/auth/session-state';
+import { startHouseholdSessionSync } from '@/features/household/household-session';
 import {
   getPendingVerificationSnapshot,
   restorePendingVerification,
@@ -82,6 +83,14 @@ export default function RootLayout() {
       void initializeRouteAccess();
       void restorePendingVerification();
     }
+  }, [isPublic]);
+
+  // Which household is on screen follows who is signed in, for the whole app
+  // rather than per route. Public pages never read household data, so this
+  // starts with the rest of local startup.
+  useEffect(() => {
+    if (isPublic) return undefined;
+    return startHouseholdSessionSync();
   }, [isPublic]);
 
   const decision = resolveRouteGuard({

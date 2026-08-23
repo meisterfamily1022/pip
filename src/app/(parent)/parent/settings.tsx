@@ -24,6 +24,7 @@ import { parentAccessPreferences } from '@/services/parent-access-preferences';
 import { resetRouteAccess } from '@/startup/route-access';
 import { playmapTheme as theme } from '@/theme/playmap-theme';
 import { getSessionSnapshot } from '@/features/auth/session-state';
+import { areQaDiagnosticsEnabled, formatReleaseIdentity, getReleaseIdentity } from '@/features/release/release-identity';
 
 /**
  * Settings.
@@ -175,12 +176,29 @@ export default function ParentSettingsRoute() {
           <ListRow onPress={() => router.push('/privacy')} title="Privacy" />
           {cloudEligible ? <ListRow onPress={() => router.push('/parent/analytics-privacy' as never)} title="Optional analytics" /> : null}
           {cloudEligible ? <ListRow onPress={() => router.push('/parent/analytics-profile' as never)} title="Optional household profile" /> : null}
-          <ListRow onPress={() => router.push('/parent/account')} title="Account & your data" />
+          <ListRow onPress={() => router.push('/parent/account')} title="Account & data" />
           <ListRow detail={pipBrand.primaryTagline} title={`About ${pipBrand.name} 1.0`} />
         </ListCard>
         <Text style={styles.note}>Core family data stays on this device. Optional analytics is off unless a signed-in parent chooses it.</Text>
         <Text style={styles.note}>Pip is free during launch. Optional Pip Plus features may be introduced later.</Text>
       </Section>
+
+      {/*
+        Which build is this. Only rendered in development and in internal QA
+        builds that opted in, never in the App Store build — the point is to
+        make a stale bundle obvious to whoever is testing, not to expose the
+        source revision to families.
+      */}
+      {areQaDiagnosticsEnabled() ? (
+        <Section label="Internal QA">
+          <ListCard>
+            <ListRow detail={formatReleaseIdentity(getReleaseIdentity())} title="Build" />
+          </ListCard>
+          <Text style={styles.note}>
+            Version, build number and the commit this bundle was built from. Quote this line in any bug report.
+          </Text>
+        </Section>
+      ) : null}
 
       {sampleCount > 0 ? (
         <Section label="Sample toys">

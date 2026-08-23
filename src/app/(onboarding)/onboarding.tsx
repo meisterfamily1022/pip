@@ -27,8 +27,8 @@ export default function OnboardingHomeRoute() {
     <PageShell
       footer={
         <>
-          <PrimaryButton label="Get started" onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
-          <QuietButton label="Sign in" onPress={() => router.push('/sign-in')} />
+          <PrimaryButton label="Set up Pip on this device" onPress={() => void onboardingProgressStorage.markStarted().then(() => router.replace('/parent-pin-setup'))} />
+          <QuietButton label="I already have an account" onPress={() => router.push('/sign-in')} />
         </>
       }
     >
@@ -51,9 +51,16 @@ export default function OnboardingHomeRoute() {
         ))}
       </View>
 
+      {/*
+        Third in the hierarchy, and stated at its real worth. An account signs
+        you in and nothing more: there is no backup and no second device yet, so
+        this must not read as the safe choice a careful parent ought to take.
+        The day backup genuinely works, this copy earns a reason — until then it
+        would be selling something Pip does not have.
+      */}
       <View style={styles.account}>
         <Text style={styles.accountText}>
-          {`${pipBrand.name} works without an account. Your library and toy photos stay on this device.`}
+          {`${pipBrand.name} works without an account, and your library and toy photos stay on this device either way. An account only signs you in — it does not back anything up yet.`}
         </Text>
         <QuietButton label="Create an account" onPress={() => router.push('/sign-up')} />
       </View>

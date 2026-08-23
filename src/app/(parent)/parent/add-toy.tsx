@@ -40,6 +40,19 @@ export default function AddToyRoute() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
+  // One key for this manual add, for as long as this screen stays mounted:
+  // createParentToy treats a repeated call with the same key as "already
+  // done" rather than creating a second toy, so a retry after a caught save
+  // error (or any resubmission of the same form before it navigates away)
+  // cannot duplicate the toy. This does not survive a kill mid-save — unlike
+  // the batch queue, a manual add has no durable draft to resume from, so
+  // that narrow window is a documented residual risk, not a claimed fix.
+  //
+  // The lazy useState initializer, not useRef, because React requires the
+  // render body to be pure and Date.now()/Math.random() are not — useState's
+  // initializer is the one place a one-time impure computation is allowed,
+  // since React guarantees it runs exactly once regardless of re-renders.
+  const [manualIntakeKey] = useState(() => `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const load = useCallback(async () => {
     setError(null);
@@ -68,7 +81,7 @@ export default function AddToyRoute() {
     setError(null);
     try {
       const database = await initializeDatabase();
-      await createParentToy(database, input);
+      await createParentToy(database, { ...input, intakeKey: manualIntakeKey });
       router.replace(first === '1' ? '/parent/first-toy?added=1' : '/parent/toy-library');
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'That toy could not be saved.');

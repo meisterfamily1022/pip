@@ -1,6 +1,15 @@
 /* eslint-disable import/first */
 
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
+// A store that stores, so the send log the screen reads on mount is real.
+jest.mock('expo-secure-store', () => {
+  const values = new Map<string, string>();
+  return {
+    getItemAsync: jest.fn(async (key: string) => values.get(key) ?? null),
+    setItemAsync: jest.fn(async (key: string, value: string) => { values.set(key, value); }),
+    deleteItemAsync: jest.fn(async (key: string) => { values.delete(key); }),
+  };
+});
 jest.mock('./auth-client', () => {
   class AuthRequestError extends Error {
     code: string;
@@ -15,6 +24,7 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { router } from 'expo-router';
 
 import { AuthRequestError, resendVerification, verifyEmail } from './auth-client';
+import { otpSendLog } from './otp-send-log';
 import { pendingVerification } from './sign-up-form';
 import { VerifyEmailScreen } from './verify-email-screen';
 
@@ -37,8 +47,9 @@ async function renderScreen(): Promise<ReactTestRenderer> {
 }
 
 describe('email OTP verification interactions', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    await otpSendLog.clear();
     jest.spyOn(pendingVerification, 'get').mockResolvedValue('parent@example.com');
     jest.spyOn(pendingVerification, 'clear').mockResolvedValue();
     (verifyEmail as jest.Mock).mockResolvedValue({ accountId: 'user-123' });
@@ -81,7 +92,52 @@ describe('email OTP verification interactions', () => {
 
     expect(resendVerification).toHaveBeenCalledWith('parent@example.com');
     expect(control(renderer, 'Six-digit code').props.value).toBe('');
-    expect(JSON.stringify(renderer.toJSON())).toContain('A new code is on its way. Use the newest code in your email.');
+    // Names the address, so an inbox that stays empty is unambiguous.
+    expect(JSON.stringify(renderer.toJSON())).toContain('A new code is on its way to parent@example.com.');
+  });
+
+  it('arrives with the cooldown already running, because the first code was already sent', async () => {
+    await otpSendLog.record('parent@example.com', Date.now());
+    const renderer = await renderScreen();
+
+    // The first code is requested on sign-in, one screen earlier. Starting at
+    // "nothing sent yet" left this button enabled for the one press most likely
+    // to come straight back as over_email_send_rate_limit.
+    expect(control(renderer, 'Send another code in 60s').props.accessibilityState.disabled).toBe(true);
+    expect(resendVerification).not.toHaveBeenCalled();
+  });
+
+  it('carries the count of earlier codes into its guidance', async () => {
+    for (const _ of [1, 2, 3]) await otpSendLog.record('parent@example.com', Date.now());
+    const renderer = await renderScreen();
+
+    // Three codes have gone to this address, even though none was requested here.
+    expect(JSON.stringify(renderer.toJSON())).toContain('3 codes');
+  });
+
+  it('counts the cooldown down instead of letting the parent hit the send rate limit', async () => {
+    const renderer = await renderScreen();
+
+    expect(control(renderer, 'Send another code').props.accessibilityState.disabled).toBe(false);
+    await act(async () => control(renderer, 'Send another code').props.onPress());
+
+    // The server allows one code per address per minute; the button says so
+    // rather than letting the next press come back as over_email_send_rate_limit.
+    const cooling = control(renderer, 'Send another code in 60s');
+    expect(cooling.props.accessibilityState.disabled).toBe(true);
+    expect(resendVerification).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start a cooldown when the send itself failed', async () => {
+    (resendVerification as jest.Mock).mockRejectedValueOnce(
+      new AuthRequestError('NETWORK_ERROR', 'You appear to be offline. Check your connection and try again.'),
+    );
+    const renderer = await renderScreen();
+
+    await act(async () => control(renderer, 'Send another code').props.onPress());
+
+    // Nothing was sent, so nothing should stop the parent trying again.
+    expect(control(renderer, 'Send another code').props.accessibilityState.disabled).toBe(false);
   });
 
   it.each([

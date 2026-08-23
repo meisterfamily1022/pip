@@ -38,6 +38,7 @@ class TestDatabase implements DatabaseConnection {
   private readonly sessions = new Map<number, RecordRow>();
   private readonly children = new Map<number, RecordRow>([[1, {
     id: 1, name: 'Ari', household_id: 'local', avatar_id: 'circle-dot', accent_color_id: 'mint', age_range: null,
+    normalized_name: 'ari',
     choice_limit: 3, reading_support: 'pictures-words', display_order: 1, hidden_at: null, created_at: '', updated_at: '',
   }]]);
   private settings: RecordRow | null = null;
@@ -55,7 +56,7 @@ class TestDatabase implements DatabaseConnection {
     if (source.startsWith('UPDATE toys SET original_image_uri') || source.startsWith('UPDATE toys SET preferred_image_variant') || source.startsWith('UPDATE toys SET ai_metadata_status')) return { lastInsertRowId: 0, changes: 0 };
     if (source.startsWith('INSERT OR IGNORE INTO settings')) { if (!this.settings) this.settings = { id: 1, onboarding_completed: 0, child_mode_used: 0, parent_pin: null, child_nickname: null, active_child_id: null, choice_limit: 3, cleanup_required: 1, created_at: params[1]!, updated_at: params[2]! }; return { lastInsertRowId: 1, changes: 1 }; }
     if (source.startsWith('UPDATE settings')) { if (!this.settings) throw new Error('Missing settings'); [this.settings.onboarding_completed, this.settings.child_mode_used, this.settings.child_nickname, this.settings.active_child_id, this.settings.choice_limit, this.settings.cleanup_required, this.settings.updated_at] = params; return { lastInsertRowId: 1, changes: 1 }; }
-    if (source.startsWith('INSERT INTO child_profiles')) { const rowId = id(); this.children.set(rowId, { id: rowId, name: params[0]!, household_id: params[1]!, avatar_id: params[2]!, accent_color_id: params[3]!, age_range: params[4]!, choice_limit: params[5]!, reading_support: params[6]!, display_order: params[7]!, hidden_at: null, created_at: params[8]!, updated_at: params[9]! }); return { lastInsertRowId: rowId, changes: 1 }; }
+    if (source.startsWith('INSERT INTO child_profiles')) { const rowId = id(); this.children.set(rowId, { id: rowId, name: params[0]!, normalized_name: params[1]!, household_id: params[2]!, avatar_id: params[3]!, accent_color_id: params[4]!, age_range: params[5]!, choice_limit: params[6]!, reading_support: params[7]!, display_order: params[8]!, hidden_at: null, created_at: params[9]!, updated_at: params[10]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO rooms')) { const rowId = id(); this.rooms.set(rowId, { id: rowId, name: params[0]!, created_at: params[1]!, updated_at: params[2]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('INSERT INTO storage_spots')) { if (this.failStorageSpotCreation) throw new Error('Storage spot creation failed.'); const rowId = id(); this.spots.set(rowId, { id: rowId, room_id: params[0]!, name: params[1]!, created_at: params[2]!, updated_at: params[3]! }); return { lastInsertRowId: rowId, changes: 1 }; }
     if (source.startsWith('UPDATE rooms')) { const row = this.rooms.get(params[2] as number); if (!row) return { lastInsertRowId: 0, changes: 0 }; row.name = params[0]!; row.updated_at = params[1]!; return { lastInsertRowId: 0, changes: 1 }; }
@@ -70,19 +71,35 @@ class TestDatabase implements DatabaseConnection {
     // which this fake does not model, so they are accepted and ignored.
     if (source.startsWith('INSERT OR IGNORE INTO households')) return { lastInsertRowId: 0, changes: 1 };
     if (/^UPDATE "\w+" SET household_id/.test(source)) return { lastInsertRowId: 0, changes: 0 };
+    // Version 14 gives households an owner and records which one this device is
+    // showing. Ownership is exercised against real SQLite in
+    // features/household/household-scope.test.ts; here the statements only have
+    // to be accepted so the migration runner reaches the end.
+    if (source.startsWith('UPDATE households SET owner_account_id')) return { lastInsertRowId: 0, changes: 1 };
+    // Version 20 backfills the canonical normalised name onto every existing
+    // profile. The rule itself is exercised against real SQLite in
+    // features/children/child-profile-service.test.ts.
+    if (source.startsWith('UPDATE child_profiles SET normalized_name')) { const row = this.children.get(params[1] as number); if (row) row.normalized_name = params[0]!; return { lastInsertRowId: 0, changes: row ? 1 : 0 }; }
+    if (source.startsWith('INSERT OR IGNORE INTO device_household_state')) return { lastInsertRowId: 0, changes: 1 };
     throw new Error(`Unhandled SQL: ${source}`);
   }
 
   async getFirstAsync<T>(source: string, ...params: SqlParameters): Promise<T | null> {
+    // The active household. This fake holds a single library, so it is always
+    // the device-local one; scoping is proven against real SQLite in
+    // features/household/household-scope.test.ts.
+    if (source.includes('FROM device_household_state')) return { active_household_id: 'local' } as T;
     if (source.startsWith('PRAGMA user_version')) return { user_version: this.version } as T;
-    if (source.includes('FROM rooms WHERE name')) {
-      const name = String(params[0]).trim().toLowerCase();
-      const excluded = params.length > 1 ? params[1] : null;
+    // Name-uniqueness is now scoped: the household parameter leads, so these
+    // read one position further along than they used to.
+    if (source.includes('FROM rooms WHERE household_id') && source.includes('name =')) {
+      const name = String(params[1]).trim().toLowerCase();
+      const excluded = params.length > 2 ? params[2] : null;
       const found = [...this.rooms.values()].find((row) => String(row.name).toLowerCase() === name && row.id !== excluded);
       return (found ?? null) as T | null;
     }
     if (source.includes('FROM storage_spots WHERE room_id') && source.includes('name =')) {
-      const roomId = params[0]; const name = String(params[1]).trim().toLowerCase(); const excluded = params.length > 2 ? params[2] : null;
+      const roomId = params[0]; const name = String(params[2]).trim().toLowerCase(); const excluded = params.length > 3 ? params[3] : null;
       const found = [...this.spots.values()].find((row) => row.room_id === roomId && String(row.name).toLowerCase() === name && row.id !== excluded);
       return (found ?? null) as T | null;
     }
@@ -112,6 +129,11 @@ class TestDatabase implements DatabaseConnection {
     // migration's add-column-if-missing helper run without needing a schema
     // model here; migrations.test.ts and migration-integrity.test.ts cover that.
     if (source.startsWith('PRAGMA table_info')) return [];
+    // The rooms rebuild (migration 17) checks the whole database for
+    // foreign-key inconsistencies after it runs. This fake has no real
+    // referential integrity to check — real-SQLite coverage for that lives in
+    // migrations.test.ts — so reporting none lets the migration proceed.
+    if (source.startsWith('PRAGMA foreign_key_check')) return [];
     throw new Error(`Unhandled SQL: ${source}`);
   }
 }

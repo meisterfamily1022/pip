@@ -1,7 +1,8 @@
 import type { DatabaseConnection } from '@/database/types';
 import type { ChildProfileRow } from '@/database/rows';
 import type { ChildProfile, ChoiceLimit } from '@/domain/models';
-import { LOCAL_HOUSEHOLD_ID } from '@/database/migrations';
+import { getActiveHouseholdId } from '@/features/household/household-scope';
+import { normalizeChildName } from '@/domain/child-name';
 import {
   DEFAULT_ACCENT_COLOR_ID,
   DEFAULT_AVATAR_ID,
@@ -57,7 +58,7 @@ export async function listChildProfiles(
   database: DatabaseConnection,
   options: { includeHidden?: boolean; householdId?: string } = {},
 ): Promise<ChildProfile[]> {
-  const householdId = options.householdId ?? LOCAL_HOUSEHOLD_ID;
+  const householdId = options.householdId ?? (await getActiveHouseholdId(database));
   const hiddenClause = options.includeHidden ? '' : 'AND hidden_at IS NULL';
   const rows = await database.getAllAsync<ChildProfileRow>(
     `SELECT ${COLUMNS} FROM child_profiles WHERE household_id = ? ${hiddenClause} ORDER BY display_order, id;`,
@@ -66,20 +67,32 @@ export async function listChildProfiles(
   return rows.map(toProfile);
 }
 
-export async function getChildProfile(database: DatabaseConnection, id: number): Promise<ChildProfile | null> {
-  const row = await database.getFirstAsync<ChildProfileRow>(`SELECT ${COLUMNS} FROM child_profiles WHERE id = ?;`, id);
+export async function getChildProfile(
+  database: DatabaseConnection,
+  id: number,
+  // Callers that already know which household they are working in pass it,
+  // so reading back a profile just written to a non-active household does not
+  // come back empty.
+  householdId?: string,
+): Promise<ChildProfile | null> {
+  const row = await database.getFirstAsync<ChildProfileRow>(
+    `SELECT ${COLUMNS} FROM child_profiles WHERE id = ? AND household_id = ?;`,
+    id,
+    householdId ?? (await getActiveHouseholdId(database)),
+  );
   return row ? toProfile(row) : null;
 }
 
 export async function createChildProfile(
   database: DatabaseConnection,
   input: ChildProfileInput | string,
-  householdId: string = LOCAL_HOUSEHOLD_ID,
+  explicitHouseholdId?: string,
 ): Promise<ChildProfile> {
   // The original signature took a bare name; both forms are accepted so callers
   // that only set a nickname keep working.
   const details: ChildProfileInput = typeof input === 'string' ? { name: input } : input;
   const name = validateName(details.name);
+  const householdId = explicitHouseholdId ?? (await getActiveHouseholdId(database));
   const timestamp = now();
 
   const nextOrder = await database.getFirstAsync<{ next: number }>(
@@ -89,9 +102,12 @@ export async function createChildProfile(
 
   const result = await database.runAsync(
     `INSERT INTO child_profiles
-       (name, household_id, avatar_id, accent_color_id, age_range, choice_limit, reading_support, display_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       (name, normalized_name, household_id, avatar_id, accent_color_id, age_range, choice_limit, reading_support, display_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     name,
+    // Written here, never computed in SQL, so the unique index and the
+    // service's pre-check are enforcing exactly the same rule.
+    normalizeChildName(name),
     householdId,
     details.avatarId ?? DEFAULT_AVATAR_ID,
     details.accentColorId ?? DEFAULT_ACCENT_COLOR_ID,
@@ -103,7 +119,7 @@ export async function createChildProfile(
     timestamp,
   );
 
-  const profile = await getChildProfile(database, result.lastInsertRowId);
+  const profile = await getChildProfile(database, result.lastInsertRowId, householdId);
   if (!profile) throw new Error('Child profile could not be loaded.');
   return profile;
 }
@@ -128,9 +144,10 @@ export async function updateChildProfile(
 
   await database.runAsync(
     `UPDATE child_profiles
-        SET name = ?, avatar_id = ?, accent_color_id = ?, age_range = ?, choice_limit = ?, reading_support = ?, updated_at = ?
+        SET name = ?, normalized_name = ?, avatar_id = ?, accent_color_id = ?, age_range = ?, choice_limit = ?, reading_support = ?, updated_at = ?
       WHERE id = ?;`,
     next.name,
+    normalizeChildName(next.name),
     next.avatarId,
     next.accentColorId,
     next.ageRange,

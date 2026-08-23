@@ -2,6 +2,7 @@ import type { User } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
 import { clearSession, setAuthenticatedSession, type AuthenticatedAccount, type SessionRestorer } from './session-state';
+import { otpSendLog } from './otp-send-log';
 import { pendingVerification } from './sign-up-form';
 
 export class AuthRequestError extends Error {
@@ -65,6 +66,10 @@ async function requestFreshEmailOtp(email: string): Promise<void> {
   await pendingVerification.clear();
   await sendEmailOtp(normalizedEmail);
   await pendingVerification.set(normalizedEmail);
+  // Recorded here, the one place a send is known to have been accepted, so the
+  // confirm screen's cooldown covers the first code as well as every resend —
+  // including the first code, which is requested from a different screen.
+  await otpSendLog.record(normalizedEmail);
 }
 
 export const signUp = async (input: { email: string }): Promise<void> => requestFreshEmailOtp(input.email);
@@ -77,6 +82,7 @@ export async function verifyEmail(email: string, code: string): Promise<Authenti
   if (error) throw authError(error);
   if (!data.user) throw new AuthRequestError('AUTH_ERROR', 'We could not complete sign-in. Try again shortly.');
   const account = toAccount(data.user);
+  await otpSendLog.clear();
   setAuthenticatedSession(account);
   return account;
 }

@@ -34,3 +34,47 @@ This acceptance pass used the web build from the authoritative main checkout. Re
 ## Second-pass result
 
 The repaired screens were revisited after reload at desktop width, then representative routes were crawled again at phone and tablet widths. No clipping or horizontal overflow was observed. Browser warning inspection found only Metro disconnect warnings corresponding to intentional clean server restarts; no application render, invalid DOM/SVG, style, or runtime errors were captured.
+
+## Native acceptance pass — iOS Simulator
+
+Date: 2026-08-21
+Device: iPhone 17 Pro, iOS 26.5 (simulator `E7216BF1-6663-47C6-9DC2-D2651722D275`), debug dev client on Metro from this branch.
+
+The original pass above ran on the web build and, correctly, refused to claim
+native acceptance. A simulator is now available, so the native-only column of
+that table was re-checked directly. This section records what was checked on
+device; the web table above is unchanged.
+
+| Native item the table left open | Result |
+| --- | --- |
+| Safe areas, Dynamic Island, home indicator | Checked on Parent Home, Library, Add toys, Settings, Children, Add/Edit child, bulk review. Content clears the Dynamic Island; the sticky footer CTA and tab bar clear the home indicator. No clipping or horizontal overflow. |
+| OS camera permission sheet | Real sheet shown, with the app's own purpose string: "Pip lets you take toy photos for your local toy library." The app shows adjacent progress text while the sheet is up. |
+| Permanent camera denial and recovery | Denying produces "The camera is switched off" with numbered recovery steps, an "Open iPhone Settings" action, and "Choose from Photos instead". |
+| Settings deep link | Opens iOS Settings with a "◀ Pip" return affordance. Observed landing on the Settings root rather than the Pip pane on a simulator whose app pane did not yet exist; not investigated further. |
+| Native confirmation layout | The delete-profile confirmation renders as an in-app modal, not a UIAlert, with both actions reachable and the destructive action distinct. |
+| Photo-led surfaces | Parent Home hero photo, Library card thumbnail, and the bulk review photo slot all render at native scale without distortion. |
+| Native text entry | See the finding below. |
+
+### Found and fixed on device
+
+Typing a nickname with repeated spaces stored the name verbatim, so the
+children list rendered a gap wide enough to read as two separate names. Names
+are now stored collapsed on add and rename (`9fd493e`), which also keeps the
+stored name consistent with the rule the uniqueness index uses.
+
+`RoundedTextInput` now defaults to no autocorrect, no spellcheck, and word
+capitalisation, since every field it backs holds a name a family chose.
+
+### Still not claimed
+
+- **iOS "." shortcut.** Two spaces becomes a period. This is a system keyboard
+  setting with no per-field UIKit trait, so the app does not suppress it.
+  "Sam. Smith" therefore remains a different name from "Sam Smith" — correct,
+  but worth knowing.
+- **Software keyboard avoidance.** The simulator was driven by hardware
+  keyboard, so the software keyboard never covered a field. Keyboard overlap on
+  the name, PIN, room, and toy fields remains unverified.
+- **VoiceOver, Dynamic Type, reduced motion, haptics.** Not exercised; the
+  accessibility props are covered by component tests only.
+- **Physical device.** Simulator only. Camera capture itself cannot be
+  exercised without hardware.

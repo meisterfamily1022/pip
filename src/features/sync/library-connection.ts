@@ -99,13 +99,18 @@ export type SyncOperation = {
 const now = (): string => new Date().toISOString();
 
 /** Entities queued for upload, in the order they must be applied. */
-const IMPORT_ORDER = ['room', 'storage_spot', 'toy', 'child_profile'] as const;
+const IMPORT_ORDER = ['room', 'child_profile', 'storage_spot', 'toy', 'play_session'] as const;
 
 const SOURCE_TABLES: Record<(typeof IMPORT_ORDER)[number], string> = {
   room: 'rooms',
+  child_profile: 'child_profiles',
   storage_spot: 'storage_spots',
   toy: 'toys',
-  child_profile: 'child_profiles',
+  // Play history is part of a family's library, not incidental: "Ari played
+  // with this two days ago" is what the home screen is built around. Leaving
+  // sessions out of the queue meant a restore brought back the toys and none
+  // of the story attached to them.
+  play_session: 'play_sessions',
 };
 
 /**
@@ -127,7 +132,7 @@ export async function planLibraryImport(
     for (const entity of IMPORT_ORDER) {
       const table = SOURCE_TABLES[entity];
       // child_profiles carries no sample flag; only inventory tables do.
-      const sampleClause = entity === 'child_profile' ? '' : 'AND is_sample = 0';
+      const sampleClause = entity === 'child_profile' || entity === 'play_session' ? '' : 'AND is_sample = 0';
       const rows = await database.getAllAsync<{ id: number }>(
         `SELECT id FROM "${table}" WHERE household_id = ? ${sampleClause};`,
         householdId,
@@ -254,34 +259,56 @@ export async function requeueInterrupted(
  * Records a deletion so it can be replicated.
  *
  * Without this a device that never saw the delete would treat the record as new
- * and resurrect it on the next exchange.
+ * and resurrect it on the next exchange. `remoteImagePath` carries the exact
+ * object a deleted toy's photo was last uploaded to — captured now, because by
+ * the time this tombstone is actually pushed the local toy row, and with it
+ * the path, is already gone.
  */
 export async function recordDeletion(
   database: DatabaseConnection,
   entity: string,
   entityId: string,
   householdId: string = LOCAL_HOUSEHOLD_ID,
+  remoteImagePath: string | null = null,
 ): Promise<void> {
   await database.runAsync(
-    `INSERT INTO deleted_records (entity, entity_id, household_id, deleted_at)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT (entity, entity_id) DO NOTHING;`,
+    `INSERT INTO deleted_records (entity, entity_id, household_id, remote_image_path, deleted_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (entity, entity_id, household_id) DO NOTHING;`,
     entity,
     entityId,
     householdId,
+    remoteImagePath,
     now(),
   );
 }
 
+export type Tombstone = { entity: string; entityId: string; remoteImagePath: string | null };
+
 export async function listTombstones(
   database: DatabaseConnection,
   householdId: string = LOCAL_HOUSEHOLD_ID,
-): Promise<{ entity: string; entityId: string }[]> {
-  const rows = await database.getAllAsync<{ entity: string; entity_id: string }>(
-    'SELECT entity, entity_id FROM deleted_records WHERE household_id = ? ORDER BY entity, entity_id;',
+): Promise<Tombstone[]> {
+  const rows = await database.getAllAsync<{ entity: string; entity_id: string; remote_image_path: string | null }>(
+    'SELECT entity, entity_id, remote_image_path FROM deleted_records WHERE household_id = ? ORDER BY entity, entity_id;',
     householdId,
   );
-  return rows.map((row) => ({ entity: row.entity, entityId: row.entity_id }));
+  return rows.map((row) => ({ entity: row.entity, entityId: row.entity_id, remoteImagePath: row.remote_image_path }));
+}
+
+/** Clears a tombstone once its deletion has been confirmed pushed, so it is not resent. */
+export async function clearTombstone(
+  database: DatabaseConnection,
+  entity: string,
+  entityId: string,
+  householdId: string = LOCAL_HOUSEHOLD_ID,
+): Promise<void> {
+  await database.runAsync(
+    'DELETE FROM deleted_records WHERE entity = ? AND entity_id = ? AND household_id = ?;',
+    entity,
+    entityId,
+    householdId,
+  );
 }
 
 /** True when a record was deleted here, so an incoming copy must not revive it. */
@@ -289,11 +316,13 @@ export async function isDeletedLocally(
   database: DatabaseConnection,
   entity: string,
   entityId: string,
+  householdId: string = LOCAL_HOUSEHOLD_ID,
 ): Promise<boolean> {
   const row = await database.getFirstAsync<{ entity_id: string }>(
-    'SELECT entity_id FROM deleted_records WHERE entity = ? AND entity_id = ?;',
+    'SELECT entity_id FROM deleted_records WHERE entity = ? AND entity_id = ? AND household_id = ?;',
     entity,
     entityId,
+    householdId,
   );
   return row !== null;
 }

@@ -18,6 +18,7 @@ class ToyTestDatabase implements DatabaseConnection {
   public readonly spots = new Map<number, Row>();
   public readonly toys = new Map<number, Row>();
   public readonly categories = new Map<number, PlayCategory[]>();
+  public readonly deletedRecords: { entity: string; entityId: string; householdId: string; remoteImagePath: string | null }[] = [];
 
   constructor() {
     this.seedRoom('Playroom', ['Blue Bin', 'Shelf']);
@@ -97,6 +98,13 @@ class ToyTestDatabase implements DatabaseConnection {
       const changes = this.toys.delete(params[0] as number) ? 1 : 0;
       return { lastInsertRowId: 0, changes };
     }
+    // Deletion propagation to a remote household is exercised against real
+    // SQLite in features/sync/sync.test.ts; here it only needs to be accepted
+    // so permanentlyDeleteParentToy completes.
+    if (source.startsWith('INSERT INTO deleted_records')) {
+      this.deletedRecords.push({ entity: params[0] as string, entityId: params[1] as string, householdId: params[2] as string, remoteImagePath: params[3] as string | null });
+      return { lastInsertRowId: 0, changes: 1 };
+    }
     throw new Error(`Unhandled SQL: ${source}`);
   }
 
@@ -107,6 +115,10 @@ class ToyTestDatabase implements DatabaseConnection {
   }
 
   async getFirstAsync<T>(source: string, ...params: SqlParameters): Promise<T | null> {
+    // The active household, which these fakes do not model: they each hold a
+    // single library, so it is always the device-local one. Scoping itself is
+    // proven against real SQLite in features/household/household-scope.test.ts.
+    if (source.includes('FROM device_household_state')) return { active_household_id: 'local' } as T;
     if (source.includes('COUNT(*) AS count FROM play_sessions')) return { count: source.includes("status = 'active'") ? this.activePlaySessionCount : this.playSessionCount } as T;
     if (source.includes('JOIN rooms') && source.includes('WHERE t.intake_key')) {
       const row = [...this.toys.values()].find((candidate) => candidate.intake_key === params[0]);
@@ -126,6 +138,9 @@ class ToyTestDatabase implements DatabaseConnection {
     if (source.includes('FROM toys t')) {
       let rows = [...this.toys.values()];
       let index = 0;
+      // This fake holds one library, so household scoping matches everything —
+      // but the parameter is positional and comes first, so it must be consumed.
+      if (source.includes('t.household_id = ?')) index += 1;
       if (source.includes('t.is_archived = ?')) { const archived = params[index++]; rows = rows.filter((row) => row.is_archived === archived); }
       if (source.includes('t.is_available = ?')) { const available = params[index++]; rows = rows.filter((row) => row.is_available === available); }
       if (source.includes('t.room_id = ?')) { const roomId = params[index++]; rows = rows.filter((row) => row.room_id === roomId); }

@@ -1,9 +1,9 @@
 import { LOCAL_HOUSEHOLD_ID, runMigrations } from '@/database/migrations';
 import { RealSqliteConnection } from '@/database/real-sqlite-connection.test-helper';
 import { ensureSettings } from '@/repositories/settings-repository';
-import { resolveConflict, CONFLICT_EXPLANATIONS, isDestructive, type RecordVersion } from './conflict-resolution';
 import {
   checkConnectionEligibility,
+  clearTombstone,
   getImportProgress,
   isDeletedLocally,
   listSyncOperations,
@@ -13,105 +13,6 @@ import {
   recordDeletion,
   requeueInterrupted,
 } from './library-connection';
-
-const SYNCED_AT = '2026-08-01T00:00:00.000Z';
-const version = (overrides: Partial<RecordVersion> = {}): RecordVersion => ({
-  updatedAt: '2026-08-02T00:00:00.000Z',
-  ...overrides,
-});
-
-describe('conflict resolution', () => {
-  it('does nothing when neither side changed', () => {
-    const unchanged = version({ updatedAt: '2026-07-01T00:00:00.000Z' });
-    expect(resolveConflict('toy', unchanged, unchanged, SYNCED_AT)).toEqual({ kind: 'already-equal' });
-  });
-
-  it('takes whichever side actually changed', () => {
-    const old = version({ updatedAt: '2026-07-01T00:00:00.000Z' });
-    expect(resolveConflict('toy', version(), old, SYNCED_AT)).toEqual({ kind: 'keep-local' });
-    expect(resolveConflict('toy', old, version(), SYNCED_AT)).toEqual({ kind: 'take-remote' });
-  });
-
-  it('treats everything as changed when the sides have never synced', () => {
-    expect(resolveConflict('toy', version({ updatedAt: '2026-01-01T00:00:00.000Z' }), version(), null).kind).toBe(
-      'take-remote',
-    );
-  });
-
-  it('never resolves a delete-versus-edit automatically', () => {
-    const deleted = version({ deletedAt: '2026-08-03T00:00:00.000Z' });
-    const edited = version({ updatedAt: '2026-08-03T00:00:00.000Z' });
-
-    expect(resolveConflict('toy', deleted, edited, SYNCED_AT)).toEqual({
-      kind: 'needs-review',
-      reason: 'edited-and-deleted',
-    });
-    // Symmetric: the answer must not depend on which device asked.
-    expect(resolveConflict('toy', edited, deleted, SYNCED_AT)).toEqual({
-      kind: 'needs-review',
-      reason: 'edited-and-deleted',
-    });
-  });
-
-  it('converges when both sides deleted, since deletion is idempotent', () => {
-    const local = version({ deletedAt: '2026-08-03T00:00:00.000Z' });
-    const remote = version({ deletedAt: '2026-08-04T00:00:00.000Z' });
-    expect(resolveConflict('toy', local, remote, SYNCED_AT).kind).toBe('take-remote');
-  });
-
-  it('never picks a photo automatically, because one cannot be regenerated', () => {
-    const local = version({ photoUri: 'file:///a.jpg', updatedAt: '2026-08-05T00:00:00.000Z' });
-    const remote = version({ photoUri: 'file:///b.jpg', updatedAt: '2026-08-06T00:00:00.000Z' });
-
-    // Remote is strictly newer, so a last-write-wins policy would discard the
-    // local photograph. It must not.
-    expect(resolveConflict('toy', local, remote, SYNCED_AT)).toEqual({
-      kind: 'needs-review',
-      reason: 'photo-replaced',
-    });
-  });
-
-  it('allows automatic resolution when the photo is unchanged', () => {
-    const local = version({ photoUri: 'file:///same.jpg', updatedAt: '2026-08-05T00:00:00.000Z' });
-    const remote = version({ photoUri: 'file:///same.jpg', updatedAt: '2026-08-06T00:00:00.000Z' });
-    expect(resolveConflict('toy', local, remote, SYNCED_AT)).toEqual({ kind: 'take-remote' });
-  });
-
-  it('never ends a play session that two devices both think is open', () => {
-    const local = version({ sessionActive: true, updatedAt: '2026-08-05T00:00:00.000Z' });
-    const remote = version({ sessionActive: true, updatedAt: '2026-08-06T00:00:00.000Z' });
-
-    expect(resolveConflict('play_session', local, remote, SYNCED_AT)).toEqual({
-      kind: 'needs-review',
-      reason: 'both-sessions-active',
-    });
-    // The same shape on a toy is not a session conflict.
-    expect(resolveConflict('toy', local, remote, SYNCED_AT).kind).toBe('take-remote');
-  });
-
-  it('refuses to guess when both sides carry the same timestamp', () => {
-    const at = '2026-08-05T00:00:00.000Z';
-    expect(resolveConflict('room', version({ updatedAt: at }), version({ updatedAt: at }), SYNCED_AT)).toEqual({
-      kind: 'needs-review',
-      reason: 'same-timestamp',
-    });
-  });
-
-  it('falls back to the newer edit only for non-destructive changes', () => {
-    const local = version({ updatedAt: '2026-08-05T00:00:00.000Z' });
-    const remote = version({ updatedAt: '2026-08-06T00:00:00.000Z' });
-    expect(resolveConflict('room', local, remote, SYNCED_AT)).toEqual({ kind: 'take-remote' });
-    expect(resolveConflict('room', remote, local, SYNCED_AT)).toEqual({ kind: 'keep-local' });
-  });
-
-  it('explains every conflict it can produce', () => {
-    for (const reason of Object.keys(CONFLICT_EXPLANATIONS)) {
-      expect(CONFLICT_EXPLANATIONS[reason as keyof typeof CONFLICT_EXPLANATIONS].length).toBeGreaterThan(0);
-    }
-    expect(isDestructive({ kind: 'needs-review', reason: 'photo-replaced' })).toBe(true);
-    expect(isDestructive({ kind: 'take-remote' })).toBe(false);
-  });
-});
 
 /* -------------------------------------------------------------------------- */
 
@@ -346,13 +247,42 @@ describe('tombstones', () => {
     await recordDeletion(fixture.database, 'toy', '7');
 
     expect(await isDeletedLocally(fixture.database, 'toy', '7')).toBe(true);
-    expect(await listTombstones(fixture.database)).toEqual([{ entity: 'toy', entityId: '7' }]);
+    expect(await listTombstones(fixture.database)).toEqual([{ entity: 'toy', entityId: '7', remoteImagePath: null }]);
+  });
+
+  it('carries the photo it deleted along with it, for later remote cleanup', async () => {
+    await recordDeletion(fixture.database, 'toy', '7', LOCAL_HOUSEHOLD_ID, 'household/7-123.jpg');
+    expect(await listTombstones(fixture.database)).toEqual([
+      { entity: 'toy', entityId: '7', remoteImagePath: 'household/7-123.jpg' },
+    ]);
   });
 
   it('treats a repeated deletion as harmless', async () => {
     await recordDeletion(fixture.database, 'toy', '7');
     await expect(recordDeletion(fixture.database, 'toy', '7')).resolves.toBeUndefined();
     expect(await listTombstones(fixture.database)).toHaveLength(1);
+  });
+
+  it('clears a tombstone once its deletion is confirmed pushed', async () => {
+    await recordDeletion(fixture.database, 'toy', '7');
+    await clearTombstone(fixture.database, 'toy', '7');
+    expect(await listTombstones(fixture.database)).toHaveLength(0);
+    expect(await isDeletedLocally(fixture.database, 'toy', '7')).toBe(false);
+  });
+
+  it('keeps two households\' tombstones for the same local id apart', async () => {
+    await fixture.database.runAsync(
+      "INSERT INTO households (id, name, created_at, updated_at) VALUES ('other-household', 'Other', '2026-01-01', '2026-01-01');",
+    );
+    await recordDeletion(fixture.database, 'toy', '7', LOCAL_HOUSEHOLD_ID);
+    await recordDeletion(fixture.database, 'toy', '7', 'other-household');
+
+    expect(await listTombstones(fixture.database, LOCAL_HOUSEHOLD_ID)).toHaveLength(1);
+    expect(await listTombstones(fixture.database, 'other-household')).toHaveLength(1);
+
+    await clearTombstone(fixture.database, 'toy', '7', LOCAL_HOUSEHOLD_ID);
+    expect(await listTombstones(fixture.database, LOCAL_HOUSEHOLD_ID)).toHaveLength(0);
+    expect(await listTombstones(fixture.database, 'other-household')).toHaveLength(1);
   });
 
   it('reports nothing for a record that was never deleted', async () => {
