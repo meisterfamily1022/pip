@@ -270,3 +270,57 @@ Suite after this pass: **659 tests across 77 suites**, tsc clean, eslint 0 error
 - **Photo reads stay servable for up to 60 seconds after deletion.** Bounded by
   `SIGNATURE_SECONDS` and enforced by signature expiry, as measured above. Lower
   the constant to shrink the window; it cannot be driven to zero from the client.
+
+## Prompt 7: live staging regression for remote-image lifecycle
+
+Run against **PiP Staging** (`jghynqqzqgdzcyhgfhsw`) through the real
+supabase-js client, real RLS and real Storage — the same calls
+`supabase-household-gateway.ts` makes, not `FakeHouseholdGateway`. Two real
+accounts, created by emailed OTP: household **A** (`…+pip-p7-a`) and household
+**B** (`…+pip-p7-b`). Production (`owfpxnbyzuohygxlqgrg`) was not linked, read,
+written or reconfigured.
+
+**24 checks: 22 passed outright, 2 resolved as the already-measured CDN
+residual rather than defects — see below. No check failed on its merits.**
+
+| Stage | Proven |
+| --- | --- |
+| Back up a toy with a photo | household row created; 48,517-byte JPEG uploaded under `<household_id>/`; toy row carries `image_path` + `image_uploaded_at` at revision 37; photo downloads **byte-identical** |
+| Replace the photo | replacement uploaded; row re-pointed at the new object; **prior object deleted only after the row was confirmed pushed**; prior object no longer listed; exactly one object remains; current photo downloads byte-identical and is the new one, not the old |
+| Delete the toy | `deleted_at` written (revision 39), so the remote row resolves as a tombstone rather than vanishing; the toy's image removed; a freshly minted signature for it is refused `Object not found` |
+| Second household | B cannot download, cannot sign, cannot list A's folder, **cannot delete** A's image (it survived B's `remove()` intact), and cannot read A's toy rows — every answer empty or refused, before *and* after deletion |
+| Orphans | `list` for the test household returns **zero objects** after the cycle |
+| Cleanup | both test users deleted through the `delete-account` Edge Function (`{"deleted": true}`); their tokens no longer resolve |
+
+### The two non-defects, disambiguated rather than waved through
+
+Immediately after deletion, `.download()` still returned bytes **to the same
+client instance that had fetched that URL before deletion**. That is the
+per-caller CDN edge cache already measured in this document, not a live object.
+Proven by re-probing with a client that had never fetched it:
+
+```
+fresh signature mint      : REFUSED (Object not found)
+fresh-client download     : REFUSED (Object not found)
+cache-busted origin probe : 400 BYPASS
+list                      : 0 object(s)
+```
+
+The object is gone at origin. Household B was refused throughout, so nothing
+leaked to anyone else. The window is bounded by `SIGNATURE_SECONDS` (60s) and is
+a constant in the code, not a property of the CDN.
+
+### Manual add: real rapid double-tap
+
+Two taps fired back-to-back on **Save toy** in the simulator, no wait between
+them. Library reported "Search 2 toys", and the device database held exactly one
+new row:
+
+```
+1|Prompt7 Toy A|manual-1787405956965-igd5d4namnq
+2|DoubleTapProbe|manual-1787443508828-177cgospyls
+```
+
+One `DoubleTapProbe` row, carrying the per-screen `intakeKey` the fix
+introduced. The protection is at the service/database layer, so it holds
+whether or not the button had been disabled in time.
