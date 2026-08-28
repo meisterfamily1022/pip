@@ -26,7 +26,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "server",
+      "output": "static",
       "favicon": "./assets/brand/generated/pip-favicon.png"
     },
     "plugins": [
