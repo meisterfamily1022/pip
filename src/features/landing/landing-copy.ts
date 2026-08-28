@@ -136,4 +136,7 @@ export const landingNav = {
  * worse than no privacy link, so `landing.test.ts` asserts each target has a
  * route file behind it.
  */
-export const landingFooterLinks = [{ id: 'privacy', label: 'Privacy notice', href: '/privacy' }] as const;
+export const landingFooterLinks = [
+  { id: 'support', label: 'Support', href: '/support' },
+  { id: 'privacy', label: 'Privacy notice', href: '/privacy' },
+] as const;
